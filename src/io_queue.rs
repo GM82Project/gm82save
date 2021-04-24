@@ -2,7 +2,7 @@ use std::{
     io::{Error, ErrorKind, Write},
     mem::take,
     path::{Path, PathBuf},
-    sync::mpsc::{sync_channel, Receiver, SyncSender},
+    sync::mpsc::{channel, sync_channel, Receiver, Sender, SyncSender},
     thread::{spawn, JoinHandle},
 };
 
@@ -42,13 +42,13 @@ impl IOThread {
 
 pub struct IOController {
     handle: JoinHandle<Result<(), ()>>,
-    pub(self) queue: SyncSender<Command>,
+    pub(self) queue: Sender<Command>,
     pub(self) error: Receiver<Error>,
 }
 
 impl IOController {
     pub fn new() -> Self {
-        let (queue_tx, queue_rx) = sync_channel(2);
+        let (queue_tx, queue_rx) = channel();
         let (error_tx, error_rx) = sync_channel(0);
         Self { handle: spawn(move || IOThread::new(queue_rx, error_tx).run_thread()), queue: queue_tx, error: error_rx }
     }
