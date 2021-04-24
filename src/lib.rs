@@ -11,13 +11,14 @@ use crate::{
 };
 use ctor::ctor;
 use std::{
+    collections::{HashMap, HashSet},
     convert::TryFrom,
     ffi::{OsStr, OsString},
     fmt::Formatter,
     io::Write,
     os::windows::ffi::{OsStrExt, OsStringExt},
     path::PathBuf,
-    slice,
+    slice, str,
 };
 use winapi::{
     ctypes::wchar_t,
@@ -483,6 +484,80 @@ unsafe fn save_object(obj: &Object, path: &mut PathBuf, controller: &IOControlle
     Ok(())
 }
 
+unsafe fn save_tiles(tiles: &[Tile], path: &mut PathBuf, controller: &IOController) -> Result<()> {
+    let mut layers = HashMap::new();
+    for tile in tiles {
+        let f = match layers.entry(tile.depth) {
+            std::collections::hash_map::Entry::Occupied(e) => e.into_mut(),
+            std::collections::hash_map::Entry::Vacant(e) => {
+                path.push(format!("{}.txt", tile.depth));
+                let f = e.insert(controller.open_file(&path)?);
+                path.pop();
+                f
+            },
+        };
+        writeln!(
+            f,
+            "{},{},{},{},{},{},{},{}",
+            get_asset_name(BACKGROUND_NAMES, BACKGROUND_COUNT, tile.source_bg),
+            tile.x,
+            tile.y,
+            tile.u,
+            tile.v,
+            tile.width,
+            tile.height,
+            u8::from(tile.locked)
+        )?;
+    }
+    path.push("layers.txt");
+    let mut f = controller.open_file(&path)?;
+    for depth in layers.keys() {
+        writeln!(f, "{}", depth)?;
+    }
+    path.pop();
+    Ok(())
+}
+
+fn save_instances(instances: &[Instance], path: &mut PathBuf, controller: &IOController) -> Result<()> {
+    path.push("instances.txt");
+    let mut f = controller.open_file(&path)?;
+    path.pop();
+    let mut codes = HashSet::with_capacity(instances.len());
+    for instance in instances {
+        let code = try_decode(instance.creation_code)?;
+        let mut hash_hex = [0; 8];
+        let fname = if code.len() != 0 {
+            let hash = crc::crc32::checksum_ieee(code.as_ref());
+            for i in 0..8 {
+                hash_hex[7 - i] = match (hash >> i) & 0xf {
+                    i if i < 10 => b'0' + i as u8,
+                    i => b'A' - 10 + i as u8,
+                };
+            }
+            let fname = unsafe { str::from_utf8_unchecked(&hash_hex) };
+            if !codes.insert(hash) {
+                path.push(fname);
+                path.set_extension("gml");
+                controller.write_file(&path, code.into())?;
+                path.pop();
+            }
+            fname
+        } else {
+            ""
+        };
+        writeln!(
+            f,
+            "{},{},{},{},{}",
+            get_asset_name(OBJECT_NAMES, OBJECT_COUNT, instance.object),
+            instance.x,
+            instance.y,
+            fname,
+            u8::from(instance.locked),
+        )?;
+    }
+    Ok(())
+}
+
 unsafe fn save_room(room: &Room, path: &mut PathBuf, controller: &IOController) -> Result<()> {
     std::fs::create_dir_all(&path)?;
     path.push("room.txt");
@@ -550,10 +625,12 @@ unsafe fn save_room(room: &Room, path: &mut PathBuf, controller: &IOController) 
     path.push("code.gml");
     std::fs::write(&path, try_decode(room.creation_code)?)?;
     path.pop();
-    let _tiles = slice::from_raw_parts(room.tiles, room.tile_count as usize);
-    // TODO
-    let _instances = slice::from_raw_parts(room.instances, room.instance_count as usize);
-    // TODO
+
+    let tiles = slice::from_raw_parts(room.tiles, room.tile_count as usize);
+    save_tiles(tiles, path, controller)?;
+
+    let instances = slice::from_raw_parts(room.instances, room.instance_count as usize);
+    save_instances(instances, path, controller)?;
     Ok(())
 }
 
@@ -693,9 +770,10 @@ unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
             *settings::VERSION_BUILD
         )?;
         writeln!(f)?;
-        // TODO move this elsewhere
+        /*
         writeln!(f, "last_instance_id={}", *LAST_INSTANCE_ID)?;
         writeln!(f, "last_tile_id={}", *LAST_TILE_ID)?;
+         */
     }
     path.pop();
     advance_progress_form(5);

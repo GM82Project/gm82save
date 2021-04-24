@@ -7,6 +7,7 @@ edition = "2018"
 crate-type = ["cdylib"]
 
 [dependencies]
+crc = "1.8"
 ctor = "0.1.20"
 image = "0.23.14"
 phf = { version = "0.7.24", features = ["macros"] }
