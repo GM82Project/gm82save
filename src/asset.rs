@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+use crate::delphi::TStream;
+
 type WStr = *const u16;
 
 #[repr(C)]
@@ -22,7 +24,7 @@ pub struct Sound {
     pub volume: f64,
     pub pan: f64,
     pub preload: bool,
-    pub data: *const u8,
+    pub data: *const TStream,
 }
 
 #[repr(C)]

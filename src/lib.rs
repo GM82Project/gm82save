@@ -131,6 +131,10 @@ const CONSTANT_COUNT: IntPtr = 0x77f3c4 as _;
 const CONSTANT_NAMES: WStrListPtr = 0x78c14c as _;
 const CONSTANT_VALUES: WStrListPtr = 0x78c150 as _;
 
+const SOUNDS: AssetList<Sound> = 0x77f2b8 as _;
+const SOUND_NAMES: WStrListPtr = 0x77f2c0 as _;
+const SOUND_COUNT: IntPtr = 0x77f2c8 as _;
+
 const SPRITE_COUNT: IntPtr = 0x77f4d8 as _;
 const SPRITE_NAMES: WStrListPtr = 0x77f4cc as _;
 const SPRITES: AssetList<Sprite> = 0x77f4c4 as _;
@@ -239,6 +243,30 @@ unsafe fn save_frame(frame: &Frame, path: &std::path::Path, controller: &IOContr
             image::ColorType::Rgba8,
         )
         .map_err(|_| Error::Other(format!("failed to save frame {}", path.to_string_lossy())))?;
+    Ok(())
+}
+
+unsafe fn save_sound(sound: &Sound, path: &mut PathBuf, controller: &IOController) -> Result<()> {
+    let extension = try_decode(sound.extension)?;
+    path.set_extension(extension.trim_matches('.'));
+    if let Some(data) = sound.data.as_ref() {
+        let old_pos = data.get_pos();
+        data.set_pos(0);
+        let len = data.get_size() as usize;
+        let mut s = Vec::with_capacity(len);
+        s.set_len(len);
+        data.read(s.as_mut_ptr(), len as _);
+        data.set_pos(old_pos);
+        controller.write_file(path, s)?;
+    }
+    path.set_extension("txt");
+    let mut f = controller.open_file(&path)?;
+    writeln!(f, "extension={}", extension)?;
+    writeln!(f, "kind={}", sound.kind)?;
+    writeln!(f, "effects={}", sound.effects)?;
+    writeln!(f, "volume={}", sound.volume)?;
+    writeln!(f, "pan={}", sound.pan)?;
+    writeln!(f, "preload={}", u8::from(sound.preload))?;
     Ok(())
 }
 
@@ -669,7 +697,7 @@ unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
     advance_progress_form(10);
     // triggers
     advance_progress_form(15);
-    // sounds
+    save_assets(15, 30, "sounds", SOUNDS, SOUND_NAMES, SOUND_COUNT, RT_SOUNDS, save_sound, &mut path, &controller)?;
     advance_progress_form(30);
     save_assets(
         30,

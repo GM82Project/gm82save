@@ -116,6 +116,43 @@ impl TGraphic {
     }
 }
 
+pub struct TStream {}
+
+impl TStream {
+    pub unsafe fn get_pos(&self) -> u32 {
+        delphi_call!(0x43f234, self)
+    }
+
+    pub unsafe fn set_pos(&self, pos: u32) {
+        asm! {
+            "push edx",
+            "push 0",
+            "mov ecx,{call}",
+            "call ecx",
+            call = const 0x43f254,
+            inlateout("eax") self => _,
+            inlateout("edx") pos => _,
+            lateout("ecx") _,
+        };
+    }
+
+    pub unsafe fn get_size(&self) -> u32 {
+        let out;
+        asm! {
+            "mov ecx,[eax]",
+            "call [ecx]",
+            inlateout("eax") self => out,
+            lateout("edx") _,
+            lateout("ecx") _,
+        };
+        out
+    }
+
+    pub unsafe fn read(&self, buf: *mut u8, count: u32) {
+        let _: u32 = delphi_call!(0x43f488, self, buf, count);
+    }
+}
+
 // weird name for an allocator function
 pub unsafe fn GetMem<T>(size: u32) -> *const T {
     delphi_call!(0x40431c, size)
