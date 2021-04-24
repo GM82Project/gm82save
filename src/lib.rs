@@ -691,17 +691,26 @@ unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
         let mut f = controller.open_file(&path)?;
         writeln!(f, "gameid={}", ide::GAME_ID.read())?;
         writeln!(f)?;
-        writeln!(f, "company={}", try_decode(*settings::COMPANY)?)?;
-        writeln!(f, "product={}", try_decode(*settings::PRODUCT)?)?;
-        writeln!(f, "copyright={}", try_decode(*settings::COPYRIGHT)?)?;
-        writeln!(f, "description={}", try_decode(*settings::DESCRIPTION)?)?;
+        writeln!(f, "info_author={}", try_decode(&*ide::settings::INFO_AUTHOR)?)?;
+        writeln!(f, "info_version={}", try_decode(&*ide::settings::INFO_VERSION)?)?;
+        writeln!(f, "info_timestamp={}", delphi::Now())?;
         writeln!(
             f,
-            "version={}.{}.{}.{}",
-            *settings::VERSION_MAJOR,
-            *settings::VERSION_MINOR,
-            *settings::VERSION_RELEASE,
-            *settings::VERSION_BUILD
+            "info_information={}",
+            try_decode(&*ide::settings::INFO_INFORMATION)?.replace('\\', "\\\\").replace('\n', "\\n")
+        )?;
+        writeln!(f)?;
+        writeln!(f, "exe_company={}", try_decode(&*ide::settings::EXE_COMPANY)?)?;
+        writeln!(f, "exe_product={}", try_decode(&*ide::settings::EXE_PRODUCT)?)?;
+        writeln!(f, "exe_copyright={}", try_decode(&*ide::settings::EXE_COPYRIGHT)?)?;
+        writeln!(f, "exe_description={}", try_decode(&*ide::settings::EXE_DESCRIPTION)?)?;
+        writeln!(
+            f,
+            "exe_version={}.{}.{}.{}",
+            *ide::settings::VERSION_MAJOR,
+            *ide::settings::VERSION_MINOR,
+            *ide::settings::VERSION_RELEASE,
+            *ide::settings::VERSION_BUILD
         )?;
         writeln!(f)?;
         /*

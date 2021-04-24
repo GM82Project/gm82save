@@ -124,10 +124,10 @@ pub mod settings {
     pub const VERSION_MINOR: *const u32 = 0x77f5b8 as _;
     pub const VERSION_RELEASE: *const u32 = 0x77f5bc as _;
     pub const VERSION_BUILD: *const u32 = 0x77f5c0 as _;
-    pub const COMPANY: *const UStr = 0x77f5c4 as _;
-    pub const PRODUCT: *const UStr = 0x77f5c8 as _;
-    pub const COPYRIGHT: *const UStr = 0x77f5cc as _;
-    pub const DESCRIPTION: *const UStr = 0x77f5d0 as _;
+    pub const EXE_COMPANY: *const UStr = 0x77f5c4 as _;
+    pub const EXE_PRODUCT: *const UStr = 0x77f5c8 as _;
+    pub const EXE_COPYRIGHT: *const UStr = 0x77f5cc as _;
+    pub const EXE_DESCRIPTION: *const UStr = 0x77f5d0 as _;
 }
 
 pub mod game_info {
