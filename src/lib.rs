@@ -28,12 +28,14 @@ use winapi::{
     },
 };
 
-unsafe fn decode_pas_str(str: *const u16) -> OsString {
+fn decode_pas_str(str: *const u16) -> OsString {
     if str.is_null() {
         OsString::new()
     } else {
-        let len = str.cast::<u32>().sub(1).read();
-        OsString::from_wide(slice::from_raw_parts(str, len as usize))
+        unsafe {
+            let len = str.cast::<u32>().sub(1).read();
+            OsString::from_wide(slice::from_raw_parts(str, len as usize))
+        }
     }
 }
 
@@ -56,8 +58,8 @@ unsafe fn write_tree_children<F: Write>(parent: &delphi::TTreeNode, tabs: &mut S
     Ok(())
 }
 
-unsafe fn try_decode(name: *const u16) -> Result<String> {
-    decode_pas_str(name).into_string().map_err(|e| Error::UnicodeError(e.to_string_lossy().into()))
+fn try_decode(name: *const u16) -> Result<String> {
+    unsafe { decode_pas_str(name).into_string().map_err(|e| Error::UnicodeError(e.to_string_lossy().into())) }
 }
 
 type IntPtr = *const u32;
@@ -217,18 +219,22 @@ impl From<image::ImageError> for Error {
     }
 }
 
-unsafe fn get_asset<'a, T>(assets: AssetList<T>, count: IntPtr, id: i32) -> Option<&'a T> {
-    let assets = slice::from_raw_parts(assets.read(), count.read() as _);
-    assets.get(usize::try_from(id).ok()?)?.as_ref()
+fn get_asset<'a, T>(assets: AssetList<T>, count: IntPtr, id: i32) -> Option<&'a T> {
+    unsafe {
+        let assets = slice::from_raw_parts(assets.read(), count.read() as _);
+        assets.get(usize::try_from(id).ok()?)?.as_ref()
+    }
 }
 
-unsafe fn get_asset_name(names: WStrListPtr, count: IntPtr, id: i32) -> String {
-    let names = slice::from_raw_parts(names.read(), count.read() as _);
-    usize::try_from(id)
-        .ok()
-        .and_then(|id| names.get(id))
-        .and_then(|&s| decode_pas_str(s).into_string().ok())
-        .unwrap_or(String::new())
+fn get_asset_name(names: WStrListPtr, count: IntPtr, id: i32) -> String {
+    unsafe {
+        let names = slice::from_raw_parts(names.read(), count.read() as _);
+        usize::try_from(id)
+            .ok()
+            .and_then(|id| names.get(id))
+            .and_then(|&s| decode_pas_str(s).into_string().ok())
+            .unwrap_or(String::new())
+    }
 }
 
 type Result<T> = std::result::Result<T, Error>;
