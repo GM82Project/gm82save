@@ -155,7 +155,7 @@ impl<'a> Write for IORequest<'a> {
             }
         } else {
             if self.buffer.len() + buf.len() > self.buffer.capacity() {
-                self.buffer.reserve(buf.len() - self.buffer.len() + DEFAULT_CAPACITY);
+                self.buffer.reserve(buf.len() + DEFAULT_CAPACITY);
             }
             self.buffer.extend_from_slice(buf);
         }
