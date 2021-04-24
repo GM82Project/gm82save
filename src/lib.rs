@@ -333,7 +333,7 @@ unsafe fn save_event<F: Write>(ev: &Event, name: &str, file: &mut F) -> Result<(
     let actions = slice::from_raw_parts(ev.actions, ev.action_count as usize);
     for action in actions {
         let action = &**action;
-        let code = try_decode(action.fn_code)?;
+        let code = try_decode(action.param_strings[0])?;
         write!(file, "{}", &code)?;
         if !code.ends_with('\n') {
             writeln!(file)?;
