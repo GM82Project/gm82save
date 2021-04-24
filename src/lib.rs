@@ -253,18 +253,23 @@ unsafe fn save_frame(frame: &Frame, path: &std::path::Path, controller: &IOContr
     Ok(())
 }
 
+unsafe fn save_stream(data: &delphi::TStream, path: &std::path::Path, controller: &IOController) -> Result<()> {
+    let old_pos = data.get_pos();
+    data.set_pos(0);
+    let len = data.get_size() as usize;
+    let mut s = Vec::with_capacity(len);
+    s.set_len(len);
+    data.read(s.as_mut_ptr(), len as _);
+    data.set_pos(old_pos);
+    controller.write_file(path, s)?;
+    Ok(())
+}
+
 unsafe fn save_sound(sound: &Sound, path: &mut PathBuf, controller: &IOController) -> Result<()> {
     let extension = try_decode(sound.extension)?;
     path.set_extension(extension.trim_matches('.'));
     if let Some(data) = sound.data.as_ref() {
-        let old_pos = data.get_pos();
-        data.set_pos(0);
-        let len = data.get_size() as usize;
-        let mut s = Vec::with_capacity(len);
-        s.set_len(len);
-        data.read(s.as_mut_ptr(), len as _);
-        data.set_pos(old_pos);
-        controller.write_file(path, s)?;
+        save_stream(data, &path, controller)?;
     }
     path.set_extension("txt");
     let mut f = controller.open_file(&path)?;
@@ -785,6 +790,44 @@ unsafe fn save_assets<T>(
     Ok(())
 }
 
+unsafe fn save_included_files(path: &mut PathBuf, controller: &IOController) -> Result<()> {
+    path.push("datafiles");
+    path.push("include");
+    std::fs::create_dir_all(&path)?;
+    path.pop();
+    path.push("index.txt");
+    let mut index = controller.open_file(&path)?;
+    path.pop();
+    let files = slice::from_raw_parts(INCLUDED_FILES.read(), INCLUDED_FILE_COUNT.read() as usize);
+    for file in files {
+        let file = &**file;
+        let mut name = try_decode(file.file_name)?;
+        writeln!(index, "{}", &name)?;
+        if file.data_exists && file.stored_in_gmk {
+            if let Some(stream) = file.data.as_ref() {
+                path.push("include");
+                path.push(&name);
+                save_stream(stream, &path, controller)?;
+                path.pop();
+                path.pop();
+            }
+        }
+        name += ".txt";
+        path.push(&name);
+        let mut f = controller.open_file(&path)?;
+        writeln!(f, "store={}", u8::from(file.stored_in_gmk))?;
+        writeln!(f, "free={}", u8::from(file.free_memory))?;
+        writeln!(f, "overwrite={}", u8::from(file.overwrite_file))?;
+        writeln!(f, "remove={}", u8::from(file.remove_at_end))?;
+        writeln!(f, "export={}", file.export_setting)?;
+        if file.export_setting == 3 {
+            writeln!(f, "export_folder={}", try_decode(file.export_custom_folder)?)?;
+        }
+    }
+    path.pop();
+    Ok(())
+}
+
 unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
     let controller = io_queue::IOController::new();
     {
@@ -889,7 +932,8 @@ unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
     advance_progress_form(90);
     save_assets(90, 95, "rooms", ROOMS, ROOM_NAMES, ROOM_COUNT, RT_ROOMS, save_room, &mut path, &controller)?;
     advance_progress_form(95);
-    // included files
+    save_included_files(&mut path, &controller)?;
+    // no game information or library init code
 
     controller.finish()?;
     advance_progress_form(100);

@@ -255,7 +255,7 @@ pub struct IncludedFile {
     pub data_exists: bool,
     pub source_length: u32,
     pub stored_in_gmk: bool,
-    pub data: *const u8,
+    pub data: *const TStream,
     pub export_setting: u32,
     pub export_custom_folder: WStr,
     pub overwrite_file: bool,
