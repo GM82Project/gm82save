@@ -1,3 +1,5 @@
+#![allow(non_snake_case, dead_code)]
+
 type WStr = *const u16;
 
 macro_rules! delphi_call {

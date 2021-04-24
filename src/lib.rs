@@ -70,6 +70,7 @@ const LAST_INSTANCE_ID: IntPtr = 0x77f2e0 as _;
 const LAST_TILE_ID: IntPtr = 0x77f2e4 as _;
 
 mod settings {
+    #![allow(dead_code)]
     use crate::delphi::TGraphic;
     use winapi::ctypes::wchar_t;
 
@@ -355,6 +356,7 @@ unsafe fn save_timeline(tl: &Timeline, path: &mut PathBuf, controller: &IOContro
 }
 
 mod events {
+    #![allow(dead_code)]
     pub const EV_CREATE: usize = 0;
     pub const EV_DESTROY: usize = 1;
     pub const EV_STEP: usize = 2;
@@ -515,9 +517,9 @@ unsafe fn save_room(room: &Room, path: &mut PathBuf, controller: &IOController) 
     path.push("code.gml");
     std::fs::write(&path, try_decode(room.creation_code)?)?;
     path.pop();
-    let tiles = slice::from_raw_parts(room.tiles, room.tile_count as usize);
+    let _tiles = slice::from_raw_parts(room.tiles, room.tile_count as usize);
     // TODO
-    let instances = slice::from_raw_parts(room.instances, room.instance_count as usize);
+    let _instances = slice::from_raw_parts(room.instances, room.instance_count as usize);
     // TODO
     Ok(())
 }

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 type WStr = *const u16;
 
 #[repr(C)]
