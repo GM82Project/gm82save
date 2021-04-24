@@ -1,15 +1,13 @@
 #![allow(dead_code)]
 
-use crate::delphi::TStream;
-
-type WStr = *const u16;
+use crate::delphi::{TStream, UStr};
 
 #[repr(C)]
 pub struct Trigger {
     exists: u32,
-    pub name: WStr,
-    pub condition: WStr,
-    pub constant_name: WStr,
+    pub name: UStr,
+    pub condition: UStr,
+    pub constant_name: UStr,
     pub kind: u32,
 }
 
@@ -17,9 +15,9 @@ pub struct Trigger {
 pub struct Sound {
     exists: u32,
     pub kind: u32,
-    pub extension: WStr,
+    pub extension: UStr,
     pub effects: u32,
-    pub source: WStr,
+    pub source: UStr,
     pub padding: u32, // ???
     pub volume: f64,
     pub pan: f64,
@@ -89,13 +87,13 @@ pub struct Path {
 #[repr(C)]
 pub struct Script {
     exists: u32,
-    pub source: WStr,
+    pub source: UStr,
 }
 
 #[repr(C)]
 pub struct Font {
     exists: u32,
-    pub sys_name: WStr,
+    pub sys_name: UStr,
     pub size: u32,
     pub bold: bool,
     pub italic: bool,
@@ -115,13 +113,13 @@ pub struct Action {
     pub is_condition: bool,
     pub applies_to_something: bool,
     pub execution_type: u32,
-    pub fn_name: WStr,
-    pub fn_code: WStr,
+    pub fn_name: UStr,
+    pub fn_code: UStr,
     pub param_count: u32,
     pub param_types: [u32; 8],
     pub applies_to: i32,
     pub is_relative: bool,
-    pub param_strings: [WStr; 8],
+    pub param_strings: [UStr; 8],
     pub invert_condition: bool,
 }
 
@@ -191,7 +189,7 @@ pub struct Instance {
     pub y: i32,
     pub object: i32,
     pub id: u32,
-    pub creation_code: WStr,
+    pub creation_code: UStr,
     pub locked: bool,
 }
 
@@ -212,7 +210,7 @@ pub struct Tile {
 #[repr(C)]
 pub struct Room {
     exists: u32,
-    pub caption: WStr,
+    pub caption: UStr,
     pub speed: u32,
     pub width: u32,
     pub height: u32,
@@ -226,7 +224,7 @@ pub struct Room {
     pub views_enabled: bool,
     pub clear_view: bool,
     pub views: [View; 8],
-    pub creation_code: WStr,
+    pub creation_code: UStr,
     pub instance_count: u32,
     pub instances: *const Instance,
     pub tile_count: u32,
@@ -250,14 +248,14 @@ pub struct Room {
 #[repr(C)]
 pub struct IncludedFile {
     exists: u32,
-    pub file_name: WStr,
-    pub source_path: WStr,
+    pub file_name: UStr,
+    pub source_path: UStr,
     pub data_exists: bool,
     pub source_length: u32,
     pub stored_in_gmk: bool,
     pub data: *const TStream,
     pub export_setting: u32,
-    pub export_custom_folder: WStr,
+    pub export_custom_folder: UStr,
     pub overwrite_file: bool,
     pub free_memory: bool,
     pub remove_at_end: bool,
@@ -266,12 +264,12 @@ pub struct IncludedFile {
 #[repr(C)]
 pub struct Extension {
     exists: u32,
-    pub name: WStr,
+    pub name: UStr,
     // other stuff that doesn't get written to the gmk
 }
 
 #[repr(C)]
 pub struct Library {
     stuff: [u8; 0x24], // ???
-    pub init_code: WStr,
+    pub init_code: UStr,
 }

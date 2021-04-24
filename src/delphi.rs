@@ -1,6 +1,10 @@
 #![allow(non_snake_case, dead_code)]
 
-type WStr = *const u16;
+use std::{
+    ffi::{OsStr, OsString},
+    os::windows::ffi::{OsStrExt, OsStringExt},
+    slice,
+};
 
 macro_rules! delphi_call {
     ($call: literal) => {{
@@ -42,14 +46,13 @@ macro_rules! delphi_call {
     ($call: literal, $a: expr, $b: expr, $c: expr) => {{
         let out;
         asm! {
-            "push ebx",
             "mov ebx, {call}",
             "call ebx",
-            "pop ebx",
             call = const $call,
             inlateout("eax") $a => out,
             inlateout("edx") $b => _,
             inlateout("ecx") $c => _,
+            lateout("ebx") _,
         };
         out
     }};
@@ -67,7 +70,7 @@ pub struct TreeNodeData {
 #[repr(C)]
 pub struct TTreeNode {
     unknown: u64,
-    pub name: WStr,
+    pub name: UStr,
     pub data: *const TreeNodeData,
 }
 
@@ -93,8 +96,8 @@ impl TTreeNode {
 pub struct TTreeNodes {}
 
 impl TTreeNodes {
-    pub unsafe fn AddChild(&self, parent: *const TTreeNode, s: WStr) {
-        let _: u32 = delphi_call!(0x4ae1e8, self, parent, s);
+    pub unsafe fn AddChild(&self, parent: *const TTreeNode, s: &UStr) {
+        let _: u32 = delphi_call!(0x4ae1e8, self, parent, s.0);
     }
 
     pub unsafe fn Clear(&self) {
@@ -105,14 +108,14 @@ impl TTreeNodes {
 pub struct TGraphic {}
 
 impl TGraphic {
-    pub unsafe fn SaveToFile(&self, filename: WStr) {
+    pub unsafe fn SaveToFile(&self, filename: &UStr) {
         // NOTE: FILENAME MUST BE FULLY FORMED
-        let _: u32 = delphi_call!(0x45e6d8, self, filename);
+        let _: u32 = delphi_call!(0x45e6d8, self, filename.0);
     }
 
-    pub unsafe fn LoadFromFile(&self, filename: WStr) {
+    pub unsafe fn LoadFromFile(&self, filename: &UStr) {
         // NOTE: FILENAME MUST BE FULLY FORMED
-        let _: u32 = delphi_call!(0x45e64c, self, filename);
+        let _: u32 = delphi_call!(0x45e64c, self, filename.0);
     }
 }
 
@@ -153,6 +156,14 @@ impl TStream {
     }
 }
 
+pub struct TStrings {}
+
+impl TStrings {
+    pub unsafe fn SaveToFile(&self, fname: &UStr) {
+        let _: u32 = delphi_call!(0x43e204, self, fname.0);
+    }
+}
+
 // weird name for an allocator function
 pub unsafe fn GetMem<T>(size: u32) -> *const T {
     delphi_call!(0x40431c, size)
@@ -162,22 +173,73 @@ pub unsafe fn FreeMem<T>(mem: *const T) {
     let _: u32 = delphi_call!(0x404338, mem);
 }
 
-pub unsafe fn UStrFromPCharLen(dest: *const WStr, source: *const u8, length: usize) {
+pub unsafe fn UStrFromPCharLen(dest: &mut UStr, source: *const u8, length: usize) {
     let _: u32 = delphi_call!(0x407fe4, dest, source, length);
 }
 
-pub unsafe fn UStrFromPWCharLen(dest: *const WStr, source: *const u16, length: usize) {
+pub unsafe fn UStrFromPWCharLen(dest: &mut UStr, source: *const u16, length: usize) {
     let _: u32 = delphi_call!(0x407ff4, dest, source, length);
 }
 
-pub unsafe fn UStrClr(str: *mut WStr) {
-    let _: u32 = delphi_call!(0x407ea8, str);
+pub unsafe fn UStrClr(str: &mut UStr) {
+    let _: u32 = delphi_call!(0x407ea8, str.0);
 }
 
-pub unsafe fn ShowMessage(msg: WStr) {
-    let _: u32 = delphi_call!(0x4d43f8, msg);
+#[repr(transparent)]
+pub struct UStr(pub(self) *const u16);
+
+impl UStr {
+    pub fn new(s: &OsStr) -> Self {
+        let mut out = UStr(std::ptr::null());
+        let s = s.encode_wide().collect::<Vec<_>>();
+        unsafe {
+            UStrFromPWCharLen(&mut out, s.as_ptr(), s.len());
+        }
+        out
+    }
+
+    pub fn to_os_string(&self) -> OsString {
+        if self.0.is_null() {
+            OsString::new()
+        } else {
+            unsafe {
+                let len = self.0.cast::<u32>().sub(1).read();
+                OsString::from_wide(slice::from_raw_parts(self.0, len as usize))
+            }
+        }
+    }
 }
 
-pub unsafe fn advance_progress_form(progress: u32) {
-    let _: u32 = delphi_call!(0x6ca2ac, progress);
+impl Drop for UStr {
+    fn drop(&mut self) {
+        unsafe { UStrClr(self) }
+    }
+}
+
+pub unsafe fn ShowMessage(msg: &UStr) {
+    let _: u32 = delphi_call!(0x4d43f8, msg.0);
+}
+
+pub fn advance_progress_form(progress: u32) {
+    unsafe {
+        let _: u32 = delphi_call!(0x6ca2ac, progress);
+    }
+}
+
+pub unsafe fn Now() -> f64 {
+    let out: f64;
+    asm! {
+        "mov ecx, {call}",
+        "call ecx",
+        "sub esp,8",
+        "fstp qword ptr [esp]",
+        "movsd {out}, [esp]",
+        "add esp,8",
+        call = const 0x4199b0,
+        out = lateout(xmm_reg) out,
+        lateout("eax") _,
+        lateout("edx") _,
+        lateout("ecx") _,
+    };
+    out
 }
