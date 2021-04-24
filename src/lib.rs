@@ -21,7 +21,7 @@ use std::{
     slice, str,
 };
 use winapi::um::{
-    memoryapi::{FreeUserPhysicalPages, VirtualProtect},
+    memoryapi::VirtualProtect,
     processthreadsapi::{FlushInstructionCache, GetCurrentProcess},
     winnt::PAGE_READWRITE,
 };
