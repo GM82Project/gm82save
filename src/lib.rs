@@ -705,6 +705,16 @@ unsafe fn save_settings(path: &mut PathBuf, controller: &IOController) -> Result
     path.push("icon.ico");
     (&*ICON.read()).SaveToFile(DelphiUStr::new(path.as_ref()).0);
     path.pop();
+    path.push("extensions.txt");
+    let extensions = slice::from_raw_parts(EXTENSIONS.read(), EXTENSION_COUNT.read() as usize);
+    let extensions_loaded = slice::from_raw_parts(EXTENSIONS_LOADED.read(), EXTENSION_COUNT.read() as usize);
+    let mut f = controller.open_file(&path)?;
+    for (extension, &loaded) in extensions.iter().zip(extensions_loaded) {
+        if loaded {
+            writeln!(f, "{}", try_decode((&**extension).name)?)?;
+        }
+    }
+    path.pop();
     path.pop();
     Ok(())
 }
