@@ -599,6 +599,8 @@ unsafe fn save_settings(path: &mut PathBuf, controller: &IOController) -> Result
 }
 
 unsafe fn save_assets<T>(
+    bar_start: u32,
+    bar_end: u32,
     name: &str,
     assets: AssetList<T>,
     names: WStrListPtr,
@@ -626,6 +628,7 @@ unsafe fn save_assets<T>(
         } else {
             writeln!(index, "")?;
         }
+        advance_progress_form(bar_start + (bar_end - bar_start) * i as u32 / count as u32);
     }
     path.push("tree.yyd");
     if let Some(tree) = tree.as_ref() {
@@ -668,9 +671,22 @@ unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
     advance_progress_form(15);
     // sounds
     advance_progress_form(30);
-    save_assets("sprites", SPRITES, SPRITE_NAMES, SPRITE_COUNT, RT_SPRITES, save_sprite, &mut path, &controller)?;
+    save_assets(
+        30,
+        55,
+        "sprites",
+        SPRITES,
+        SPRITE_NAMES,
+        SPRITE_COUNT,
+        RT_SPRITES,
+        save_sprite,
+        &mut path,
+        &controller,
+    )?;
     advance_progress_form(55);
     save_assets(
+        55,
+        65,
         "backgrounds",
         BACKGROUNDS,
         BACKGROUND_NAMES,
@@ -681,13 +697,26 @@ unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
         &controller,
     )?;
     advance_progress_form(65);
-    save_assets("paths", PATHS, PATH_NAMES, PATH_COUNT, RT_PATHS, save_path, &mut path, &controller)?;
+    save_assets(65, 70, "paths", PATHS, PATH_NAMES, PATH_COUNT, RT_PATHS, save_path, &mut path, &controller)?;
     advance_progress_form(70);
-    save_assets("scripts", SCRIPTS, SCRIPT_NAMES, SCRIPT_COUNT, RT_SCRIPTS, save_script, &mut path, &controller)?;
+    save_assets(
+        70,
+        75,
+        "scripts",
+        SCRIPTS,
+        SCRIPT_NAMES,
+        SCRIPT_COUNT,
+        RT_SCRIPTS,
+        save_script,
+        &mut path,
+        &controller,
+    )?;
     advance_progress_form(75);
-    save_assets("fonts", FONTS, FONT_NAMES, FONT_COUNT, RT_FONTS, save_font, &mut path, &controller)?;
+    save_assets(75, 80, "fonts", FONTS, FONT_NAMES, FONT_COUNT, RT_FONTS, save_font, &mut path, &controller)?;
     advance_progress_form(80);
     save_assets(
+        80,
+        85,
         "timelines",
         TIMELINES,
         TIMELINE_NAMES,
@@ -698,9 +727,20 @@ unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
         &controller,
     )?;
     advance_progress_form(85);
-    save_assets("objects", OBJECTS, OBJECT_NAMES, OBJECT_COUNT, RT_OBJECTS, save_object, &mut path, &controller)?;
+    save_assets(
+        85,
+        90,
+        "objects",
+        OBJECTS,
+        OBJECT_NAMES,
+        OBJECT_COUNT,
+        RT_OBJECTS,
+        save_object,
+        &mut path,
+        &controller,
+    )?;
     advance_progress_form(90);
-    save_assets("rooms", ROOMS, ROOM_NAMES, ROOM_COUNT, RT_ROOMS, save_room, &mut path, &controller)?;
+    save_assets(90, 95, "rooms", ROOMS, ROOM_NAMES, ROOM_COUNT, RT_ROOMS, save_room, &mut path, &controller)?;
     advance_progress_form(95);
     // included files
 
