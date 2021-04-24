@@ -822,6 +822,10 @@ unsafe fn patch(dest: *mut u8, source: &[u8]) {
 
 #[ctor]
 unsafe fn injector() {
+    std::panic::set_hook(Box::new(|info| {
+        delphi::ShowMessage(DelphiUStr::new(info.to_string().as_ref()).0);
+    }));
+
     // call injected() instead of the "generate gm81" function
     // and insert a jump call after that
     let func_dest = 0x705cd0 as *mut u8;
