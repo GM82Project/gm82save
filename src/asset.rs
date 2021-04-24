@@ -222,7 +222,7 @@ pub struct Room {
     pub clear_screen: bool,
     pub backgrounds: [RoomBackground; 8],
     pub views_enabled: bool,
-    pub clear_region: bool,
+    pub clear_view: bool,
     pub views: [View; 8],
     pub creation_code: WStr,
     pub instance_count: u32,

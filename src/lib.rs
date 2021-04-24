@@ -343,7 +343,7 @@ unsafe fn save_event<F: Write>(ev: &Event, name: &str, file: &mut F) -> Result<(
 }
 
 unsafe fn save_timeline(tl: &Timeline, path: &mut PathBuf, controller: &IOController) -> Result<()> {
-    path.set_extension(".gml");
+    path.set_extension("gml");
     let mut f = controller.open_file(path)?;
     let count = tl.moment_count as usize;
     let events = slice::from_raw_parts(tl.moment_events, count);
@@ -359,11 +359,11 @@ mod events {
     #![allow(dead_code)]
     pub const EV_CREATE: usize = 0;
     pub const EV_DESTROY: usize = 1;
-    pub const EV_STEP: usize = 2;
-    pub const EV_ALARM: usize = 3;
-    pub const EV_KEYBOARD: usize = 4;
-    pub const EV_MOUSE: usize = 5;
-    pub const EV_COLLISION: usize = 6;
+    pub const EV_ALARM: usize = 2;
+    pub const EV_STEP: usize = 3;
+    pub const EV_COLLISION: usize = 4;
+    pub const EV_KEYBOARD: usize = 5;
+    pub const EV_MOUSE: usize = 6;
     pub const EV_OTHER: usize = 7;
     pub const EV_DRAW: usize = 8;
     pub const EV_KEYPRESS: usize = 9;
@@ -373,11 +373,11 @@ mod events {
     pub const EVENT_ID_TO_NAME: [&str; 12] = [
         "Create",
         "Destroy",
-        "Step",
         "Alarm",
+        "Step",
+        "Collision",
         "Keyboard",
         "Mouse",
-        "Collision",
         "Other",
         "Draw",
         "KeyPress",
@@ -420,7 +420,7 @@ unsafe fn event_name(ev_type: usize, ev_numb: usize) -> String {
 }
 
 unsafe fn save_object(obj: &Object, path: &mut PathBuf, controller: &IOController) -> Result<()> {
-    path.set_extension(".txt");
+    path.set_extension("txt");
     {
         let mut f = controller.open_file(&path)?;
         writeln!(f, "sprite={}", get_asset_name(SPRITE_NAMES, SPRITE_COUNT, obj.sprite_index))?;
@@ -431,7 +431,7 @@ unsafe fn save_object(obj: &Object, path: &mut PathBuf, controller: &IOControlle
         writeln!(f, "parent={}", get_asset_name(OBJECT_NAMES, OBJECT_COUNT, obj.parent_index))?;
         writeln!(f, "mask={}", get_asset_name(SPRITE_NAMES, SPRITE_COUNT, obj.mask_index))?;
     }
-    path.set_extension(".gml");
+    path.set_extension("gml");
     {
         let mut f = controller.open_file(&path)?;
         for (ev_type, event_group) in obj.events.iter().enumerate().filter(|(_, p)| !p.is_null()) {
@@ -463,9 +463,8 @@ unsafe fn save_room(room: &Room, path: &mut PathBuf, controller: &IOController) 
         writeln!(f, "roomspeed={}", room.speed)?;
         writeln!(f, "roompersistent={}", u8::from(room.persistent))?;
         writeln!(f, "bg_color={}", room.bg_colour)?; // TODO: hex?
-        // TODO: what are these two
         writeln!(f, "clear_screen={}", u8::from(room.clear_screen))?;
-        writeln!(f, "clear_region={}", u8::from(room.clear_region))?;
+        writeln!(f, "clear_view={}", u8::from(room.clear_view))?;
         writeln!(f)?;
         for (i, bg) in room.backgrounds.iter().enumerate() {
             writeln!(f, "bg_visible{}={}", i, bg.visible_on_start)?;
