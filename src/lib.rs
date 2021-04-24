@@ -60,7 +60,7 @@ unsafe fn write_tree_children<F: Write>(parent: &delphi::TTreeNode, tabs: &mut S
 }
 
 fn try_decode(name: *const u16) -> Result<String> {
-    unsafe { decode_pas_str(name).into_string().map_err(|e| Error::UnicodeError(e.to_string_lossy().into())) }
+    decode_pas_str(name).into_string().map_err(|e| Error::UnicodeError(e.to_string_lossy().into()))
 }
 
 type IntPtr = *const u32;
