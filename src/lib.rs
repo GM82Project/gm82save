@@ -709,6 +709,31 @@ unsafe fn save_settings(path: &mut PathBuf, controller: &IOController) -> Result
     Ok(())
 }
 
+unsafe fn save_triggers(path: &mut PathBuf, controller: &IOController) -> Result<()> {
+    path.push("triggers");
+    std::fs::create_dir_all(&path)?;
+    path.push("index.yyd");
+    let mut index = controller.open_file(&path)?;
+    path.pop();
+    let triggers = slice::from_raw_parts(TRIGGERS.read(), TRIGGER_COUNT.read() as usize);
+    for trigger in triggers {
+        if let Some(trigger) = trigger.as_ref() {
+            let name = try_decode(trigger.name)?;
+            path.push(&name);
+            path.set_extension("txt");
+            let mut f = controller.open_file(&path)?;
+            writeln!(f, "constant={}", try_decode(trigger.constant_name)?)?;
+            writeln!(f, "kind={}", trigger.kind)?;
+            path.set_extension("gml");
+            controller.write_file(&path, try_decode(trigger.condition)?.into())?;
+            path.pop();
+            writeln!(index, "{}", name)?;
+        }
+    }
+    path.pop();
+    Ok(())
+}
+
 unsafe fn save_assets<T>(
     bar_start: u32,
     bar_end: u32,
@@ -779,7 +804,7 @@ unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
     advance_progress_form(5);
     save_settings(&mut path, &controller)?;
     advance_progress_form(10);
-    // triggers
+    save_triggers(&mut path, &controller)?;
     advance_progress_form(15);
     save_assets(15, 30, "sounds", SOUNDS, SOUND_NAMES, SOUND_COUNT, RT_SOUNDS, save_sound, &mut path, &controller)?;
     advance_progress_form(30);
