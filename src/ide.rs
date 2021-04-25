@@ -131,7 +131,7 @@ pub mod settings {
 }
 
 pub mod game_info {
-    use crate::delphi::UStr;
+    use crate::delphi::{THelpForm, UStr};
     pub const NEW_WINDOW: *const bool = 0x77f578 as _;
     pub const CAPTION: *const UStr = 0x77b57c as _;
     pub const LEFT: *const i32 = 0x77b580 as _;
@@ -142,6 +142,7 @@ pub mod game_info {
     pub const RESIZABLE: *const bool = 0x77b594 as _;
     pub const WINDOW_ON_TOP: *const bool = 0x77b598 as _;
     pub const FREEZE_GAME: *const bool = 0x77b59c as _;
+    pub const FORM: *const *const THelpForm = 0x788958 as _;
 }
 
 macro_rules! read_array {

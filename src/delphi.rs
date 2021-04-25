@@ -156,6 +156,20 @@ impl TStream {
     }
 }
 
+#[repr(C)]
+pub struct THelpForm {
+    padding: [u8; 0x388],
+    pub editor: *const TRichEdit,
+}
+
+#[repr(C)]
+pub struct TRichEdit {
+    padding: [u8; 0x6c],
+    pub colour: u32,
+    padding2: [u8; 0x2c0 - 0x70],
+    pub rich_edit_strings: *const TStrings,
+}
+
 pub struct TStrings {}
 
 impl TStrings {

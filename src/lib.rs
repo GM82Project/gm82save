@@ -215,6 +215,7 @@ unsafe fn save_event<F: Write>(ev: &Event, name: &str, file: &mut F) -> Result<(
     let actions = slice::from_raw_parts(ev.actions, ev.action_count as usize);
     for action in actions {
         let action = &**action;
+        // TODO handle dnd properly
         let code = try_decode(&action.param_strings[0])?;
         write!(file, "{}", &code)?;
         if !code.ends_with('\n') {
@@ -414,7 +415,7 @@ unsafe fn save_room(room: &Room, path: &mut PathBuf, controller: &IOController) 
         writeln!(f, "isometric={}", u8::from(room.isometric))?;
         writeln!(f, "roomspeed={}", room.speed)?;
         writeln!(f, "roompersistent={}", u8::from(room.persistent))?;
-        writeln!(f, "bg_color={}", room.bg_colour)?; // TODO: hex?
+        writeln!(f, "bg_color={}", room.bg_colour)?;
         writeln!(f, "clear_screen={}", u8::from(room.clear_screen))?;
         writeln!(f, "clear_view={}", u8::from(room.clear_view))?;
         writeln!(f)?;
@@ -670,7 +671,8 @@ unsafe fn save_game_information(path: &mut PathBuf, controller: &IOController) -
     use ide::game_info::*;
     path.push("game_information.txt");
     let mut f = controller.open_file(&path)?;
-    writeln!(f, "color={}", 0)?; // TODO
+    let editor = &*(&**FORM).editor;
+    writeln!(f, "color={}", editor.colour)?;
     writeln!(f, "new_window={}", u8::from(*NEW_WINDOW))?;
     writeln!(f, "caption={}", try_decode(&*CAPTION)?)?;
     writeln!(f, "left={}", *LEFT)?;
@@ -682,15 +684,7 @@ unsafe fn save_game_information(path: &mut PathBuf, controller: &IOController) -
     writeln!(f, "window_on_top={}", u8::from(*WINDOW_ON_TOP))?;
     writeln!(f, "freeze_game={}", u8::from(*FREEZE_GAME))?;
     path.set_extension("rtf");
-    // TODO what
-    let info: &delphi::TStrings = &*(0x7828b0 as *const *const *const *const *const delphi::TStrings)
-        .read()
-        .read()
-        .add(0xe2)
-        .read()
-        .add(0xb0)
-        .read();
-    info.SaveToFile(&UStr::new(path.as_ref()));
+    (&*editor.rich_edit_strings).SaveToFile(&UStr::new(path.as_ref()));
     path.pop();
     Ok(())
 }
