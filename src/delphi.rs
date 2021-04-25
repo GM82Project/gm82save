@@ -10,9 +10,8 @@ macro_rules! delphi_call {
     ($call: literal) => {{
         let out;
         asm! {
-            "mov ecx, {call}",
-            "call ecx",
-            call = const $call,
+            "call {call}",
+            call = in(reg) $call,
             lateout("eax") out,
             lateout("edx") _,
             lateout("ecx") _,
@@ -22,9 +21,8 @@ macro_rules! delphi_call {
     ($call: literal, $a: expr) => {{
         let out;
         asm! {
-            "mov ecx, {call}",
-            "call ecx",
-            call = const $call,
+            "call {call}",
+            call = in(reg) $call,
             inlateout("eax") $a => out,
             lateout("edx") _,
             lateout("ecx") _,
@@ -34,9 +32,8 @@ macro_rules! delphi_call {
     ($call: literal, $a: expr, $b: expr) => {{
         let out;
         asm! {
-            "mov ecx, {call}",
-            "call ecx",
-            call = const $call,
+            "call {call}",
+            call = in(reg) $call,
             inlateout("eax") $a => out,
             inlateout("edx") $b => _,
             lateout("ecx") _,
@@ -46,13 +43,11 @@ macro_rules! delphi_call {
     ($call: literal, $a: expr, $b: expr, $c: expr) => {{
         let out;
         asm! {
-            "mov ebx, {call}",
-            "call ebx",
-            call = const $call,
+            "call {call}",
+            call = in(reg) $call,
             inlateout("eax") $a => out,
             inlateout("edx") $b => _,
             inlateout("ecx") $c => _,
-            lateout("ebx") _,
         };
         out
     }};
@@ -128,13 +123,13 @@ impl TStream {
 
     pub unsafe fn set_pos(&self, pos: u32) {
         asm! {
-            "push edx",
+            "push {pos_lo}",
             "push 0",
-            "mov ecx,{call}",
-            "call ecx",
-            call = const 0x43f254,
+            "call {call}",
+            call = in(reg) 0x43f254,
+            pos_lo = in(reg) pos,
             inlateout("eax") self => _,
-            inlateout("edx") pos => _,
+            lateout("edx") _,
             lateout("ecx") _,
         };
     }
@@ -243,13 +238,12 @@ pub fn advance_progress_form(progress: u32) {
 pub unsafe fn Now() -> f64 {
     let out: f64;
     asm! {
-        "mov ecx, {call}",
-        "call ecx",
+        "call {call}",
         "sub esp,8",
         "fstp qword ptr [esp]",
         "movsd {out}, [esp]",
         "add esp,8",
-        call = const 0x4199b0,
+        call = in(reg) 0x4199b0,
         out = lateout(xmm_reg) out,
         lateout("eax") _,
         lateout("edx") _,
