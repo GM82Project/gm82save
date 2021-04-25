@@ -697,7 +697,10 @@ unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
         writeln!(
             f,
             "info_information={}",
-            try_decode(&*ide::settings::INFO_INFORMATION)?.replace('\\', "\\\\").replace('\n', "\\n")
+            try_decode(&*ide::settings::INFO_INFORMATION)?
+                .replace('\\', "\\\\")
+                .replace('\r', "\\r")
+                .replace('\n', "\\n")
         )?;
         writeln!(f)?;
         writeln!(f, "exe_company={}", try_decode(&*ide::settings::EXE_COMPANY)?)?;
