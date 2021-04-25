@@ -560,6 +560,7 @@ unsafe fn save_settings(path: &mut PathBuf, controller: &IOController) -> Result
         }
     }
     path.pop();
+    save_game_information(path, &controller)?;
     path.pop();
     Ok(())
 }
@@ -661,6 +662,35 @@ unsafe fn save_included_files(path: &mut PathBuf, controller: &IOController) -> 
             writeln!(f, "export_folder={}", try_decode(&file.export_custom_folder)?)?;
         }
     }
+    path.pop();
+    Ok(())
+}
+
+unsafe fn save_game_information(path: &mut PathBuf, controller: &IOController) -> Result<()> {
+    use ide::game_info::*;
+    path.push("game_information.txt");
+    let mut f = controller.open_file(&path)?;
+    writeln!(f, "color={}", 0)?; // TODO
+    writeln!(f, "new_window={}", u8::from(*NEW_WINDOW))?;
+    writeln!(f, "caption={}", try_decode(&*CAPTION)?)?;
+    writeln!(f, "left={}", *LEFT)?;
+    writeln!(f, "top={}", *TOP)?;
+    writeln!(f, "width={}", *WIDTH)?;
+    writeln!(f, "height={}", *HEIGHT)?;
+    writeln!(f, "border={}", u8::from(*BORDER))?;
+    writeln!(f, "resizable={}", u8::from(*RESIZABLE))?;
+    writeln!(f, "window_on_top={}", u8::from(*WINDOW_ON_TOP))?;
+    writeln!(f, "freeze_game={}", u8::from(*FREEZE_GAME))?;
+    path.set_extension("rtf");
+    // TODO what
+    let info: &delphi::TStrings = &*(0x7828b0 as *const *const *const *const *const delphi::TStrings)
+        .read()
+        .read()
+        .add(0xe2)
+        .read()
+        .add(0xb0)
+        .read();
+    info.SaveToFile(&UStr::new(path.as_ref()));
     path.pop();
     Ok(())
 }
@@ -836,7 +866,7 @@ unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
     )?;
     advance_progress_form(95);
     save_included_files(&mut path, &controller)?;
-    // no game information or library init code
+    // no library init code
 
     controller.finish()?;
     advance_progress_form(100);
