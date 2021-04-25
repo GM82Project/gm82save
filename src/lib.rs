@@ -1,5 +1,8 @@
 #![feature(asm)]
 
+#[cfg(not(all(windows, target_arch = "x86")))]
+compile_error!("this tool only works on windows 32-bit");
+
 mod asset;
 mod delphi;
 mod ide;
