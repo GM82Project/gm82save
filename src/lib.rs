@@ -59,8 +59,17 @@ impl From<image::ImageError> for Error {
     }
 }
 
-fn try_decode(name: &UStr) -> Result<String> {
-    name.to_os_string().into_string().map_err(|e| Error::UnicodeError(e.to_string_lossy().into()))
+type Result<T> = std::result::Result<T, Error>;
+
+impl UStr {
+    fn try_decode(&self) -> Result<String> {
+        self.to_os_string().into_string().map_err(|e| Error::UnicodeError(e.to_string_lossy().into()))
+    }
+
+    fn try_decode_opt(&self) -> Option<String> {
+        // i feel like having this separately might provide better optimization?
+        self.to_os_string().into_string().ok()
+    }
 }
 
 trait GetAsset<T> {
@@ -75,15 +84,10 @@ impl<'a, T> GetAsset<Option<&'a T>> for &'a [*const T] {
 
 impl<'a> GetAsset<String> for &'a [UStr] {
     fn get_asset(&self, id: i32) -> String {
-        usize::try_from(id)
-            .ok()
-            .and_then(|id| self.get(id))
-            .and_then(|s| s.to_os_string().into_string().ok())
-            .unwrap_or(String::new())
+        // it's ok to ignore errors here because it's invalid UTF-16 that'll get caught elsewhere
+        usize::try_from(id).ok().and_then(|id| self.get(id)).and_then(|s| s.try_decode_opt()).unwrap_or(String::new())
     }
 }
-
-type Result<T> = std::result::Result<T, Error>;
 
 unsafe fn save_frame(frame: &Frame, path: &std::path::Path, controller: &IOController) -> Result<()> {
     let f = controller.open_file(path)?;
@@ -111,7 +115,7 @@ unsafe fn save_stream(data: &delphi::TStream, path: &std::path::Path, controller
 }
 
 unsafe fn save_sound(sound: &Sound, path: &mut PathBuf, controller: &IOController) -> Result<()> {
-    let extension = try_decode(&sound.extension)?;
+    let extension = sound.extension.try_decode()?;
     path.set_extension(extension.trim_matches('.'));
     if let Some(data) = sound.data.as_ref() {
         save_stream(data, &path, controller)?;
@@ -195,14 +199,14 @@ unsafe fn save_path(path: &Path, file_path: &mut PathBuf, controller: &IOControl
 
 unsafe fn save_script(script: &Script, path: &mut PathBuf, controller: &IOController) -> Result<()> {
     path.set_extension("gml");
-    controller.write_file(path, try_decode(&script.source)?.into())?;
+    controller.write_file(path, script.source.try_decode()?.into())?;
     Ok(())
 }
 
 unsafe fn save_font(font: &Font, path: &mut PathBuf, controller: &IOController) -> Result<()> {
     path.set_extension("txt");
     let mut f = controller.open_file(path)?;
-    writeln!(f, "name={}", try_decode(&font.sys_name)?)?;
+    writeln!(f, "name={}", font.sys_name.try_decode()?)?;
     writeln!(f, "size={}", font.size)?;
     writeln!(f, "bold={}", font.bold as u8)?;
     writeln!(f, "italic={}", font.italic as u8)?;
@@ -219,7 +223,7 @@ unsafe fn save_event<F: Write>(ev: &Event, name: &str, file: &mut F) -> Result<(
     for action in actions {
         let action = &**action;
         // TODO handle dnd properly
-        let code = try_decode(&action.param_strings[0])?;
+        let code = action.param_strings[0].try_decode()?;
         write!(file, "{}", &code)?;
         if !code.ends_with('\n') {
             writeln!(file)?;
@@ -295,7 +299,7 @@ unsafe fn event_name(ev_type: usize, ev_numb: usize) -> String {
         events::EV_TRIGGER => format!(
             "{}_{}",
             events::EVENT_ID_TO_NAME[ev_type],
-            ide::get_triggers().get_asset(ev_numb as _).and_then(|t| try_decode(&t.name).ok()).unwrap_or("".into())
+            ide::get_triggers().get_asset(ev_numb as _).and_then(|t| t.name.try_decode_opt()).unwrap_or("".into())
         ),
         _ => format!("{}_{}", events::EVENT_ID_TO_NAME[ev_type], ev_numb),
     }
@@ -371,7 +375,7 @@ fn save_instances(instances: &[Instance], path: &mut PathBuf, controller: &IOCon
     path.pop();
     let mut codes = HashSet::with_capacity(instances.len());
     for instance in instances {
-        let code = try_decode(&instance.creation_code)?;
+        let code = instance.creation_code.try_decode()?;
         let mut hash_hex = [0; 8];
         let fname = if code.len() != 0 {
             let hash = crc::crc32::checksum_ieee(code.as_ref());
@@ -410,7 +414,7 @@ unsafe fn save_room(room: &Room, path: &mut PathBuf, controller: &IOController) 
     path.push("room.txt");
     {
         let mut f = controller.open_file(&path)?;
-        writeln!(f, "caption={}", try_decode(&room.caption)?)?;
+        writeln!(f, "caption={}", room.caption.try_decode()?)?;
         writeln!(f, "width={}", room.width)?;
         writeln!(f, "height={}", room.height)?;
         writeln!(f, "snap_x={}", room.snap_x)?;
@@ -470,7 +474,7 @@ unsafe fn save_room(room: &Room, path: &mut PathBuf, controller: &IOController) 
     }
     path.pop();
     path.push("code.gml");
-    std::fs::write(&path, try_decode(&room.creation_code)?)?;
+    std::fs::write(&path, room.creation_code.try_decode()?)?;
     path.pop();
 
     let tiles = slice::from_raw_parts(room.tiles, room.tile_count as usize);
@@ -488,7 +492,7 @@ unsafe fn save_constants(path: &mut PathBuf, controller: &IOController) -> Resul
     let names = ide::get_constant_names();
     let values = ide::get_constants();
     for (name, value) in names.iter().zip(values) {
-        writeln!(f, "{}={}", try_decode(name)?, try_decode(value)?)?;
+        writeln!(f, "{}={}", name.try_decode()?, value.try_decode()?)?;
     }
     Ok(())
 }
@@ -499,7 +503,7 @@ unsafe fn save_settings(path: &mut PathBuf, controller: &IOController) -> Result
     std::fs::create_dir_all(&path)?;
     save_constants(path, controller)?;
     path.push("information.txt");
-    controller.write_file(&path, try_decode(&*ide::settings::INFO_INFORMATION)?.into())?;
+    controller.write_file(&path, ide::settings::INFO_INFORMATION.read().try_decode()?.into())?;
     path.pop();
     path.push("settings.txt");
     let mut f = controller.open_file(&path)?;
@@ -560,7 +564,7 @@ unsafe fn save_settings(path: &mut PathBuf, controller: &IOController) -> Result
     let mut f = controller.open_file(&path)?;
     for (extension, &loaded) in extensions.iter().zip(extensions_loaded) {
         if loaded {
-            writeln!(f, "{}", try_decode(&(&**extension).name)?)?;
+            writeln!(f, "{}", &(&**extension).name.try_decode()?)?;
         }
     }
     path.pop();
@@ -578,14 +582,14 @@ unsafe fn save_triggers(path: &mut PathBuf, controller: &IOController) -> Result
     let triggers = ide::get_triggers();
     for trigger in triggers {
         if let Some(trigger) = trigger.as_ref() {
-            let name = try_decode(&trigger.name)?;
+            let name = trigger.name.try_decode()?;
             path.push(&name);
             path.set_extension("txt");
             let mut f = controller.open_file(&path)?;
-            writeln!(f, "constant={}", try_decode(&trigger.constant_name)?)?;
+            writeln!(f, "constant={}", trigger.constant_name.try_decode()?)?;
             writeln!(f, "kind={}", trigger.kind)?;
             path.set_extension("gml");
-            controller.write_file(&path, try_decode(&trigger.condition)?.into())?;
+            controller.write_file(&path, trigger.condition.try_decode()?.into())?;
             path.pop();
             writeln!(index, "{}", name)?;
         }
@@ -613,7 +617,7 @@ unsafe fn save_assets<T>(
     let count = assets.len();
     for i in 0..count {
         if let Some(asset) = assets[i].as_ref() {
-            let name = try_decode(&names[i])?;
+            let name = names[i].try_decode()?;
             path.push(&name);
             save_func(asset, path, controller)?;
             path.pop();
@@ -643,7 +647,7 @@ unsafe fn save_included_files(path: &mut PathBuf, controller: &IOController) -> 
     let files = ide::get_included_files();
     for file in files {
         let file = &**file;
-        let mut name = try_decode(&file.file_name)?;
+        let mut name = file.file_name.try_decode()?;
         writeln!(index, "{}", &name)?;
         if file.data_exists && file.stored_in_gmk {
             if let Some(stream) = file.data.as_ref() {
@@ -663,7 +667,7 @@ unsafe fn save_included_files(path: &mut PathBuf, controller: &IOController) -> 
         writeln!(f, "remove={}", u8::from(file.remove_at_end))?;
         writeln!(f, "export={}", file.export_setting)?;
         if file.export_setting == 3 {
-            writeln!(f, "export_folder={}", try_decode(&file.export_custom_folder)?)?;
+            writeln!(f, "export_folder={}", file.export_custom_folder.try_decode()?)?;
         }
     }
     path.pop();
@@ -677,7 +681,7 @@ unsafe fn save_game_information(path: &mut PathBuf, controller: &IOController) -
     let editor = &*(&**FORM).editor;
     writeln!(f, "color={}", editor.colour)?;
     writeln!(f, "new_window={}", u8::from(*NEW_WINDOW))?;
-    writeln!(f, "caption={}", try_decode(&*CAPTION)?)?;
+    writeln!(f, "caption={}", CAPTION.read().try_decode()?)?;
     writeln!(f, "left={}", *LEFT)?;
     writeln!(f, "top={}", *TOP)?;
     writeln!(f, "width={}", *WIDTH)?;
@@ -695,7 +699,7 @@ unsafe fn save_game_information(path: &mut PathBuf, controller: &IOController) -
 unsafe fn write_tree_children<F: Write>(parent: &delphi::TTreeNode, tabs: &mut String, f: &mut F) -> Result<()> {
     for i in 0..parent.GetCount() {
         let node = &*parent.GetItem(i);
-        let name = try_decode(&node.name)?;
+        let name = node.name.try_decode()?;
         match (*node.data).rtype {
             2 => {
                 writeln!(f, "{}+{}", tabs, name)?;
@@ -718,22 +722,24 @@ unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
         let mut f = controller.open_file(&path)?;
         writeln!(f, "gameid={}", ide::GAME_ID.read())?;
         writeln!(f)?;
-        writeln!(f, "info_author={}", try_decode(&*ide::settings::INFO_AUTHOR)?)?;
-        writeln!(f, "info_version={}", try_decode(&*ide::settings::INFO_VERSION)?)?;
+        writeln!(f, "info_author={}", ide::settings::INFO_AUTHOR.read().try_decode()?)?;
+        writeln!(f, "info_version={}", ide::settings::INFO_VERSION.read().try_decode()?)?;
         writeln!(f, "info_timestamp={}", delphi::Now())?;
         writeln!(
             f,
             "info_information={}",
-            try_decode(&*ide::settings::INFO_INFORMATION)?
+            ide::settings::INFO_INFORMATION
+                .read()
+                .try_decode()?
                 .replace('\\', "\\\\")
                 .replace('\r', "\\r")
                 .replace('\n', "\\n")
         )?;
         writeln!(f)?;
-        writeln!(f, "exe_company={}", try_decode(&*ide::settings::EXE_COMPANY)?)?;
-        writeln!(f, "exe_product={}", try_decode(&*ide::settings::EXE_PRODUCT)?)?;
-        writeln!(f, "exe_copyright={}", try_decode(&*ide::settings::EXE_COPYRIGHT)?)?;
-        writeln!(f, "exe_description={}", try_decode(&*ide::settings::EXE_DESCRIPTION)?)?;
+        writeln!(f, "exe_company={}", ide::settings::EXE_COMPANY.read().try_decode()?)?;
+        writeln!(f, "exe_product={}", ide::settings::EXE_PRODUCT.read().try_decode()?)?;
+        writeln!(f, "exe_copyright={}", ide::settings::EXE_COPYRIGHT.read().try_decode()?)?;
+        writeln!(f, "exe_description={}", ide::settings::EXE_DESCRIPTION.read().try_decode()?)?;
         writeln!(
             f,
             "exe_version={}.{}.{}.{}",
