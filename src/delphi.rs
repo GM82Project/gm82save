@@ -196,7 +196,7 @@ pub unsafe fn UStrFromPWCharLen(dest: &mut UStr, source: *const u16, length: usi
 }
 
 pub unsafe fn UStrClr(str: &mut UStr) {
-    let _: u32 = delphi_call!(0x407ea8, str.0);
+    let _: u32 = delphi_call!(0x407ea8, str);
 }
 
 #[repr(transparent)]
