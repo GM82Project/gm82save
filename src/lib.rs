@@ -236,20 +236,6 @@ unsafe fn save_event<F: Write>(ev: &Event, name: &str, file: &mut F) -> Result<(
         match action.action_kind {
             0 => {
                 // normal
-                // DEFINITION
-                writeln!(file, "execution_type={}", action.execution_type)?;
-                match action.execution_type {
-                    1 => writeln!(file, "function={}", action.fn_name.try_decode()?)?,
-                    2 => writeln!(file, "code={}", action.fn_code.try_delimit()?)?,
-                    _ => (),
-                }
-                writeln!(file, "show_relative={}", u8::from(action.can_be_relative))?;
-                writeln!(file, "show_applies_to={}", u8::from(action.applies_to_something))?;
-                writeln!(file, "argcount={}", action.param_count)?;
-                for i in 0..action.param_count as usize {
-                    writeln!(file, "argtype{}={}", i, action.param_types[i])?;
-                }
-                // CONTENT
                 if action.can_be_relative {
                     writeln!(file, "relative={}", u8::from(action.is_relative))?;
                 }
@@ -264,15 +250,10 @@ unsafe fn save_event<F: Write>(ev: &Event, name: &str, file: &mut F) -> Result<(
             },
             5 => {
                 // repeat
-                // CONTENT
                 writeln!(file, "repeats={}", action.param_strings[0].try_decode()?)?;
             },
             6 => {
                 // variable
-                // DEFINITION
-                writeln!(file, "show_relative={}", u8::from(action.can_be_relative))?;
-                writeln!(file, "show_applies_to={}", u8::from(action.applies_to_something))?;
-                // CONTENT
                 writeln!(file, "var_name={}", action.param_strings[0].try_decode()?)?;
                 writeln!(file, "var_value={}", action.param_strings[1].try_decode()?)?;
                 if action.can_be_relative {
@@ -284,9 +265,6 @@ unsafe fn save_event<F: Write>(ev: &Event, name: &str, file: &mut F) -> Result<(
             },
             7 => {
                 // code
-                // DEFINITION
-                writeln!(file, "show_applies_to={}", u8::from(action.applies_to_something))?;
-                // CONTENT
                 if action.applies_to_something {
                     writeln!(file, "applies_to={}", action.applies_to)?;
                 }
