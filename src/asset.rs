@@ -269,7 +269,48 @@ pub struct Extension {
 }
 
 #[repr(C)]
-pub struct Library {
-    stuff: [u8; 0x24], // ???
+pub struct ActionDefinition {
+    exists: u32,
+    name: UStr,
+    id: u32,
+    image: u32,      // pointer
+    image_list: u32, // also pointer
+    image_index: u32,
+    hidden: bool,
+    advanced: bool,
+    pro_only: bool,
+    short_desc: UStr,
+    list_text: UStr,
+    hint_text: UStr,
+    kind: u32,
+    interface: u32,
+    question: bool,
+    apply_to: bool,
+    relative: bool,
+    arg_count: u32,
+    arg_captions: [UStr; 8],
+    arg_types: [u32; 8],
+    arg_defaults: [UStr; 8],
+    arg_menu_lens: [UStr; 8],
+    execution_type: u32,
+    function_name: UStr,
+    code_string: UStr,
+}
+
+#[repr(C)]
+pub struct ActionLibrary {
+    exists: u32,
+    caption: UStr,
+    id: u32,
+    author: UStr,
+    version: u32,
+    padding: u32,
+    last_changed: f64,
+    information: UStr,
     pub init_code: UStr,
+    advanced: bool,
+    action_count: u32,
+    actions: *const *const ActionDefinition,
+    max_id: u32,
+    // also an image list but who cares
 }

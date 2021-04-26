@@ -934,7 +934,6 @@ unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
     )?;
     advance_progress_form(95);
     save_included_files(&mut path, &controller)?;
-    // no library init code
 
     controller.finish()?;
     advance_progress_form(100);
