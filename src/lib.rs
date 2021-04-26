@@ -942,7 +942,7 @@ unsafe extern "C" fn injected() -> u32 {
     // get the path to the gm81 file
     let ebp: *const UStr;
     asm!("mov {}, [ebp]", out(reg) ebp);
-    let real_string = ebp.sub(1).read();
+    let real_string = &*ebp.sub(1);
     let path = real_string.to_os_string();
 
     if let Err(e) = save_gmk(path.into()) {
