@@ -222,16 +222,76 @@ unsafe fn save_font(font: &Font, path: &mut PathBuf, controller: &IOController) 
     Ok(())
 }
 
+const ACTION_TOKEN: &str = "/*\"/*'/**//* YYD ACTION";
+
 unsafe fn save_event<F: Write>(ev: &Event, name: &str, file: &mut F) -> Result<()> {
     writeln!(file, "#define {}", name)?;
     let actions = slice::from_raw_parts(ev.actions, ev.action_count as usize);
     for action in actions {
         let action = &**action;
-        // TODO handle dnd properly
-        let code = action.param_strings[0].try_decode()?;
-        write!(file, "{}", &code)?;
-        if !code.ends_with('\n') {
-            writeln!(file)?;
+        writeln!(file, "{}", ACTION_TOKEN)?;
+        writeln!(file, "lib_id={}", action.lib_id)?;
+        writeln!(file, "action_id={}", action.id)?;
+        writeln!(file, "kind={}", action.action_kind)?;
+        match action.action_kind {
+            0 => {
+                // normal
+                writeln!(file, "execution_type={}", action.execution_type)?;
+                match action.execution_type {
+                    1 => writeln!(file, "function={}", action.fn_name.try_decode()?)?,
+                    2 => writeln!(file, "code={}", action.fn_code.try_delimit()?)?,
+                    _ => (),
+                }
+                writeln!(file, "show_relative={}", u8::from(action.can_be_relative))?;
+                if action.can_be_relative {
+                    writeln!(file, "relative={}", u8::from(action.is_relative))?;
+                }
+                writeln!(file, "show_applies_to={}", u8::from(action.applies_to_something))?;
+                if action.applies_to_something {
+                    writeln!(file, "applies_to={}", action.applies_to)?;
+                }
+                writeln!(file, "invert={}", u8::from(action.invert_condition))?;
+                writeln!(file, "argcount={}", action.param_count)?;
+                for i in 0..action.param_count as usize {
+                    writeln!(file, "argtype{}={}", i, action.param_types[i])?;
+                    // params can have newlines so delimit
+                    writeln!(file, "arg{}={}", i, action.param_strings[i].try_delimit()?)?;
+                }
+            },
+            5 => {
+                // repeat
+                writeln!(file, "repeats={}", action.param_strings[0].try_decode()?)?;
+            },
+            6 => {
+                // variable
+                writeln!(file, "var_name={}", action.param_strings[0].try_decode()?)?;
+                writeln!(file, "var_value={}", action.param_strings[1].try_decode()?)?;
+                writeln!(file, "show_relative={}", u8::from(action.can_be_relative))?;
+                if action.can_be_relative {
+                    writeln!(file, "relative={}", u8::from(action.is_relative))?;
+                }
+                writeln!(file, "show_applies_to={}", u8::from(action.applies_to_something))?;
+                if action.applies_to_something {
+                    writeln!(file, "applies_to={}", action.applies_to)?;
+                }
+            },
+            7 => {
+                // code
+                writeln!(file, "show_applies_to={}", u8::from(action.applies_to_something))?;
+                if action.applies_to_something {
+                    writeln!(file, "applies_to={}", action.applies_to)?;
+                }
+            },
+            _ => (),
+        }
+        writeln!(file, "*/")?;
+        if action.action_kind == 7 {
+            // code
+            let code = action.param_strings[0].try_decode()?;
+            write!(file, "{}", &code)?;
+            if !code.ends_with('\n') {
+                writeln!(file)?;
+            }
         }
     }
     Ok(())
