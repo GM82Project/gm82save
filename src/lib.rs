@@ -70,6 +70,11 @@ impl UStr {
         // i feel like having this separately might provide better optimization?
         self.to_os_string().into_string().ok()
     }
+
+    fn try_delimit(&self) -> Result<String> {
+        self.try_decode()
+            .map(|s| s.replace('\\', "\\\\").replace('\r', "\\r").replace('\n', "\\n").replace("*/", "*\\/"))
+    }
 }
 
 trait GetAsset<T> {
@@ -725,16 +730,7 @@ unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
         writeln!(f, "info_author={}", ide::settings::INFO_AUTHOR.read().try_decode()?)?;
         writeln!(f, "info_version={}", ide::settings::INFO_VERSION.read().try_decode()?)?;
         writeln!(f, "info_timestamp={}", delphi::Now())?;
-        writeln!(
-            f,
-            "info_information={}",
-            ide::settings::INFO_INFORMATION
-                .read()
-                .try_decode()?
-                .replace('\\', "\\\\")
-                .replace('\r', "\\r")
-                .replace('\n', "\\n")
-        )?;
+        writeln!(f, "info_information={}", ide::settings::INFO_INFORMATION.read().try_delimit()?)?;
         writeln!(f)?;
         writeln!(f, "exe_company={}", ide::settings::EXE_COMPANY.read().try_decode()?)?;
         writeln!(f, "exe_product={}", ide::settings::EXE_PRODUCT.read().try_decode()?)?;
