@@ -6,20 +6,20 @@ compile_error!("this tool only works on windows 32-bit");
 mod asset;
 mod delphi;
 mod ide;
-mod io_queue;
 mod stub;
 
 use crate::{
     asset::*,
     delphi::{advance_progress_form, TTreeNode, UStr},
-    io_queue::IOController,
 };
 use ctor::ctor;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
     fmt::Formatter,
-    io::Write,
+    fs::File,
+    io::{BufWriter, Write},
     path::PathBuf,
     slice, str,
 };
@@ -81,9 +81,9 @@ trait GetAsset<T> {
     fn get_asset(&self, id: i32) -> T;
 }
 
-impl<'a, T> GetAsset<Option<&'a T>> for &'a [*const T] {
+impl<'a, T> GetAsset<Option<&'a T>> for &'a [Option<&'a T>] {
     fn get_asset(&self, id: i32) -> Option<&'a T> {
-        unsafe { self.get(usize::try_from(id).ok()?)?.as_ref() }
+        self.get(usize::try_from(id).ok()?)?.clone()
     }
 }
 
@@ -94,8 +94,12 @@ impl<'a> GetAsset<String> for &'a [UStr] {
     }
 }
 
-unsafe fn save_frame(frame: &Frame, path: &std::path::Path, controller: &IOController) -> Result<()> {
-    let f = controller.open_file(path)?;
+fn open_file(path: &std::path::Path) -> Result<BufWriter<File>> {
+    Ok(BufWriter::new(File::create(path)?))
+}
+
+unsafe fn save_frame(frame: &Frame, path: &std::path::Path) -> Result<()> {
+    let f = open_file(path)?;
     image::codecs::png::PngEncoder::new(f)
         .encode(
             slice::from_raw_parts(frame.data, (frame.width * frame.height * 4) as usize),
@@ -107,7 +111,7 @@ unsafe fn save_frame(frame: &Frame, path: &std::path::Path, controller: &IOContr
     Ok(())
 }
 
-unsafe fn save_stream(data: &delphi::TStream, path: &std::path::Path, controller: &IOController) -> Result<()> {
+unsafe fn save_stream(data: &delphi::TStream, path: &std::path::Path) -> Result<()> {
     let old_pos = data.get_pos();
     data.set_pos(0);
     let len = data.get_size() as usize;
@@ -115,18 +119,18 @@ unsafe fn save_stream(data: &delphi::TStream, path: &std::path::Path, controller
     s.set_len(len);
     data.read(s.as_mut_ptr(), len as _);
     data.set_pos(old_pos);
-    controller.write_file(path, s)?;
+    std::fs::write(path, s)?;
     Ok(())
 }
 
-unsafe fn save_sound(sound: &Sound, path: &mut PathBuf, controller: &IOController) -> Result<()> {
+unsafe fn save_sound(sound: &Sound, path: &mut PathBuf) -> Result<()> {
     let extension = sound.extension.try_decode()?;
     path.set_extension(extension.trim_matches('.'));
     if let Some(data) = sound.data.as_ref() {
-        save_stream(data, &path, controller)?;
+        save_stream(data, &path)?;
     }
     path.set_extension("txt");
-    let mut f = controller.open_file(&path)?;
+    let mut f = open_file(&path)?;
     writeln!(f, "extension={}", extension)?;
     writeln!(f, "kind={}", sound.kind)?;
     writeln!(f, "effects={}", sound.effects)?;
@@ -136,16 +140,16 @@ unsafe fn save_sound(sound: &Sound, path: &mut PathBuf, controller: &IOControlle
     Ok(())
 }
 
-unsafe fn save_sprite(sprite: &Sprite, path: &mut PathBuf, controller: &IOController) -> Result<()> {
+unsafe fn save_sprite(sprite: &Sprite, path: &mut PathBuf) -> Result<()> {
     std::fs::create_dir_all(&path)?;
     let frames = slice::from_raw_parts(sprite.frames, sprite.frame_count as _);
     for (i, frame) in frames.iter().enumerate() {
         path.push(format!("{}.png", i));
-        save_frame(&**frame, path, controller)?;
+        save_frame(&**frame, path)?;
         path.pop();
     }
     path.push("sprite.txt");
-    let mut f = controller.open_file(&path)?;
+    let mut f = open_file(&path)?;
     writeln!(f, "frames={}", sprite.frame_count)?;
     writeln!(f, "origin_x={}", sprite.origin_x)?;
     writeln!(f, "origin_y={}", sprite.origin_y)?;
@@ -161,14 +165,14 @@ unsafe fn save_sprite(sprite: &Sprite, path: &mut PathBuf, controller: &IOContro
     Ok(())
 }
 
-unsafe fn save_background(back: &Background, path: &mut PathBuf, controller: &IOController) -> Result<()> {
+unsafe fn save_background(back: &Background, path: &mut PathBuf) -> Result<()> {
     path.set_extension("png");
     let frame = &*back.frame;
     if frame.width != 0 && frame.height != 0 {
-        save_frame(frame, &path, controller)?;
+        save_frame(frame, &path)?;
     }
     path.set_extension("txt");
-    let mut f = controller.open_file(path)?;
+    let mut f = open_file(path)?;
     writeln!(f, "width={}", frame.width)?;
     writeln!(f, "height={}", frame.height)?;
     writeln!(f, "tileset={}", back.is_tileset as u8)?;
@@ -181,10 +185,10 @@ unsafe fn save_background(back: &Background, path: &mut PathBuf, controller: &IO
     Ok(())
 }
 
-unsafe fn save_path(path: &Path, file_path: &mut PathBuf, controller: &IOController) -> Result<()> {
+unsafe fn save_path(path: &Path, file_path: &mut PathBuf) -> Result<()> {
     std::fs::create_dir_all(&file_path)?;
     file_path.push("path.txt");
-    let mut f = controller.open_file(&file_path)?;
+    let mut f = open_file(&file_path)?;
     writeln!(f, "connection={}", path.connection)?;
     writeln!(f, "closed={}", path.closed as u8)?;
     writeln!(f, "precision={}", path.precision)?;
@@ -193,7 +197,7 @@ unsafe fn save_path(path: &Path, file_path: &mut PathBuf, controller: &IOControl
     writeln!(f, "snap_y={}", path.snap_y)?;
     file_path.pop();
     file_path.push("points.txt");
-    let mut f = controller.open_file(&file_path)?;
+    let mut f = open_file(&file_path)?;
     let points = slice::from_raw_parts(path.points, path.point_count as _);
     for p in points {
         writeln!(f, "{},{},{}", p.x, p.y, p.speed)?;
@@ -202,15 +206,15 @@ unsafe fn save_path(path: &Path, file_path: &mut PathBuf, controller: &IOControl
     Ok(())
 }
 
-unsafe fn save_script(script: &Script, path: &mut PathBuf, controller: &IOController) -> Result<()> {
+unsafe fn save_script(script: &Script, path: &mut PathBuf) -> Result<()> {
     path.set_extension("gml");
-    controller.write_file(path, script.source.try_decode()?.into())?;
+    std::fs::write(path, script.source.try_decode()?)?;
     Ok(())
 }
 
-unsafe fn save_font(font: &Font, path: &mut PathBuf, controller: &IOController) -> Result<()> {
+unsafe fn save_font(font: &Font, path: &mut PathBuf) -> Result<()> {
     path.set_extension("txt");
-    let mut f = controller.open_file(path)?;
+    let mut f = open_file(path)?;
     writeln!(f, "name={}", font.sys_name.try_decode()?)?;
     writeln!(f, "size={}", font.size)?;
     writeln!(f, "bold={}", font.bold as u8)?;
@@ -284,9 +288,9 @@ unsafe fn save_event<F: Write>(ev: &Event, name: &str, file: &mut F) -> Result<(
     Ok(())
 }
 
-unsafe fn save_timeline(tl: &Timeline, path: &mut PathBuf, controller: &IOController) -> Result<()> {
+unsafe fn save_timeline(tl: &Timeline, path: &mut PathBuf) -> Result<()> {
     path.set_extension("gml");
-    let mut f = controller.open_file(path)?;
+    let mut f = open_file(path)?;
     let count = tl.moment_count as usize;
     let events = slice::from_raw_parts(tl.moment_events, count);
     let times = slice::from_raw_parts(tl.moment_times, count);
@@ -357,10 +361,10 @@ unsafe fn event_name(ev_type: usize, ev_numb: usize) -> String {
     }
 }
 
-unsafe fn save_object(obj: &Object, path: &mut PathBuf, controller: &IOController) -> Result<()> {
+unsafe fn save_object(obj: &Object, path: &mut PathBuf) -> Result<()> {
     path.set_extension("txt");
     {
-        let mut f = controller.open_file(&path)?;
+        let mut f = open_file(&path)?;
         writeln!(f, "sprite={}", ide::get_sprite_names().get_asset(obj.sprite_index))?;
         writeln!(f, "visible={}", u8::from(obj.visible))?;
         writeln!(f, "solid={}", u8::from(obj.solid))?;
@@ -371,7 +375,7 @@ unsafe fn save_object(obj: &Object, path: &mut PathBuf, controller: &IOControlle
     }
     path.set_extension("gml");
     {
-        let mut f = controller.open_file(&path)?;
+        let mut f = open_file(&path)?;
         for (ev_type, event_group) in obj.events.iter().enumerate().filter(|(_, p)| !p.is_null()) {
             let count = event_group.sub(1).cast::<u32>().read() as usize;
             let events = slice::from_raw_parts(*event_group, count);
@@ -387,14 +391,14 @@ unsafe fn save_object(obj: &Object, path: &mut PathBuf, controller: &IOControlle
     Ok(())
 }
 
-unsafe fn save_tiles(tiles: &[Tile], path: &mut PathBuf, controller: &IOController) -> Result<()> {
+unsafe fn save_tiles(tiles: &[Tile], path: &mut PathBuf) -> Result<()> {
     let mut layers = HashMap::new();
     for tile in tiles {
         let f = match layers.entry(tile.depth) {
             std::collections::hash_map::Entry::Occupied(e) => e.into_mut(),
             std::collections::hash_map::Entry::Vacant(e) => {
                 path.push(format!("{}.txt", tile.depth));
-                let f = e.insert(controller.open_file(&path)?);
+                let f = e.insert(open_file(&path)?);
                 path.pop();
                 f
             },
@@ -413,7 +417,7 @@ unsafe fn save_tiles(tiles: &[Tile], path: &mut PathBuf, controller: &IOControll
         )?;
     }
     path.push("layers.txt");
-    let mut f = controller.open_file(&path)?;
+    let mut f = open_file(&path)?;
     for depth in layers.keys() {
         writeln!(f, "{}", depth)?;
     }
@@ -421,9 +425,9 @@ unsafe fn save_tiles(tiles: &[Tile], path: &mut PathBuf, controller: &IOControll
     Ok(())
 }
 
-fn save_instances(instances: &[Instance], path: &mut PathBuf, controller: &IOController) -> Result<()> {
+fn save_instances(instances: &[Instance], path: &mut PathBuf) -> Result<()> {
     path.push("instances.txt");
-    let mut f = controller.open_file(&path)?;
+    let mut f = open_file(&path)?;
     path.pop();
     let mut codes = HashSet::with_capacity(instances.len());
     for instance in instances {
@@ -441,7 +445,7 @@ fn save_instances(instances: &[Instance], path: &mut PathBuf, controller: &IOCon
             if !codes.insert(hash) {
                 path.push(fname);
                 path.set_extension("gml");
-                controller.write_file(&path, code.into())?;
+                std::fs::write(&path, code)?;
                 path.pop();
             }
             fname
@@ -461,11 +465,11 @@ fn save_instances(instances: &[Instance], path: &mut PathBuf, controller: &IOCon
     Ok(())
 }
 
-unsafe fn save_room(room: &Room, path: &mut PathBuf, controller: &IOController) -> Result<()> {
+unsafe fn save_room(room: &Room, path: &mut PathBuf) -> Result<()> {
     std::fs::create_dir_all(&path)?;
     path.push("room.txt");
     {
-        let mut f = controller.open_file(&path)?;
+        let mut f = open_file(&path)?;
         writeln!(f, "caption={}", room.caption.try_decode()?)?;
         writeln!(f, "width={}", room.width)?;
         writeln!(f, "height={}", room.height)?;
@@ -530,16 +534,16 @@ unsafe fn save_room(room: &Room, path: &mut PathBuf, controller: &IOController) 
     path.pop();
 
     let tiles = slice::from_raw_parts(room.tiles, room.tile_count as usize);
-    save_tiles(tiles, path, controller)?;
+    save_tiles(tiles, path)?;
 
     let instances = slice::from_raw_parts(room.instances, room.instance_count as usize);
-    save_instances(instances, path, controller)?;
+    save_instances(instances, path)?;
     Ok(())
 }
 
-unsafe fn save_constants(path: &mut PathBuf, controller: &IOController) -> Result<()> {
+unsafe fn save_constants(path: &mut PathBuf) -> Result<()> {
     path.push("constants.txt");
-    let mut f = controller.open_file(&path)?;
+    let mut f = open_file(&path)?;
     path.pop();
     let names = ide::get_constant_names();
     let values = ide::get_constants();
@@ -549,16 +553,16 @@ unsafe fn save_constants(path: &mut PathBuf, controller: &IOController) -> Resul
     Ok(())
 }
 
-unsafe fn save_settings(path: &mut PathBuf, controller: &IOController) -> Result<()> {
+unsafe fn save_settings(path: &mut PathBuf) -> Result<()> {
     use ide::settings::*;
     path.push("settings");
     std::fs::create_dir_all(&path)?;
-    save_constants(path, controller)?;
+    save_constants(path)?;
     path.push("information.txt");
-    controller.write_file(&path, ide::settings::INFO_INFORMATION.read().try_decode()?.into())?;
+    std::fs::write(&path, ide::settings::INFO_INFORMATION.read().try_decode()?)?;
     path.pop();
     path.push("settings.txt");
-    let mut f = controller.open_file(&path)?;
+    let mut f = open_file(&path)?;
     path.pop();
     writeln!(f, "fullscreen={}", u8::from(FULLSCREEN.read()))?;
     writeln!(f, "interpolate_pixels={}", u8::from(INTERPOLATE_PIXELS.read()))?;
@@ -613,23 +617,23 @@ unsafe fn save_settings(path: &mut PathBuf, controller: &IOController) -> Result
     path.push("extensions.txt");
     let extensions = ide::get_extensions();
     let extensions_loaded = ide::get_extensions_loaded();
-    let mut f = controller.open_file(&path)?;
+    let mut f = open_file(&path)?;
     for (extension, &loaded) in extensions.iter().zip(extensions_loaded) {
         if loaded {
             writeln!(f, "{}", &(&**extension).name.try_decode()?)?;
         }
     }
     path.pop();
-    save_game_information(path, &controller)?;
+    save_game_information(path)?;
     path.pop();
     Ok(())
 }
 
-unsafe fn save_triggers(path: &mut PathBuf, controller: &IOController) -> Result<()> {
+unsafe fn save_triggers(path: &mut PathBuf) -> Result<()> {
     path.push("triggers");
     std::fs::create_dir_all(&path)?;
     path.push("index.yyd");
-    let mut index = controller.open_file(&path)?;
+    let mut index = open_file(&path)?;
     path.pop();
     let triggers = ide::get_triggers();
     for trigger in triggers {
@@ -637,11 +641,11 @@ unsafe fn save_triggers(path: &mut PathBuf, controller: &IOController) -> Result
             let name = trigger.name.try_decode()?;
             path.push(&name);
             path.set_extension("txt");
-            let mut f = controller.open_file(&path)?;
+            let mut f = open_file(&path)?;
             writeln!(f, "constant={}", trigger.constant_name.try_decode()?)?;
             writeln!(f, "kind={}", trigger.kind)?;
             path.set_extension("gml");
-            controller.write_file(&path, trigger.condition.try_decode()?.into())?;
+            std::fs::write(&path, trigger.condition.try_decode()?)?;
             path.pop();
             writeln!(index, "{}", name)?;
         }
@@ -650,51 +654,48 @@ unsafe fn save_triggers(path: &mut PathBuf, controller: &IOController) -> Result
     Ok(())
 }
 
-unsafe fn save_assets<T>(
-    bar_start: u32,
-    bar_end: u32,
+unsafe fn save_assets<'a, T: Sync>(
+    _bar_start: u32,
+    _bar_end: u32,
     name: &str,
-    assets: &[*const T],
+    assets: &[Option<&'a T>],
     names: &[UStr],
     tree: *const *const TTreeNode,
-    save_func: unsafe fn(&T, &mut PathBuf, &IOController) -> Result<()>,
+    save_func: unsafe fn(&T, &mut PathBuf) -> Result<()>,
     path: &mut PathBuf,
-    controller: &IOController,
 ) -> Result<()> {
     path.push(name);
     std::fs::create_dir_all(&path)?;
     path.push("index.yyd");
-    let mut index = controller.open_file(&path)?;
+    let mut index = open_file(&path)?;
     path.pop();
-    let count = assets.len();
-    for i in 0..count {
-        if let Some(asset) = assets[i].as_ref() {
-            let name = names[i].try_decode()?;
-            path.push(&name);
-            save_func(asset, path, controller)?;
-            path.pop();
-            writeln!(index, "{}", name)?;
-        } else {
-            writeln!(index, "")?;
-        }
-        advance_progress_form(bar_start + (bar_end - bar_start) * i as u32 / count as u32);
+    for name in names {
+        writeln!(index, "{}", name.try_decode()?)?;
     }
+    (assets, names).into_par_iter().try_for_each(|(asset, name)| -> Result<()> {
+        if let Some(asset) = asset.as_ref() {
+            let name = name.try_decode()?;
+            let mut p = path.join(name);
+            save_func(asset, &mut p)?;
+        }
+        Ok(())
+    })?;
     path.push("tree.yyd");
     if let Some(tree) = tree.as_ref() {
-        write_tree_children(&**tree, &mut String::new(), &mut controller.open_file(&path)?)?;
+        write_tree_children(&**tree, &mut String::new(), &mut open_file(&path)?)?;
     }
     path.pop();
     path.pop();
     Ok(())
 }
 
-unsafe fn save_included_files(path: &mut PathBuf, controller: &IOController) -> Result<()> {
+unsafe fn save_included_files(path: &mut PathBuf) -> Result<()> {
     path.push("datafiles");
     path.push("include");
     std::fs::create_dir_all(&path)?;
     path.pop();
     path.push("index.txt");
-    let mut index = controller.open_file(&path)?;
+    let mut index = open_file(&path)?;
     path.pop();
     let files = ide::get_included_files();
     for file in files {
@@ -705,14 +706,14 @@ unsafe fn save_included_files(path: &mut PathBuf, controller: &IOController) -> 
             if let Some(stream) = file.data.as_ref() {
                 path.push("include");
                 path.push(&name);
-                save_stream(stream, &path, controller)?;
+                save_stream(stream, &path)?;
                 path.pop();
                 path.pop();
             }
         }
         name += ".txt";
         path.push(&name);
-        let mut f = controller.open_file(&path)?;
+        let mut f = open_file(&path)?;
         writeln!(f, "store={}", u8::from(file.stored_in_gmk))?;
         writeln!(f, "free={}", u8::from(file.free_memory))?;
         writeln!(f, "overwrite={}", u8::from(file.overwrite_file))?;
@@ -726,10 +727,10 @@ unsafe fn save_included_files(path: &mut PathBuf, controller: &IOController) -> 
     Ok(())
 }
 
-unsafe fn save_game_information(path: &mut PathBuf, controller: &IOController) -> Result<()> {
+unsafe fn save_game_information(path: &mut PathBuf) -> Result<()> {
     use ide::game_info::*;
     path.push("game_information.txt");
-    let mut f = controller.open_file(&path)?;
+    let mut f = open_file(&path)?;
     let editor = &*(&**FORM).editor;
     writeln!(f, "color={}", editor.colour)?;
     writeln!(f, "new_window={}", u8::from(*NEW_WINDOW))?;
@@ -768,10 +769,9 @@ unsafe fn write_tree_children<F: Write>(parent: &delphi::TTreeNode, tabs: &mut S
 }
 
 unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
-    let controller = io_queue::IOController::new();
     {
         // some stuff to go in the main gmk
-        let mut f = controller.open_file(&path)?;
+        let mut f = open_file(&path)?;
         writeln!(f, "gameid={}", ide::GAME_ID.read())?;
         writeln!(f)?;
         writeln!(f, "info_author={}", ide::settings::INFO_AUTHOR.read().try_decode()?)?;
@@ -799,21 +799,11 @@ unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
     }
     path.pop();
     advance_progress_form(5);
-    save_settings(&mut path, &controller)?;
+    save_settings(&mut path)?;
     advance_progress_form(10);
-    save_triggers(&mut path, &controller)?;
+    save_triggers(&mut path)?;
     advance_progress_form(15);
-    save_assets(
-        15,
-        30,
-        "sounds",
-        ide::get_sounds(),
-        ide::get_sound_names(),
-        ide::RT_SOUNDS,
-        save_sound,
-        &mut path,
-        &controller,
-    )?;
+    save_assets(15, 30, "sounds", ide::get_sounds(), ide::get_sound_names(), ide::RT_SOUNDS, save_sound, &mut path)?;
     advance_progress_form(30);
     save_assets(
         30,
@@ -824,7 +814,6 @@ unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
         ide::RT_SPRITES,
         save_sprite,
         &mut path,
-        &controller,
     )?;
     advance_progress_form(55);
     save_assets(
@@ -836,20 +825,9 @@ unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
         ide::RT_BACKGROUNDS,
         save_background,
         &mut path,
-        &controller,
     )?;
     advance_progress_form(65);
-    save_assets(
-        65,
-        70,
-        "paths",
-        ide::get_paths(),
-        ide::get_path_names(),
-        ide::RT_PATHS,
-        save_path,
-        &mut path,
-        &controller,
-    )?;
+    save_assets(65, 70, "paths", ide::get_paths(), ide::get_path_names(), ide::RT_PATHS, save_path, &mut path)?;
     advance_progress_form(70);
     save_assets(
         70,
@@ -860,20 +838,9 @@ unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
         ide::RT_SCRIPTS,
         save_script,
         &mut path,
-        &controller,
     )?;
     advance_progress_form(75);
-    save_assets(
-        75,
-        80,
-        "fonts",
-        ide::get_fonts(),
-        ide::get_font_names(),
-        ide::RT_FONTS,
-        save_font,
-        &mut path,
-        &controller,
-    )?;
+    save_assets(75, 80, "fonts", ide::get_fonts(), ide::get_font_names(), ide::RT_FONTS, save_font, &mut path)?;
     advance_progress_form(80);
     save_assets(
         80,
@@ -884,7 +851,6 @@ unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
         ide::RT_TIMELINES,
         save_timeline,
         &mut path,
-        &controller,
     )?;
     advance_progress_form(85);
     save_assets(
@@ -896,24 +862,12 @@ unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
         ide::RT_OBJECTS,
         save_object,
         &mut path,
-        &controller,
     )?;
     advance_progress_form(90);
-    save_assets(
-        90,
-        95,
-        "rooms",
-        ide::get_rooms(),
-        ide::get_room_names(),
-        ide::RT_ROOMS,
-        save_room,
-        &mut path,
-        &controller,
-    )?;
+    save_assets(90, 95, "rooms", ide::get_rooms(), ide::get_room_names(), ide::RT_ROOMS, save_room, &mut path)?;
     advance_progress_form(95);
-    save_included_files(&mut path, &controller)?;
+    save_included_files(&mut path)?;
 
-    controller.finish()?;
     advance_progress_form(100);
     Ok(())
 }

@@ -5,7 +5,8 @@ use crate::{
 use std::slice;
 
 type IntPtr = *const usize;
-type AssetList<T> = *const *const *const T;
+type AssetList<T> = *const *const Option<&'static T>;
+type GaplessList<T> = *const *const &'static T;
 type UStrListPtr = *const *const UStr;
 
 const TRIGGER_COUNT: IntPtr = 0x77f3f8 as _;
@@ -51,10 +52,10 @@ const ROOMS: AssetList<Room> = 0x77f3a8 as _;
 const ROOM_NAMES: UStrListPtr = 0x77f3b0 as _;
 const ROOM_COUNT: IntPtr = 0x77f3b8 as _;
 
-const INCLUDED_FILES: AssetList<IncludedFile> = 0x77f420 as _;
+const INCLUDED_FILES: GaplessList<IncludedFile> = 0x77f420 as _;
 const INCLUDED_FILE_COUNT: IntPtr = 0x77f428 as _;
 
-const EXTENSIONS: AssetList<Extension> = 0x77f5d4 as _;
+const EXTENSIONS: GaplessList<Extension> = 0x77f5d4 as _;
 const EXTENSION_COUNT: IntPtr = 0x77f5d8 as _;
 const EXTENSIONS_LOADED: *const *const bool = 0x790a14 as _;
 
@@ -155,7 +156,7 @@ macro_rules! read_array {
 
 macro_rules! get_assets {
     ($n:ident, $nn:ident, $t:ty, $p:expr, $np:expr, $c:expr) => {
-        read_array!($n, *const $t, $p, $c);
+        read_array!($n, Option<&'a $t>, $p, $c);
         read_array!($nn, UStr, $np, $c);
     };
 }
@@ -172,8 +173,8 @@ get_assets!(get_rooms, get_room_names, Room, ROOMS, ROOM_NAMES, ROOM_COUNT);
 
 read_array!(get_constant_names, UStr, CONSTANT_NAMES, CONSTANT_COUNT);
 read_array!(get_constants, UStr, CONSTANT_VALUES, CONSTANT_COUNT);
-read_array!(get_triggers, *const Trigger, TRIGGERS, TRIGGER_COUNT);
+read_array!(get_triggers, Option<&'a Trigger>, TRIGGERS, TRIGGER_COUNT);
 
-read_array!(get_included_files, *const IncludedFile, INCLUDED_FILES, INCLUDED_FILE_COUNT);
-read_array!(get_extensions, *const Extension, EXTENSIONS, EXTENSION_COUNT);
+read_array!(get_included_files, &'a IncludedFile, INCLUDED_FILES, INCLUDED_FILE_COUNT);
+read_array!(get_extensions, &'a Extension, EXTENSIONS, EXTENSION_COUNT);
 read_array!(get_extensions_loaded, bool, EXTENSIONS_LOADED, EXTENSION_COUNT);

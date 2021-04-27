@@ -25,6 +25,8 @@ pub struct Sound {
     pub data: *const TStream,
 }
 
+unsafe impl Sync for Sound {}
+
 #[repr(C)]
 pub struct Frame {
     exists: u32,
@@ -50,6 +52,8 @@ pub struct Sprite {
     pub frames: *const *const Frame,
 }
 
+unsafe impl Sync for Sprite {}
+
 #[repr(C)]
 pub struct Background {
     exists: u32,
@@ -62,6 +66,8 @@ pub struct Background {
     pub h_sep: u32,
     pub v_sep: u32,
 }
+
+unsafe impl Sync for Background {}
 
 #[repr(C)]
 pub struct PathPoint {
@@ -83,6 +89,8 @@ pub struct Path {
     pub snap_x: u32,
     pub snap_y: u32,
 }
+
+unsafe impl Sync for Path {}
 
 #[repr(C)]
 pub struct Script {
@@ -138,6 +146,8 @@ pub struct Timeline {
     pub moment_count: u32,
 }
 
+unsafe impl Sync for Timeline {}
+
 #[repr(C)]
 pub struct Object {
     exists: u32,
@@ -150,6 +160,8 @@ pub struct Object {
     pub mask_index: i32,
     pub events: [*const *const Event; 12],
 }
+
+unsafe impl Sync for Object {}
 
 #[repr(C)]
 pub struct RoomBackground {
@@ -244,6 +256,8 @@ pub struct Room {
     pub x_position_scroll: u32,
     pub y_position_scroll: u32,
 }
+
+unsafe impl Sync for Room {}
 
 #[repr(C)]
 pub struct IncludedFile {

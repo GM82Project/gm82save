@@ -225,6 +225,8 @@ impl Drop for UStr {
     }
 }
 
+unsafe impl Sync for UStr {}
+
 pub unsafe fn ShowMessage(msg: &UStr) {
     let _: u32 = delphi_call!(0x4d43f8, msg.0);
 }
