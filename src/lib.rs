@@ -559,7 +559,7 @@ unsafe fn save_settings(path: &mut PathBuf) -> Result<()> {
     std::fs::create_dir_all(&path)?;
     save_constants(path)?;
     path.push("information.txt");
-    std::fs::write(&path, ide::settings::INFO_INFORMATION.read().try_decode()?)?;
+    std::fs::write(&path, (&*ide::settings::INFO_INFORMATION).try_decode()?)?;
     path.pop();
     path.push("settings.txt");
     let mut f = open_file(&path)?;
@@ -673,7 +673,7 @@ unsafe fn save_assets<'a, T: Sync>(
         writeln!(index, "{}", name.try_decode()?)?;
     }
     (assets, names).into_par_iter().try_for_each(|(asset, name)| -> Result<()> {
-        if let Some(asset) = asset.as_ref() {
+        if let Some(asset) = asset {
             let name = name.try_decode()?;
             let mut p = path.join(name);
             save_func(asset, &mut p)?;
@@ -734,7 +734,7 @@ unsafe fn save_game_information(path: &mut PathBuf) -> Result<()> {
     let editor = &*(&**FORM).editor;
     writeln!(f, "color={}", editor.colour)?;
     writeln!(f, "new_window={}", u8::from(*NEW_WINDOW))?;
-    writeln!(f, "caption={}", CAPTION.read().try_decode()?)?;
+    writeln!(f, "caption={}", (&*CAPTION).try_decode()?)?;
     writeln!(f, "left={}", *LEFT)?;
     writeln!(f, "top={}", *TOP)?;
     writeln!(f, "width={}", *WIDTH)?;
@@ -774,15 +774,15 @@ unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
         let mut f = open_file(&path)?;
         writeln!(f, "gameid={}", ide::GAME_ID.read())?;
         writeln!(f)?;
-        writeln!(f, "info_author={}", ide::settings::INFO_AUTHOR.read().try_decode()?)?;
-        writeln!(f, "info_version={}", ide::settings::INFO_VERSION.read().try_decode()?)?;
+        writeln!(f, "info_author={}", (&*ide::settings::INFO_AUTHOR).try_decode()?)?;
+        writeln!(f, "info_version={}", (&*ide::settings::INFO_VERSION).try_decode()?)?;
         writeln!(f, "info_timestamp={}", delphi::Now())?;
-        writeln!(f, "info_information={}", ide::settings::INFO_INFORMATION.read().try_delimit()?)?;
+        writeln!(f, "info_information={}", (&*ide::settings::INFO_INFORMATION).try_delimit()?)?;
         writeln!(f)?;
-        writeln!(f, "exe_company={}", ide::settings::EXE_COMPANY.read().try_decode()?)?;
-        writeln!(f, "exe_product={}", ide::settings::EXE_PRODUCT.read().try_decode()?)?;
-        writeln!(f, "exe_copyright={}", ide::settings::EXE_COPYRIGHT.read().try_decode()?)?;
-        writeln!(f, "exe_description={}", ide::settings::EXE_DESCRIPTION.read().try_decode()?)?;
+        writeln!(f, "exe_company={}", (&*ide::settings::EXE_COMPANY).try_decode()?)?;
+        writeln!(f, "exe_product={}", (&*ide::settings::EXE_PRODUCT).try_decode()?)?;
+        writeln!(f, "exe_copyright={}", (&*ide::settings::EXE_COPYRIGHT).try_decode()?)?;
+        writeln!(f, "exe_description={}", (&*ide::settings::EXE_DESCRIPTION).try_decode()?)?;
         writeln!(
             f,
             "exe_version={}.{}.{}.{}",
