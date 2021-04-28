@@ -22,7 +22,6 @@ use std::{
     io::{BufWriter, Write},
     path::PathBuf,
     slice, str,
-    sync::mpsc,
 };
 use winapi::um::{
     memoryapi::VirtualProtect,
@@ -656,8 +655,8 @@ unsafe fn save_triggers(path: &mut PathBuf) -> Result<()> {
 }
 
 unsafe fn save_assets<'a, T: Sync>(
-    bar_start: u32,
-    bar_end: u32,
+    _bar_start: u32,
+    _bar_end: u32,
     name: &str,
     assets: &[Option<&'a T>],
     names: &[UStr],
@@ -670,35 +669,15 @@ unsafe fn save_assets<'a, T: Sync>(
     path.push("index.yyd");
     let mut index = open_file(&path)?;
     path.pop();
-    let mut count = 0;
     for name in names {
         let name = name.try_decode()?;
         writeln!(index, "{}", name)?;
-        if !name.is_empty() {
-            count += 1;
-        }
     }
-    let (progress_tx, progress_rx) = mpsc::channel();
-    rayon::spawn(move || {
-        let mut i = 0;
-        loop {
-            std::thread::yield_now();
-            loop {
-                match progress_rx.try_recv() {
-                    Ok(()) => i += 1,
-                    Err(mpsc::TryRecvError::Empty) => break,
-                    Err(mpsc::TryRecvError::Disconnected) => return,
-                }
-            }
-            advance_progress_form(bar_start + (bar_end - bar_start) * i as u32 / count as u32);
-        }
-    });
-    (assets, names).into_par_iter().try_for_each_with(progress_tx, |progress_tx, (asset, name)| -> Result<()> {
+    (assets, names).into_par_iter().try_for_each(|(asset, name)| -> Result<()> {
         if let Some(asset) = asset {
             let name = name.try_decode()?;
             let mut p = path.join(name);
             save_func(asset, &mut p)?;
-            let _ = progress_tx.send(());
         }
         Ok(())
     })?;
