@@ -2,7 +2,7 @@ use crate::{
     asset::*,
     delphi,
     delphi::{advance_progress_form, TTreeNode, UStr},
-    ide,
+    ide, Error, Result,
 };
 use rayon::prelude::*;
 use std::{
@@ -13,38 +13,6 @@ use std::{
     path::PathBuf,
     slice, str,
 };
-
-pub enum Error {
-    IoError(std::io::Error),
-    ImageError(image::ImageError),
-    UnicodeError(String),
-    Other(String),
-}
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::IoError(e) => write!(f, "io error: {}", e),
-            Self::ImageError(e) => write!(f, "image error: {}", e),
-            Self::UnicodeError(s) => write!(f, "couldn't encode {}", s),
-            Self::Other(s) => write!(f, "other error: {}", s),
-        }
-    }
-}
-
-impl From<std::io::Error> for Error {
-    fn from(err: std::io::Error) -> Self {
-        Error::IoError(err)
-    }
-}
-
-impl From<image::ImageError> for Error {
-    fn from(err: image::ImageError) -> Self {
-        Error::ImageError(err)
-    }
-}
-
-type Result<T> = std::result::Result<T, Error>;
 
 impl UStr {
     fn try_decode(&self) -> Result<String> {
@@ -656,7 +624,9 @@ unsafe fn save_assets<'a, T: Sync>(
     path.pop();
     for name in names {
         let name = name.try_decode()?;
-        writeln!(index, "{}", name)?;
+        if !name.is_empty() {
+            writeln!(index, "{}", name)?;
+        }
     }
     (assets, names).into_par_iter().try_for_each(|(asset, name)| -> Result<()> {
         if let Some(asset) = asset {
