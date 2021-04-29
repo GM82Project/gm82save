@@ -7,11 +7,13 @@ mod asset;
 #[macro_use]
 mod delphi;
 mod ide;
+mod load;
 mod save;
 mod stub;
 
 use crate::delphi::UStr;
 use ctor::ctor;
+use std::path::PathBuf;
 use winapi::um::{
     memoryapi::VirtualProtect,
     processthreadsapi::{FlushInstructionCache, GetCurrentProcess},
@@ -72,6 +74,27 @@ unsafe extern "C" fn save() -> u32 {
     0
 }
 
+unsafe extern "C" fn load() -> bool {
+    let ebp: *mut UStr;
+    asm!("mov {}, [ebp]", out(reg) ebp);
+    let real_string = &*ebp.sub(1);
+    let path: PathBuf = real_string.to_os_string().into();
+    // .yyd works in the ui but rust doesn't get it so check for that specifically
+    let is_yyd = path.extension() == Some("yyd".as_ref()) || path.file_name() == Some(".yyd".as_ref());
+    if !is_yyd {
+        let obj = delphi_call!(0x405a4c, 0x52e8fc, 1);
+        ebp.sub(3).cast::<u32>().write(obj);
+        return false
+    }
+
+    if let Err(e) = load::load_gmk(path) {
+        // display the error
+        show_message(&format!("Failed to save: {}", e));
+    }
+    delphi::close_progress_form();
+    true
+}
+
 unsafe fn patch(dest: *mut u8, source: &[u8]) {
     let mut old_protect = 0;
     VirtualProtect(dest.cast(), source.len(), PAGE_READWRITE, &mut old_protect);
@@ -92,6 +115,12 @@ unsafe fn injector() {
     let mut save_patch = [0, 0, 0, 0, 0xe9, 0x67, 1, 0, 0];
     save_patch[..4].copy_from_slice(&(save as u32 - (save_dest as u32 + 4)).to_le_bytes());
     patch(save_dest, &save_patch);
+    // call load() instead of CStream.Create
+    // and insert a JZ to the post-load code
+    let load_dest = 0x705a42 as *mut u8;
+    let mut load_patch = [0xe8, 0, 0, 0, 0, 0x0b, 0xc0, 0x0f, 0x85, 0xa4, 0, 0, 0];
+    load_patch[1..5].copy_from_slice(&(load as u32 - (load_dest as u32 + 5)).to_le_bytes());
+    patch(load_dest, &load_patch);
     // replace .gm81 with .yyd
     patch(0x6e05e0 as *mut u8, &[0x04, 0, 0, 0, b'.', 0, b'y', 0, b'y', 0, b'd', 0, 0, 0]);
     patch(0x6e0728 as *mut u8, &[0x04, 0, 0, 0, b'.', 0, b'y', 0, b'y', 0, b'd', 0, 0, 0]);
