@@ -10,6 +10,7 @@ crate-type = ["cdylib"]
 crc = "1.8"
 ctor = "0.1.20"
 image = { version = "0.23", features = ["png"] }
+paste = "1.0"
 phf = { version = "0.7.24", features = ["macros"] }
 rayon = "1.5"
 winapi = { version = "0.3.9", features = ["memoryapi", "processthreadsapi"] }

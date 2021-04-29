@@ -6,6 +6,7 @@ use std::{
     slice,
 };
 
+#[macro_export]
 macro_rules! delphi_call {
     ($call: literal) => {{
         let out;
@@ -62,6 +63,19 @@ pub struct TreeNodeData {
     pub index: u32, // resource index
 }
 
+impl TreeNodeData {
+    pub fn new(rtype: u32, kind: u32, index: u32) -> *const TreeNodeData {
+        let data = unsafe {
+            let data: *mut TreeNodeData = delphi_call!(0x405a4c, 0x71c368, 1);
+            &mut *data
+        };
+        data.rtype = rtype;
+        data.kind = kind;
+        data.index = index;
+        data
+    }
+}
+
 #[repr(C)]
 pub struct TTreeNode {
     unknown: u64,
@@ -91,13 +105,19 @@ impl TTreeNode {
 pub struct TTreeNodes {}
 
 impl TTreeNodes {
-    pub unsafe fn AddChild(&self, parent: *const TTreeNode, s: &UStr) {
-        let _: u32 = delphi_call!(0x4ae1e8, self, parent, s.0);
+    pub unsafe fn AddChild(&self, parent: *const TTreeNode, s: &UStr) -> *const TTreeNode {
+        delphi_call!(0x4ae1e8, self, parent, s.0)
     }
 
     pub unsafe fn Clear(&self) {
         let _: u32 = delphi_call!(0x4ae12c, self);
     }
+}
+
+#[repr(C)]
+pub struct TTreeView {
+    padding: [u8; 0x2d8],
+    pub nodes: *const TTreeNodes,
 }
 
 pub struct TGraphic {}
@@ -237,6 +257,12 @@ pub fn advance_progress_form(progress: u32) {
     }
 }
 
+pub fn close_progress_form() {
+    unsafe {
+        let _: u32 = delphi_call!(0x6ca2cc);
+    }
+}
+
 pub unsafe fn Now() -> f64 {
     let out: f64;
     asm! {
@@ -252,4 +278,26 @@ pub unsafe fn Now() -> f64 {
         lateout("ecx") _,
     };
     out
+}
+
+pub unsafe fn Free<T>(a: *const T) {
+    let _: u32 = delphi_call!(0x405a7c, a);
+}
+
+pub unsafe fn DynArrayClear<T, U>(a: *mut T, type_info: *const U) {
+    let _: u32 = delphi_call!(0x409ce0, a, type_info);
+}
+
+pub unsafe fn DynArraySetLength<T, U>(a: *mut *mut T, type_info: *const U, dimensions: usize, size: usize) {
+    // this has caller clean-up for some reason
+    asm! {
+        "push {d}",
+        "call {call}",
+        "add esp,4",
+        call = in(reg) 0x409be0,
+        d = in(reg) size,
+        inlateout("eax") a => _,
+        inlateout("edx") type_info => _,
+        inlateout("ecx") dimensions => _,
+    };
 }

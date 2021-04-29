@@ -4,6 +4,7 @@
 compile_error!("this tool only works on windows 32-bit");
 
 mod asset;
+#[macro_use]
 mod delphi;
 mod ide;
 mod save;

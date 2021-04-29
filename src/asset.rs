@@ -1,6 +1,9 @@
 #![allow(dead_code)]
 
-use crate::delphi::{TStream, UStr};
+use crate::{
+    delphi::{TStream, UStr},
+    delphi_call,
+};
 
 #[repr(C)]
 pub struct Trigger {
@@ -96,6 +99,12 @@ unsafe impl Sync for Path {}
 pub struct Script {
     exists: u32,
     pub source: UStr,
+}
+
+impl Script {
+    pub unsafe fn new() -> *mut Script {
+        delphi_call!(0x652860, 0x65267c, 1)
+    }
 }
 
 #[repr(C)]
@@ -328,3 +337,5 @@ pub struct ActionLibrary {
     max_id: u32,
     // also an image list but who cares
 }
+
+pub type Form = u32; // pointer but eh
