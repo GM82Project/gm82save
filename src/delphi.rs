@@ -202,6 +202,10 @@ pub unsafe fn FreeMem<T>(mem: *const T) {
     let _: u32 = delphi_call!(0x404338, mem);
 }
 
+pub unsafe fn UStrAsg(dest: &mut UStr, src: &UStr) {
+    let _: u32 = delphi_call!(0x407eb8, dest, src.0);
+}
+
 pub unsafe fn UStrFromPCharLen(dest: &mut UStr, source: *const u8, length: usize) {
     let _: u32 = delphi_call!(0x407fe4, dest, source, length);
 }

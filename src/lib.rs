@@ -26,6 +26,10 @@ pub enum Error {
     UnicodeError(String),
     AssetNotFound(String),
     SyntaxError(PathBuf),
+    UnknownKey(PathBuf, String),
+    ParseIntError(std::num::ParseIntError),
+    ParseFloatError(std::num::ParseFloatError),
+    InvalidVersion(String),
     Other(String),
 }
 
@@ -37,6 +41,10 @@ impl std::fmt::Display for Error {
             Self::UnicodeError(s) => write!(f, "couldn't encode {}", s),
             Self::AssetNotFound(s) => write!(f, "couldn't find asset {}", s),
             Self::SyntaxError(p) => write!(f, "syntax error in file {}", p.to_string_lossy()),
+            Self::UnknownKey(p, k) => write!(f, "unknown key in {}: {}", p.to_string_lossy(), k),
+            Self::ParseIntError(e) => write!(f, "integer parse error: {}", e),
+            Self::ParseFloatError(e) => write!(f, "float parse error: {}", e),
+            Self::InvalidVersion(v) => write!(f, "invalid exe_version {}", v),
             Self::Other(s) => write!(f, "other error: {}", s),
         }
     }
@@ -51,6 +59,18 @@ impl From<std::io::Error> for Error {
 impl From<image::ImageError> for Error {
     fn from(err: image::ImageError) -> Self {
         Error::ImageError(err)
+    }
+}
+
+impl From<std::num::ParseIntError> for Error {
+    fn from(err: std::num::ParseIntError) -> Self {
+        Error::ParseIntError(err)
+    }
+}
+
+impl From<std::num::ParseFloatError> for Error {
+    fn from(err: std::num::ParseFloatError) -> Self {
+        Error::ParseFloatError(err)
     }
 }
 
