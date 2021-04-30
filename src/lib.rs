@@ -25,6 +25,7 @@ pub enum Error {
     ImageError(image::ImageError),
     UnicodeError(String),
     AssetNotFound(String),
+    SyntaxError(PathBuf),
     Other(String),
 }
 
@@ -35,6 +36,7 @@ impl std::fmt::Display for Error {
             Self::ImageError(e) => write!(f, "image error: {}", e),
             Self::UnicodeError(s) => write!(f, "couldn't encode {}", s),
             Self::AssetNotFound(s) => write!(f, "couldn't find asset {}", s),
+            Self::SyntaxError(p) => write!(f, "syntax error in file {}", p.to_string_lossy()),
             Self::Other(s) => write!(f, "other error: {}", s),
         }
     }

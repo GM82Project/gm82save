@@ -180,6 +180,12 @@ pub mod game_info {
     pub const FORM: *const *const THelpForm = 0x788958 as _;
 }
 
+pub fn initialize_project() {
+    unsafe {
+        let _: u32 = delphi_call!(0x705964);
+    }
+}
+
 macro_rules! read_array {
     ($n:ident, $t:ty, $p:expr, $c:expr) => {
         pub fn $n<'a>() -> &'a [$t] {

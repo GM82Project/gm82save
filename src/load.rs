@@ -10,13 +10,14 @@ fn open_file(path: &std::path::Path) -> Result<BufReader<File>> {
     Ok(BufReader::new(File::open(path)?))
 }
 
-unsafe fn read_resource_tree<F: BufRead>(
+unsafe fn read_resource_tree(
     base: *const delphi::TTreeNode,
-    f: F,
+    path: &std::path::Path,
     kind: u32,
     names: Vec<&str>,
     visible: bool,
 ) -> Result<()> {
+    let f = open_file(path)?;
     let nodes = &*((&**if visible { ide::RESOURCE_TREE } else { ide::RESOURCE_TREE_HIDDEN }).nodes);
     let mut stack = vec![base];
     for line in f.lines() {
@@ -30,7 +31,7 @@ unsafe fn read_resource_tree<F: BufRead>(
         let rtype = match trimmed.chars().next() {
             Some('+') => 2,
             Some('|') => 3,
-            _ => panic!("invalid resource tree"),
+            _ => return Err(Error::SyntaxError(path.to_path_buf())),
         };
         let name = &trimmed[1..];
         let index = if rtype == 3 {
@@ -82,13 +83,14 @@ unsafe fn load_assets<'a, T: Sync>(
         }
     }
     path.push("tree.yyd");
-    read_resource_tree(node.read(), open_file(&path)?, kind, names, true)?;
+    read_resource_tree(node.read(), &path, kind, names, true)?;
     path.pop();
     path.pop();
     Ok(())
 }
 
 pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
+    ide::initialize_project();
     path.pop();
     load_assets(
         "scripts",
