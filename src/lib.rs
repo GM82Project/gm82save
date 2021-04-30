@@ -90,8 +90,9 @@ unsafe extern "C" fn load() -> bool {
     }
 
     if let Err(e) = load::load_gmk(path) {
-        // display the error
-        show_message(&format!("Failed to save: {}", e));
+        // display the error and reload
+        show_message(&format!("Failed to load: {}", e));
+        ide::initialize_project();
     }
     delphi::close_progress_form();
     true
