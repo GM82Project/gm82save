@@ -9,7 +9,7 @@ crate-type = ["cdylib"]
 [dependencies]
 crc = "1.8"
 ctor = "0.1.20"
-image = { version = "0.23", features = ["png"] }
+image = { version = "0.23", default-features = false, features = ["png"] }
 itertools = "0.10"
 paste = "1.0"
 phf = { version = "0.7.24", features = ["macros"] }
