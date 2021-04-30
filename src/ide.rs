@@ -11,7 +11,7 @@ type UStrListPtr = *mut *mut UStr;
 type Forms = *mut *mut Form;
 type Timestamps = *mut *mut f64;
 type ThumbIDs = *mut *mut i32;
-type TypeInfoPtr = *const [u8; 0x2c];
+type TypeInfoPtr = *const u8;
 
 const TRIGGER_COUNT: IntPtr = 0x77f3f8 as _;
 const TRIGGERS: AssetList<Trigger> = 0x77f3f4 as _;
@@ -28,6 +28,7 @@ const SOUND_NAMES: UStrListPtr = 0x77f2c0 as _;
 const SOUND_TIMESTAMPS: Timestamps = 0x77f2c4 as _;
 const SOUND_COUNT: IntPtr = 0x77f2c8 as _;
 const SOUND_TYPEINFO: TypeInfoPtr = 0x651ce0 as _;
+const SOUND_TYPESIZE: usize = 0x2c;
 
 const SPRITES: AssetList<Sprite> = 0x77f4c4 as _;
 const SPRITE_NAMES: UStrListPtr = 0x77f4cc as _;
@@ -35,6 +36,7 @@ const SPRITE_TIMESTAMPS: Timestamps = 0x77f4d0 as _;
 const SPRITE_THUMBS: ThumbIDs = 0x77f4d4 as _;
 const SPRITE_COUNT: IntPtr = 0x77f4d8 as _;
 const SPRITE_TYPEINFO: TypeInfoPtr = 0x6f522c as _;
+const SPRITE_TYPESIZE: usize = 0x2c;
 
 const BACKGROUNDS: AssetList<Background> = 0x77f1ac as _;
 const BACKGROUND_FORMS: Forms = 0x77f1b0 as _;
@@ -43,6 +45,7 @@ const BACKGROUND_TIMESTAMPS: Timestamps = 0x77f1b8 as _;
 const BACKGROUND_THUMBS: ThumbIDs = 0x77f1bc as _;
 const BACKGROUND_COUNT: IntPtr = 0x77f1c0 as _;
 const BACKGROUND_TYPEINFO: TypeInfoPtr = 0x64d734 as _;
+const BACKGROUND_TYPESIZE: usize = 0x30 as _;
 
 const PATHS: AssetList<Path> = 0x77f608 as _;
 const PATH_FORMS: Forms = 0x77f60c as _;
@@ -50,6 +53,7 @@ const PATH_NAMES: UStrListPtr = 0x77f610 as _;
 const PATH_TIMESTAMPS: Timestamps = 0x77f614 as _;
 const PATH_COUNT: IntPtr = 0x77f618 as _;
 const PATH_TYPEINFO: TypeInfoPtr = 0x72207c as _;
+const PATH_TYPESIZE: usize = 0x28;
 
 const SCRIPTS: AssetList<Script> = 0x77f2cc as _;
 const SCRIPT_FORMS: Forms = 0x77f2d0 as _;
@@ -57,6 +61,7 @@ const SCRIPT_NAMES: UStrListPtr = 0x77f2d4 as _;
 const SCRIPT_TIMESTAMPS: Timestamps = 0x77f2d8 as _;
 const SCRIPT_COUNT: IntPtr = 0x77f2dc as _;
 const SCRIPT_TYPEINFO: TypeInfoPtr = 0x6550a8 as _;
+const SCRIPT_TYPESIZE: usize = 0x2c;
 
 const FONTS: AssetList<Font> = 0x77f4fc as _;
 const FONT_FORMS: Forms = 0x77f500 as _;
@@ -64,6 +69,7 @@ const FONT_NAMES: UStrListPtr = 0x77f504 as _;
 const FONT_TIMESTAMPS: Timestamps = 0x77f508 as _;
 const FONT_COUNT: IntPtr = 0x77f50c as _;
 const FONT_TYPEINFO: TypeInfoPtr = 0x6fc680 as _;
+const FONT_TYPESIZE: usize = 0x28;
 
 const TIMELINES: AssetList<Timeline> = 0x77f4e4 as _;
 const TIMELINE_FORMS: Forms = 0x77f4e8 as _;
@@ -71,6 +77,7 @@ const TIMELINE_NAMES: UStrListPtr = 0x77f4ec as _;
 const TIMELINE_TIMESTAMPS: Timestamps = 0x77f4f0 as _;
 const TIMELINE_COUNT: IntPtr = 0x77f4f4 as _;
 const TIMELINE_TYPEINFO: TypeInfoPtr = 0x6fa020 as _;
+const TIMELINE_TYPESIZE: usize = 0x2c;
 
 const OBJECTS: AssetList<Object> = 0x77f0d0 as _;
 const OBJECT_FORMS: Forms = 0x77f0d4 as _;
@@ -78,6 +85,7 @@ const OBJECT_NAMES: UStrListPtr = 0x77f0d8 as _;
 const OBJECT_TIMESTAMPS: Timestamps = 0x77f0dc as _;
 const OBJECT_COUNT: IntPtr = 0x77f0e0 as _;
 const OBJECT_TYPEINFO: TypeInfoPtr = 0x62c4a8 as _;
+const OBJECT_TYPESIZE: usize = 0x2c;
 
 const ROOMS: AssetList<Room> = 0x77f3a8 as _;
 const ROOM_FORMS: Forms = 0x77f3ac as _;
@@ -85,6 +93,7 @@ const ROOM_NAMES: UStrListPtr = 0x77f3b0 as _;
 const ROOM_TIMESTAMPS: Timestamps = 0x77f3b4 as _;
 const ROOM_COUNT: IntPtr = 0x77f3b8 as _;
 const ROOM_TYPEINFO: TypeInfoPtr = 0x6928f8 as _;
+const ROOM_TYPESIZE: usize = 0x28;
 
 const INCLUDED_FILES: GaplessList<IncludedFile> = 0x77f420 as _;
 const INCLUDED_FILE_COUNT: IntPtr = 0x77f428 as _;
@@ -204,7 +213,7 @@ macro_rules! read_array {
 }
 
 macro_rules! get_assets {
-    ($lo:ident, $t:ty, $assets_p:expr, $count_p:expr, $type_p:expr) => {
+    ($lo:ident, $t:ty, $assets_p:expr, $count_p:expr, $type_p:expr, $type_size:expr) => {
         paste::paste! {
             read_array!([<get_ $lo s>], Option<&'static $t>, $assets_p, $count_p);
             read_array!([<get_ $lo _forms>], Form, $assets_p.add(1) as Forms, $count_p);
@@ -214,7 +223,7 @@ macro_rules! get_assets {
                 unsafe {
                     $count_p.write(count);
                     for i in 0..4 {
-                        delphi::DynArraySetLength($assets_p.add(i), $type_p.add(i), 1, count);
+                        delphi::DynArraySetLength($assets_p.add(i), $type_p.add($type_size*i), 1, count);
                     }
                 }
             }
@@ -222,7 +231,7 @@ macro_rules! get_assets {
     };
 }
 macro_rules! get_graphics {
-    ($lo:ident, $t:ty, $assets_p:expr, $count_p:expr, $type_p:expr) => {
+    ($lo:ident, $t:ty, $assets_p:expr, $count_p:expr, $type_p:expr, $type_size:expr) => {
         paste::paste! {
             read_array!([<get_ $lo s>], Option<&'static $t>, $assets_p, $count_p);
             read_array!([<get_ $lo _forms>], Form, $assets_p.add(1) as Forms, $count_p);
@@ -233,7 +242,7 @@ macro_rules! get_graphics {
                 unsafe {
                     $count_p.write(count);
                     for i in 0..5 {
-                        delphi::DynArraySetLength($assets_p.add(i), $type_p.add(i), 1, count);
+                        delphi::DynArraySetLength($assets_p.add(i), $type_p.add($type_size*i), 1, count);
                     }
                 }
             }
@@ -241,15 +250,15 @@ macro_rules! get_graphics {
     };
 }
 
-get_assets!(sound, Sound, SOUNDS, SOUND_COUNT, SOUND_TYPEINFO);
-get_graphics!(sprite, Sprite, SPRITES, SPRITE_COUNT, SPRITE_TYPEINFO);
-get_graphics!(background, Background, BACKGROUNDS, BACKGROUND_COUNT, BACKGROUND_TYPEINFO);
-get_assets!(path, Path, PATHS, PATH_COUNT, PATH_TYPEINFO);
-get_assets!(script, Script, SCRIPTS, SCRIPT_COUNT, SCRIPT_TYPEINFO);
-get_assets!(font, Font, FONTS, FONT_COUNT, FONT_TYPEINFO);
-get_assets!(timeline, Timeline, TIMELINES, TIMELINE_COUNT, TIMELINE_TYPEINFO);
-get_assets!(object, Object, OBJECTS, OBJECT_COUNT, OBJECT_TYPEINFO);
-get_assets!(room, Room, ROOMS, ROOM_COUNT, ROOM_TYPEINFO);
+get_assets!(sound, Sound, SOUNDS, SOUND_COUNT, SOUND_TYPEINFO, SOUND_TYPESIZE);
+get_graphics!(sprite, Sprite, SPRITES, SPRITE_COUNT, SPRITE_TYPEINFO, SPRITE_TYPESIZE);
+get_graphics!(background, Background, BACKGROUNDS, BACKGROUND_COUNT, BACKGROUND_TYPEINFO, BACKGROUND_TYPESIZE);
+get_assets!(path, Path, PATHS, PATH_COUNT, PATH_TYPEINFO, PATH_TYPESIZE);
+get_assets!(script, Script, SCRIPTS, SCRIPT_COUNT, SCRIPT_TYPEINFO, SCRIPT_TYPESIZE);
+get_assets!(font, Font, FONTS, FONT_COUNT, FONT_TYPEINFO, FONT_TYPESIZE);
+get_assets!(timeline, Timeline, TIMELINES, TIMELINE_COUNT, TIMELINE_TYPEINFO, TIMELINE_TYPESIZE);
+get_assets!(object, Object, OBJECTS, OBJECT_COUNT, OBJECT_TYPEINFO, OBJECT_TYPESIZE);
+get_assets!(room, Room, ROOMS, ROOM_COUNT, ROOM_TYPEINFO, ROOM_TYPESIZE);
 
 read_array!(get_constant_names, UStr, CONSTANT_NAMES, CONSTANT_COUNT);
 read_array!(get_constants, UStr, CONSTANT_VALUES, CONSTANT_COUNT);
