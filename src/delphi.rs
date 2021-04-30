@@ -194,7 +194,7 @@ impl TStrings {
 }
 
 // weird name for an allocator function
-pub unsafe fn GetMem<T>(size: u32) -> *const T {
+pub unsafe fn GetMem<T>(size: usize) -> *mut T {
     delphi_call!(0x40431c, size)
 }
 

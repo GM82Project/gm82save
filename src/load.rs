@@ -6,6 +6,7 @@ use std::{
     fs::File,
     io::{BufRead, BufReader},
     path::PathBuf,
+    slice,
 };
 
 trait UStrPtr {
@@ -89,15 +90,102 @@ unsafe fn read_resource_tree(
     Ok(())
 }
 
-unsafe fn load_script(path: &mut PathBuf) -> Result<*const Script> {
+unsafe fn load_frame(path: &std::path::Path, frame: &mut Frame) -> Result<()> {
+    let im = image::open(path)?.into_rgba8();
+    frame.width = im.width();
+    frame.height = im.height();
+    let data = im.as_raw();
+    let data_ptr = delphi::GetMem(data.len());
+    data.as_ptr().copy_to_nonoverlapping(data_ptr, data.len());
+    frame.data = data_ptr;
+    Ok(())
+}
+
+unsafe fn load_background(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*const Background> {
+    let bg = &mut *Background::new();
+    path.set_extension("txt");
+    let mut bg_exists = false;
+    read_txt(path, |k, v| {
+        Ok(match k {
+            "exists" => bg_exists = v.parse::<u8>()? != 0,
+            "tileset" => bg.is_tileset = v.parse::<u8>()? != 0,
+            "tile_width" => bg.tile_width = v.parse()?,
+            "tile_height" => bg.tile_height = v.parse()?,
+            "tile_hoffset" => bg.h_offset = v.parse()?,
+            "tile_voffset" => bg.v_offset = v.parse()?,
+            "tile_hsep" => bg.h_sep = v.parse()?,
+            "tile_vsep" => bg.v_sep = v.parse()?,
+            _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
+        })
+    })?;
+    if bg_exists {
+        path.set_extension("png");
+        load_frame(path, &mut *bg.frame)?;
+    }
+    Ok(bg)
+}
+
+unsafe fn load_sprite(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*const Sprite> {
+    let sp = &mut *Sprite::new();
+    path.push("sprite.txt");
+    read_txt(&path, |k, v| {
+        Ok(match k {
+            "frames" => sp.frame_count = v.parse()?,
+            "origin_x" => sp.origin_x = v.parse()?,
+            "origin_y" => sp.origin_y = v.parse()?,
+            "collision_shape" => sp.collision_shape = v.parse()?,
+            "alpha_tolerance" => sp.alpha_tolerance = v.parse()?,
+            "per_frame_colliders" => sp.per_frame_colliders = v.parse::<u8>()? != 0,
+            "bbox_type" => sp.bbox_type = v.parse()?,
+            "bbox_left" => sp.bbox_left = v.parse()?,
+            "bbox_bottom" => sp.bbox_bottom = v.parse()?,
+            "bbox_right" => sp.bbox_right = v.parse()?,
+            "bbox_top" => sp.bbox_top = v.parse()?,
+            _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
+        })
+    })?;
+    path.pop();
+    delphi::DynArraySetLength(&mut sp.frames, 0x5b2754 as *const u8, 1, sp.frame_count as _);
+    let frames = slice::from_raw_parts_mut(sp.frames, sp.frame_count as _);
+    for (i, f) in frames.iter_mut().enumerate() {
+        path.push(format!("{}.png", i));
+        *f = Frame::new();
+        load_frame(&path, &mut **f)?;
+        path.pop();
+    }
+    Ok(sp)
+}
+
+unsafe fn load_script(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*const Script> {
     path.set_extension("gml");
     let s = Script::new();
     (&mut *s).source = UStr::new(std::fs::read_to_string(path)?.as_ref());
     Ok(s)
 }
 
+unsafe fn load_font(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*const Font> {
+    let f = &mut *Font::new();
+    path.set_extension("txt");
+    read_txt(path, |k, v| {
+        Ok(match k {
+            "name" => f.sys_name = UStr::new(v.as_ref()),
+            "size" => f.size = v.parse()?,
+            "bold" => f.bold = v.parse::<u8>()? != 0,
+            "italic" => f.italic = v.parse::<u8>()? != 0,
+            "charset" => f.charset = v.parse()?,
+            "aa_level" => f.aa_level = v.parse()?,
+            "range_start" => f.range_start = v.parse()?,
+            "range_end" => f.range_end = v.parse()?,
+            _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
+        })
+    })?;
+    Ok(f)
+}
+
 unsafe fn load_constants(path: &mut PathBuf) -> Result<()> {
+    path.push("constants.txt");
     let s = std::fs::read_to_string(&path)?;
+    path.pop();
     let lines: Vec<_> = s.par_lines().collect();
     ide::alloc_constants(lines.len());
     for (line, name_p, value_p) in izip!(lines, ide::get_constant_names_mut(), ide::get_constants_mut()) {
@@ -110,11 +198,19 @@ unsafe fn load_constants(path: &mut PathBuf) -> Result<()> {
     Ok(())
 }
 
+unsafe fn load_settings(path: &mut PathBuf) -> Result<()> {
+    path.push("settings");
+    load_constants(path)?;
+    path.pop();
+    // TODO
+    Ok(())
+}
+
 unsafe fn load_assets<'a, T: Sync>(
     name: &str,
     kind: u32,
     node: *const *const delphi::TTreeNode,
-    load_asset: unsafe fn(&mut PathBuf) -> Result<*const T>,
+    load_asset: unsafe fn(&mut PathBuf, &AssetMaps) -> Result<*const T>,
     get_assets: fn() -> &'a mut [Option<&'a T>],
     get_names: fn() -> &'a mut [UStr],
     alloc: fn(usize),
@@ -134,7 +230,7 @@ unsafe fn load_assets<'a, T: Sync>(
         if !name.is_empty() {
             *name_p = UStr::new(name.as_ref());
             path.push(name);
-            *asset = load_asset(path)?.as_ref();
+            *asset = load_asset(path, asset_maps)?.as_ref();
             path.pop();
         }
     }
@@ -173,7 +269,44 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         })
     })?;
     path.pop();
+    load_settings(&mut path)?;
     let mut asset_maps = AssetMaps::default();
+    asset_maps.sprites = Some(load_assets(
+        "sprites",
+        2,
+        ide::RT_SPRITES,
+        load_sprite,
+        ide::get_sprites_mut,
+        ide::get_sprite_names_mut,
+        ide::alloc_sprites,
+        &mut path,
+        &asset_maps,
+    )?);
+    for (sp, thumb) in ide::get_sprites().iter().zip(ide::get_sprite_thumbs_mut()) {
+        if let Some(sp) = sp {
+            *thumb = delphi_call!(0x5a9c14, sp.get_icon());
+        } else {
+            *thumb = -1;
+        }
+    }
+    asset_maps.backgrounds = Some(load_assets(
+        "backgrounds",
+        6,
+        ide::RT_BACKGROUNDS,
+        load_background,
+        ide::get_backgrounds_mut,
+        ide::get_background_names_mut,
+        ide::alloc_backgrounds,
+        &mut path,
+        &asset_maps,
+    )?);
+    for (bg, thumb) in ide::get_backgrounds().iter().zip(ide::get_background_thumbs_mut()) {
+        if let Some(bg) = bg {
+            *thumb = delphi_call!(0x5a9c14, bg.get_icon());
+        } else {
+            *thumb = -1;
+        }
+    }
     load_assets(
         "scripts",
         7,
@@ -182,6 +315,17 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         ide::get_scripts_mut,
         ide::get_script_names_mut,
         ide::alloc_scripts,
+        &mut path,
+        &asset_maps,
+    )?;
+    load_assets(
+        "fonts",
+        9,
+        ide::RT_FONTS,
+        load_font,
+        ide::get_fonts_mut,
+        ide::get_font_names_mut,
+        ide::alloc_fonts,
         &mut path,
         &asset_maps,
     )?;

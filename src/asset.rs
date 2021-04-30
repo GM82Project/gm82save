@@ -38,6 +38,12 @@ pub struct Frame {
     pub data: *const u8,
 }
 
+impl Frame {
+    pub unsafe fn new() -> *mut Self {
+        delphi_call!(0x701bf8, 0x700d94, 1)
+    }
+}
+
 #[repr(C)]
 pub struct Sprite {
     exists: u32,
@@ -52,7 +58,18 @@ pub struct Sprite {
     pub bbox_bottom: i32,
     pub bbox_right: i32,
     pub bbox_top: i32,
-    pub frames: *const *const Frame,
+    pub frames: *mut *mut Frame,
+}
+
+impl Sprite {
+    pub unsafe fn new() -> *mut Sprite {
+        delphi_call!(0x5b325c, 0x5b27dc, 1)
+    }
+
+    pub unsafe fn get_icon(&self) -> u32 {
+        // technically a pointer but eh
+        delphi_call!(0x5b401c, self)
+    }
 }
 
 unsafe impl Sync for Sprite {}
@@ -60,7 +77,7 @@ unsafe impl Sync for Sprite {}
 #[repr(C)]
 pub struct Background {
     exists: u32,
-    pub frame: *const Frame,
+    pub frame: *mut Frame,
     pub is_tileset: bool,
     pub tile_width: u32,
     pub tile_height: u32,
@@ -68,6 +85,17 @@ pub struct Background {
     pub v_offset: u32,
     pub h_sep: u32,
     pub v_sep: u32,
+}
+
+impl Background {
+    pub unsafe fn new() -> *mut Background {
+        delphi_call!(0x062dba4, 0x62d408, 1)
+    }
+
+    pub unsafe fn get_icon(&self) -> u32 {
+        // technically a pointer but eh
+        delphi_call!(0x62e5e8, self)
+    }
 }
 
 unsafe impl Sync for Background {}
@@ -102,7 +130,7 @@ pub struct Script {
 }
 
 impl Script {
-    pub unsafe fn new() -> *mut Script {
+    pub unsafe fn new() -> *mut Self {
         delphi_call!(0x652860, 0x65267c, 1)
     }
 }
@@ -118,6 +146,12 @@ pub struct Font {
     pub range_end: u32,
     pub charset: u32,
     pub aa_level: u32,
+}
+
+impl Font {
+    pub unsafe fn new() -> *mut Self {
+        delphi_call!(0x62dba4, 0x62d408, 1)
+    }
 }
 
 #[repr(C)]
