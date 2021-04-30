@@ -126,8 +126,7 @@ unsafe fn save_background(back: &Background, path: &mut PathBuf) -> Result<()> {
     }
     path.set_extension("txt");
     let mut f = open_file(path)?;
-    writeln!(f, "width={}", frame.width)?;
-    writeln!(f, "height={}", frame.height)?;
+    writeln!(f, "exists={}", u8::from(frame.width != 0 && frame.height != 0))?;
     writeln!(f, "tileset={}", back.is_tileset as u8)?;
     writeln!(f, "tile_width={}", back.tile_width)?;
     writeln!(f, "tile_height={}", back.tile_height)?;
