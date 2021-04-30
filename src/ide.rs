@@ -19,6 +19,8 @@ const TRIGGERS: AssetList<Trigger> = 0x77f3f4 as _;
 const CONSTANT_COUNT: IntPtr = 0x77f3c4 as _;
 const CONSTANT_NAMES: UStrListPtr = 0x78c14c as _;
 const CONSTANT_VALUES: UStrListPtr = 0x78c150 as _;
+const CONSTANT_NAME_TYPE: TypeInfoPtr = 0x696594 as _;
+const CONSTANT_VALUE_TYPE: TypeInfoPtr = 0x6965c0 as _;
 
 const SOUNDS: AssetList<Sound> = 0x77f2b8 as _;
 const SOUND_FORMS: Forms = 0x77f2bc as _;
@@ -115,69 +117,70 @@ pub mod settings {
     #![allow(dead_code)]
     use crate::delphi::{TGraphic, UStr};
 
-    pub const FULLSCREEN: *const bool = 0x77f514 as _;
-    pub const INTERPOLATE_PIXELS: *const bool = 0x77f518 as _;
-    pub const DONT_DRAW_BORDER: *const bool = 0x77f51c as _;
-    pub const DISPLAY_CURSOR: *const bool = 0x77f520 as _;
-    pub const SCALING: *const u32 = 0x77f524 as _;
-    pub const ALLOW_RESIZE: *const bool = 0x77f528 as _;
-    pub const WINDOW_ON_TOP: *const bool = 0x77f52c as _;
-    pub const CLEAR_COLOUR: *const u32 = 0x77f530 as _;
-    pub const SET_RESOLUTION: *const bool = 0x77f534 as _;
-    pub const COLOUR_DEPTH: *const u32 = 0x77f538 as _;
-    pub const RESOLUTION: *const u32 = 0x77f53c as _;
-    pub const FREQUENCY: *const u32 = 0x77f540 as _;
-    pub const DONT_SHOW_BUTTONS: *const bool = 0x77f544 as _;
-    pub const VSYNC_AND_FORCE_CPU: *const u32 = 0x77f54c as _;
-    pub const DISABLE_SCREENSAVER: *const bool = 0x77f550 as _;
-    pub const F4_FULLSCREEN: *const bool = 0x77f554 as _;
-    pub const F1_HELP: *const bool = 0x77f558 as _;
-    pub const ESC_CLOSE: *const bool = 0x77f55c as _;
-    pub const F5_SAVE_F6_LOAD: *const bool = 0x77f560 as _;
-    pub const F9_SCREENSHOT: *const bool = 0x77f564 as _;
-    pub const TREAT_CLOSE_AS_ESC: *const bool = 0x77f568 as _;
-    pub const PRIORITY: *const u32 = 0x77f56c as _;
-    pub const FREEZE_ON_LOSE_FOCUS: *const bool = 0x77f548 as _;
-    pub const LOADING_BAR: *const u32 = 0x77f570 as _;
-    pub const LOADING_BACKGROUND: *const *const TGraphic = 0x77f580 as _;
-    pub const LOADING_FOREGROUND: *const *const TGraphic = 0x77f57c as _;
-    pub const HAS_CUSTOM_LOAD_IMAGE: *const bool = 0x77f574 as _;
-    pub const CUSTOM_LOAD_IMAGE: *const *const TGraphic = 0x77f578 as _;
-    pub const LOADING_TRANSPARENT: *const bool = 0x77f584 as _;
-    pub const LOADING_TRANSLUCENCY: *const u32 = 0x77f588 as _;
-    pub const LOADING_PROGRESS_BAR_SCALE: *const bool = 0x77f58c as _;
-    pub const ICON: *const *const TGraphic = 0x77f590 as _;
-    pub const SHOW_ERROR_MESSAGES: *const bool = 0x77f594 as _;
-    pub const LOG_ERRORS: *const bool = 0x77f598 as _;
-    pub const ALWAYS_ABORT: *const bool = 0x77f59c as _;
-    pub const ZERO_UNINITIALIZED_VARS: *const bool = 0x77f5a0 as _;
-    pub const ERROR_ON_UNINITIALIZED_ARGS: *const bool = 0x77f5a4 as _;
-    pub const INFO_AUTHOR: *const UStr = 0x77f5a8 as _;
-    pub const INFO_VERSION: *const UStr = 0x77f5ac as _;
-    pub const INFO_INFORMATION: *const UStr = 0x77f5b0 as _;
-    pub const VERSION_MAJOR: *const u32 = 0x77f5b4 as _;
-    pub const VERSION_MINOR: *const u32 = 0x77f5b8 as _;
-    pub const VERSION_RELEASE: *const u32 = 0x77f5bc as _;
-    pub const VERSION_BUILD: *const u32 = 0x77f5c0 as _;
-    pub const EXE_COMPANY: *const UStr = 0x77f5c4 as _;
-    pub const EXE_PRODUCT: *const UStr = 0x77f5c8 as _;
-    pub const EXE_COPYRIGHT: *const UStr = 0x77f5cc as _;
-    pub const EXE_DESCRIPTION: *const UStr = 0x77f5d0 as _;
+    pub const FULLSCREEN: *mut bool = 0x77f514 as _;
+    pub const INTERPOLATE_PIXELS: *mut bool = 0x77f518 as _;
+    pub const DONT_DRAW_BORDER: *mut bool = 0x77f51c as _;
+    pub const DISPLAY_CURSOR: *mut bool = 0x77f520 as _;
+    pub const SCALING: *mut u32 = 0x77f524 as _;
+    pub const ALLOW_RESIZE: *mut bool = 0x77f528 as _;
+    pub const WINDOW_ON_TOP: *mut bool = 0x77f52c as _;
+    pub const CLEAR_COLOUR: *mut u32 = 0x77f530 as _;
+    pub const SET_RESOLUTION: *mut bool = 0x77f534 as _;
+    pub const COLOUR_DEPTH: *mut u32 = 0x77f538 as _;
+    pub const RESOLUTION: *mut u32 = 0x77f53c as _;
+    pub const FREQUENCY: *mut u32 = 0x77f540 as _;
+    pub const DONT_SHOW_BUTTONS: *mut bool = 0x77f544 as _;
+    pub const VSYNC_AND_FORCE_CPU: *mut u32 = 0x77f54c as _;
+    pub const DISABLE_SCREENSAVER: *mut bool = 0x77f550 as _;
+    pub const F4_FULLSCREEN: *mut bool = 0x77f554 as _;
+    pub const F1_HELP: *mut bool = 0x77f558 as _;
+    pub const ESC_CLOSE: *mut bool = 0x77f55c as _;
+    pub const F5_SAVE_F6_LOAD: *mut bool = 0x77f560 as _;
+    pub const F9_SCREENSHOT: *mut bool = 0x77f564 as _;
+    pub const TREAT_CLOSE_AS_ESC: *mut bool = 0x77f568 as _;
+    pub const PRIORITY: *mut u32 = 0x77f56c as _;
+    pub const FREEZE_ON_LOSE_FOCUS: *mut bool = 0x77f548 as _;
+    pub const LOADING_BAR: *mut u32 = 0x77f570 as _;
+    pub const LOADING_BACKGROUND: *mut *const TGraphic = 0x77f580 as _;
+    pub const LOADING_FOREGROUND: *mut *const TGraphic = 0x77f57c as _;
+    pub const HAS_CUSTOM_LOAD_IMAGE: *mut bool = 0x77f574 as _;
+    pub const CUSTOM_LOAD_IMAGE: *mut *const TGraphic = 0x77f578 as _;
+    pub const LOADING_TRANSPARENT: *mut bool = 0x77f584 as _;
+    pub const LOADING_TRANSLUCENCY: *mut u32 = 0x77f588 as _;
+    pub const LOADING_PROGRESS_BAR_SCALE: *mut bool = 0x77f58c as _;
+    pub const ICON: *mut *const TGraphic = 0x77f590 as _;
+    pub const SHOW_ERROR_MESSAGES: *mut bool = 0x77f594 as _;
+    pub const LOG_ERRORS: *mut bool = 0x77f598 as _;
+    pub const ALWAYS_ABORT: *mut bool = 0x77f59c as _;
+    pub const ZERO_UNINITIALIZED_VARS: *mut bool = 0x77f5a0 as _;
+    pub const ERROR_ON_UNINITIALIZED_ARGS: *mut bool = 0x77f5a4 as _;
+    pub const INFO_AUTHOR: *mut UStr = 0x77f5a8 as _;
+    pub const INFO_VERSION: *mut UStr = 0x77f5ac as _;
+    pub const INFO_TIMESTAMP: *mut f64 = 0x79081c as _;
+    pub const INFO_INFORMATION: *mut UStr = 0x77f5b0 as _;
+    pub const VERSION_MAJOR: *mut u32 = 0x77f5b4 as _;
+    pub const VERSION_MINOR: *mut u32 = 0x77f5b8 as _;
+    pub const VERSION_RELEASE: *mut u32 = 0x77f5bc as _;
+    pub const VERSION_BUILD: *mut u32 = 0x77f5c0 as _;
+    pub const EXE_COMPANY: *mut UStr = 0x77f5c4 as _;
+    pub const EXE_PRODUCT: *mut UStr = 0x77f5c8 as _;
+    pub const EXE_COPYRIGHT: *mut UStr = 0x77f5cc as _;
+    pub const EXE_DESCRIPTION: *mut UStr = 0x77f5d0 as _;
 }
 
 pub mod game_info {
     use crate::delphi::{THelpForm, UStr};
-    pub const NEW_WINDOW: *const bool = 0x77f578 as _;
-    pub const CAPTION: *const UStr = 0x77b57c as _;
-    pub const LEFT: *const i32 = 0x77b580 as _;
-    pub const TOP: *const i32 = 0x77b584 as _;
-    pub const WIDTH: *const i32 = 0x77b588 as _;
-    pub const HEIGHT: *const i32 = 0x77b58c as _;
-    pub const BORDER: *const bool = 0x77b590 as _;
-    pub const RESIZABLE: *const bool = 0x77b594 as _;
-    pub const WINDOW_ON_TOP: *const bool = 0x77b598 as _;
-    pub const FREEZE_GAME: *const bool = 0x77b59c as _;
-    pub const FORM: *const *const THelpForm = 0x788958 as _;
+    pub const NEW_WINDOW: *mut bool = 0x77f578 as _;
+    pub const CAPTION: *mut UStr = 0x77b57c as _;
+    pub const LEFT: *mut i32 = 0x77b580 as _;
+    pub const TOP: *mut i32 = 0x77b584 as _;
+    pub const WIDTH: *mut i32 = 0x77b588 as _;
+    pub const HEIGHT: *mut i32 = 0x77b58c as _;
+    pub const BORDER: *mut bool = 0x77b590 as _;
+    pub const RESIZABLE: *mut bool = 0x77b594 as _;
+    pub const WINDOW_ON_TOP: *mut bool = 0x77b598 as _;
+    pub const FREEZE_GAME: *mut bool = 0x77b59c as _;
+    pub const FORM: *mut *const THelpForm = 0x788958 as _;
 }
 
 pub fn initialize_project() {
@@ -207,7 +210,7 @@ macro_rules! get_assets {
             read_array!([<get_ $lo _forms>], Form, $assets_p.add(1) as Forms, $count_p);
             read_array!([<get_ $lo _names>], UStr, $assets_p.add(2) as UStrListPtr, $count_p);
             read_array!([<get_ $lo _timestamps>], f64, $assets_p.add(3) as Timestamps, $count_p);
-            pub fn [<alloc_ $lo s>]<'a>(count: usize) {
+            pub fn [<alloc_ $lo s>](count: usize) {
                 unsafe {
                     $count_p.write(count);
                     for i in 0..4 {
@@ -226,7 +229,7 @@ macro_rules! get_graphics {
             read_array!([<get_ $lo _names>], UStr, $assets_p.add(2) as UStrListPtr, $count_p);
             read_array!([<get_ $lo _timestamps>], f64, $assets_p.add(3) as Timestamps, $count_p);
             read_array!([<get_ $lo _thumbs>], i32, $assets_p.add(4) as ThumbIDs, $count_p);
-            pub fn [<alloc_ $lo s>]<'a>(count: usize) {
+            pub fn [<alloc_ $lo s>](count: usize) {
                 unsafe {
                     $count_p.write(count);
                     for i in 0..5 {
@@ -255,3 +258,11 @@ read_array!(get_triggers, Option<&'static Trigger>, TRIGGERS, TRIGGER_COUNT);
 read_array!(get_included_files, &'static IncludedFile, INCLUDED_FILES, INCLUDED_FILE_COUNT);
 read_array!(get_extensions, &'static Extension, EXTENSIONS, EXTENSION_COUNT);
 read_array!(get_extensions_loaded, bool, EXTENSIONS_LOADED, EXTENSION_COUNT);
+
+pub fn alloc_constants(count: usize) {
+    unsafe {
+        CONSTANT_COUNT.write(count);
+        delphi::DynArraySetLength(CONSTANT_NAMES, CONSTANT_NAME_TYPE, 1, count);
+        delphi::DynArraySetLength(CONSTANT_VALUES, CONSTANT_VALUE_TYPE, 1, count);
+    }
+}
