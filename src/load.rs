@@ -372,6 +372,29 @@ unsafe fn load_object(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*con
     Ok(obj)
 }
 
+unsafe fn load_timeline(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const Timeline> {
+    let object_map = asset_maps.objects.as_ref().unwrap();
+    let tl = &mut *Timeline::new();
+    path.set_extension("gml");
+    let code = std::fs::read_to_string(&path)?;
+    let iter = code.trim_start_matches("#define ").split("\n#define ");
+    tl.alloc(iter.clone().count());
+    let times = slice::from_raw_parts_mut(tl.moment_times, tl.moment_count);
+    let events = slice::from_raw_parts_mut(tl.moment_events, tl.moment_count);
+    for (code, time_p, event_p) in izip!(iter, times, events) {
+        if code.trim().is_empty() {
+            continue
+        }
+        let err = || Error::SyntaxError(path.to_path_buf());
+        let (name, actions) = code.split_once("\n").ok_or_else(err)?;
+        *time_p = name.trim().parse()?;
+        let event = Event::new();
+        load_event(&path, &mut *event, actions.trim(), object_map)?;
+        *event_p = event;
+    }
+    Ok(tl)
+}
+
 unsafe fn load_constants(path: &mut PathBuf) -> Result<()> {
     path.push("constants.txt");
     let s = std::fs::read_to_string(&path)?;
@@ -559,6 +582,17 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         ide::get_objects_mut,
         ide::get_object_names_mut,
         ide::alloc_objects,
+        &mut path,
+        &mut asset_maps,
+    )?;
+    load_assets(
+        "timelines",
+        12,
+        ide::RT_TIMELINES,
+        load_timeline,
+        ide::get_timelines_mut,
+        ide::get_timeline_names_mut,
+        ide::alloc_timelines,
         &mut path,
         &mut asset_maps,
     )?;

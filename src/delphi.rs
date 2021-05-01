@@ -301,7 +301,7 @@ pub unsafe fn DynArrayClear<T, U>(a: *mut T, type_info: *const U) {
     let _: u32 = delphi_call!(0x409ce0, a, type_info);
 }
 
-pub unsafe fn DynArraySetLength<T, U>(a: *mut *mut T, type_info: *const U, dimensions: usize, size: usize) {
+pub unsafe fn DynArraySetLength<T>(a: *mut *mut T, type_info: *const u8, dimensions: usize, size: usize) {
     // this has caller clean-up for some reason
     asm! {
         "push {d}",

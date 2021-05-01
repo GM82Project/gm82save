@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use crate::{
-    delphi::{TMemoryStream, UStr},
+    delphi::{DynArraySetLength, TMemoryStream, UStr},
     delphi_call,
 };
 
@@ -212,9 +212,21 @@ impl Event {
 #[repr(C)]
 pub struct Timeline {
     exists: u32,
-    pub moment_events: *const *const Event,
-    pub moment_times: *const u32,
-    pub moment_count: u32,
+    pub moment_events: *mut *mut Event,
+    pub moment_times: *mut u32,
+    pub moment_count: usize,
+}
+
+impl Timeline {
+    pub unsafe fn new() -> *mut Self {
+        delphi_call!(0x5adf3c, 0x5ad98c, 1)
+    }
+
+    pub unsafe fn alloc(&mut self, count: usize) {
+        self.moment_count = count;
+        DynArraySetLength(&mut self.moment_times, 0x5ad900 as _, 1, count);
+        DynArraySetLength(&mut self.moment_events, 0x5ad8c8 as _, 1, count);
+    }
 }
 
 unsafe impl Sync for Timeline {}
