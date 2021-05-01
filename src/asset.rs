@@ -162,7 +162,7 @@ pub struct Font {
 
 impl Font {
     pub unsafe fn new() -> *mut Self {
-        delphi_call!(0x62dba4, 0x62d408, 1)
+        delphi_call!(0x5a8760, 0x5a6628, 1)
     }
 }
 
