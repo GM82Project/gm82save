@@ -54,6 +54,10 @@ impl Frame {
     pub unsafe fn new() -> *mut Self {
         delphi_call!(0x701bf8, 0x700d94, 1)
     }
+
+    pub unsafe fn load_from_file(&mut self, file: &UStr) {
+        let _: u32 = delphi_call!(0x7026A4, self, file);
+    }
 }
 
 #[repr(C)]
@@ -366,6 +370,12 @@ pub struct IncludedFile {
     pub overwrite_file: bool,
     pub free_memory: bool,
     pub remove_at_end: bool,
+}
+
+impl IncludedFile {
+    pub unsafe fn new() -> *mut Self {
+        delphi_call!(0x6ca800, 0x6ca360, 1)
+    }
 }
 
 #[repr(C)]

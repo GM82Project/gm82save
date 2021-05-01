@@ -130,6 +130,17 @@ unsafe fn load_triggers(path: &mut PathBuf) -> Result<HashMap<String, usize>> {
     Ok(name_map)
 }
 
+fn verify_path(path: &std::path::Path) -> Result<()> {
+    if path.exists() {
+        Ok(())
+    } else {
+        Err(Error::IoError(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("file {} not found", path.to_string_lossy()),
+        )))
+    }
+}
+
 unsafe fn load_sound(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*const Sound> {
     let snd = &mut *Sound::new();
     path.set_extension("txt");
@@ -152,12 +163,7 @@ unsafe fn load_sound(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*con
     })?;
     if exists {
         path.set_extension(extension.trim_matches('.'));
-        if !path.exists() {
-            return Err(Error::IoError(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                format!("file {} not found", path.to_string_lossy()),
-            )))
-        }
+        verify_path(&path)?;
         let data = &mut *delphi::TMemoryStream::new();
         data.load(&UStr::new(path.as_ref()));
         snd.data = data;
@@ -413,10 +419,156 @@ unsafe fn load_constants(path: &mut PathBuf) -> Result<()> {
     Ok(())
 }
 
+unsafe fn load_included_files(path: &mut PathBuf) -> Result<()> {
+    path.push("datafiles");
+    path.push("index.yyd");
+    let index = std::fs::read_to_string(&path)?;
+    path.pop();
+    let files: Vec<_> = index.par_lines().collect();
+    ide::alloc_included_files(files.len());
+    for (fname, file_p) in files.iter().zip(ide::get_included_files_mut()) {
+        let file = &mut *IncludedFile::new();
+        file.file_name = UStr::new(fname.as_ref());
+        path.push(fname.to_string() + ".txt");
+        read_txt(&path, |k, v| {
+            Ok(match k {
+                "store" => file.stored_in_gmk = v.parse::<u8>()? != 0,
+                "free" => file.free_memory = v.parse::<u8>()? != 0,
+                "overwrite" => file.overwrite_file = v.parse::<u8>()? != 0,
+                "remove" => file.remove_at_end = v.parse::<u8>()? != 0,
+                "export" => file.export_setting = v.parse()?,
+                "export_folder" => file.export_custom_folder = UStr::new(v.as_ref()),
+                _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
+            })
+        })?;
+        path.pop();
+        path.push("include");
+        path.push(fname);
+        file.source_path = UStr::new(path.as_ref());
+        file.source_length = std::fs::metadata(&path)?.len() as _;
+        if file.stored_in_gmk {
+            verify_path(&path)?;
+            file.data_exists = true;
+            let data = &mut *delphi::TMemoryStream::new();
+            data.load(&UStr::new(path.as_ref()));
+            file.source_length = data.get_size();
+            file.data = data;
+        }
+        path.pop();
+        path.pop();
+        *file_p = file;
+    }
+    path.pop();
+    Ok(())
+}
+
+unsafe fn load_game_information(path: &mut PathBuf) -> Result<()> {
+    use ide::game_info::*;
+    let editor = &mut *(&**FORM).editor;
+    path.push("game_information.txt");
+    read_txt(&path, |k, v| {
+        Ok(match k {
+            "color" => editor.colour = v.parse()?,
+            "new_window" => NEW_WINDOW.write(v.parse::<u8>()? != 0),
+            "caption" => CAPTION.asg(v),
+            "left" => LEFT.write(v.parse()?),
+            "top" => TOP.write(v.parse()?),
+            "width" => WIDTH.write(v.parse()?),
+            "height" => HEIGHT.write(v.parse()?),
+            "border" => BORDER.write(v.parse::<u8>()? != 0),
+            "resizable" => RESIZABLE.write(v.parse::<u8>()? != 0),
+            "window_on_top" => WINDOW_ON_TOP.write(v.parse::<u8>()? != 0),
+            "freeze_game" => FREEZE_GAME.write(v.parse::<u8>()? != 0),
+            _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
+        })
+    })?;
+    path.set_extension("rtf");
+    verify_path(&path)?;
+    (&mut *editor.rich_edit_strings).LoadFromFile(&UStr::new(path.as_ref()));
+    path.pop();
+    Ok(())
+}
+
 unsafe fn load_settings(path: &mut PathBuf) -> Result<()> {
+    use ide::settings::*;
     path.push("settings");
     load_constants(path)?;
+    let mut custom_load_bar = false;
+    let mut custom_load_bg = false;
+    path.push("settings.txt");
     // TODO
+    read_txt(&path, |k, v| {
+        Ok(match k {
+            "fullscreen" => FULLSCREEN.write(v.parse::<u8>()? != 0),
+            "interpolate_pixels" => INTERPOLATE_PIXELS.write(v.parse::<u8>()? != 0),
+            "dont_draw_border" => DONT_DRAW_BORDER.write(v.parse::<u8>()? != 0),
+            "display_cursor" => DISPLAY_CURSOR.write(v.parse::<u8>()? != 0),
+            "scaling" => SCALING.write(v.parse()?),
+            "allow_resize" => ALLOW_RESIZE.write(v.parse::<u8>()? != 0),
+            "window_on_top" => WINDOW_ON_TOP.write(v.parse::<u8>()? != 0),
+            "clear_color" => CLEAR_COLOUR.write(v.parse()?),
+            "set_resolution" => SET_RESOLUTION.write(v.parse::<u8>()? != 0),
+            "color_depth" => COLOUR_DEPTH.write(v.parse()?),
+            "resolution" => RESOLUTION.write(v.parse()?),
+            "frequency" => FREQUENCY.write(v.parse()?),
+            "dont_show_buttons" => DONT_SHOW_BUTTONS.write(v.parse::<u8>()? != 0),
+            "vsync" => *VSYNC_AND_FORCE_CPU |= 1,
+            "force_cpu_render" => *VSYNC_AND_FORCE_CPU |= 1 << 7,
+            "disable_screensaver" => DISABLE_SCREENSAVER.write(v.parse::<u8>()? != 0),
+            "f4_fullscreen_toggle" => F4_FULLSCREEN.write(v.parse::<u8>()? != 0),
+            "f1_help_menu" => F1_HELP.write(v.parse::<u8>()? != 0),
+            "esc_close_game" => ESC_CLOSE.write(v.parse::<u8>()? != 0),
+            "f5_save_f6_load" => F5_SAVE_F6_LOAD.write(v.parse::<u8>()? != 0),
+            "f9_screenshot" => F9_SCREENSHOT.write(v.parse::<u8>()? != 0),
+            "treat_close_as_esc" => TREAT_CLOSE_AS_ESC.write(v.parse::<u8>()? != 0),
+            "priority" => PRIORITY.write(v.parse()?),
+            "freeze_on_lose_focus" => FREEZE_ON_LOSE_FOCUS.write(v.parse::<u8>()? != 0),
+            "custom_loader" => {
+                custom_load_bg = true;
+                HAS_CUSTOM_LOAD_IMAGE.write(v.parse::<u8>()? != 0);
+            },
+            "custom_bar" => {
+                let bar = v.parse()?;
+                custom_load_bar = bar == 2;
+                LOADING_BAR.write(bar);
+            },
+            "transparent" => LOADING_TRANSPARENT.write(v.parse::<u8>()? != 0),
+            "translucency" => LOADING_TRANSLUCENCY.write(v.parse()?),
+            "scale_progress_bar" => LOADING_PROGRESS_BAR_SCALE.write(v.parse::<u8>()? != 0),
+            "show_error_messages" => SHOW_ERROR_MESSAGES.write(v.parse::<u8>()? != 0),
+            "log_errors" => LOG_ERRORS.write(v.parse::<u8>()? != 0),
+            "always_abort" => ALWAYS_ABORT.write(v.parse::<u8>()? != 0),
+            "zero_uninitialized_vars" => ZERO_UNINITIALIZED_VARS.write(v.parse::<u8>()? != 0),
+            "error_on_uninitialized_args" => ERROR_ON_UNINITIALIZED_ARGS.write(v.parse::<u8>()? != 0),
+            _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
+        })
+    })?;
+    path.pop();
+    if custom_load_bar {
+        path.push("back.bmp");
+        verify_path(&path)?;
+        let bg = &mut *delphi::TBitmap::new();
+        bg.LoadFromFile(&UStr::new(path.as_ref()));
+        *LOADING_BACKGROUND = bg;
+        path.pop();
+        path.push("front.bmp");
+        verify_path(&path)?;
+        let fg = &mut *delphi::TBitmap::new();
+        fg.LoadFromFile(&UStr::new(path.as_ref()));
+        *LOADING_FOREGROUND = fg;
+        path.pop();
+    }
+    if custom_load_bg {
+        path.push("loader.bmp");
+        let im = &mut *delphi::TBitmap::new();
+        im.LoadFromFile(&UStr::new(path.as_ref()));
+        *CUSTOM_LOAD_IMAGE = im;
+        path.pop();
+    }
+    path.push("icon.ico");
+    verify_path(&path)?;
+    (&mut **ICON).LoadFromFile(&UStr::new(path.as_ref()));
+    path.pop();
     {
         path.push("extensions.txt");
         let f = open_file(&path)?;
@@ -434,6 +586,7 @@ unsafe fn load_settings(path: &mut PathBuf) -> Result<()> {
         }
         path.pop();
     }
+    load_game_information(path)?;
     path.pop();
     Ok(())
 }
@@ -598,5 +751,6 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         &mut path,
         &mut asset_maps,
     )?;
+    load_included_files(&mut path)?;
     Ok(())
 }

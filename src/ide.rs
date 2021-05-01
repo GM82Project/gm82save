@@ -96,6 +96,7 @@ const ROOM_TYPEINFO: TypeInfoPtr = 0x6928f8 as _;
 const ROOM_TYPESIZE: usize = 0x28;
 
 const INCLUDED_FILES: GaplessList<IncludedFile> = 0x77f420 as _;
+const INCLUDED_FILE_TIMESTAMPS: Timestamps = 0x77f424 as _;
 const INCLUDED_FILE_COUNT: IntPtr = 0x77f428 as _;
 
 const EXTENSIONS: GaplessList<Extension> = 0x77f5d4 as _;
@@ -124,7 +125,7 @@ pub const _LAST_TILE_ID: IntPtr = 0x77f2e4 as IntPtr;
 
 pub mod settings {
     #![allow(dead_code)]
-    use crate::delphi::{TGraphic, UStr};
+    use crate::delphi::{TBitmap, TIcon, UStr};
 
     pub const FULLSCREEN: *mut bool = 0x77f514 as _;
     pub const INTERPOLATE_PIXELS: *mut bool = 0x77f518 as _;
@@ -150,14 +151,14 @@ pub mod settings {
     pub const PRIORITY: *mut u32 = 0x77f56c as _;
     pub const FREEZE_ON_LOSE_FOCUS: *mut bool = 0x77f548 as _;
     pub const LOADING_BAR: *mut u32 = 0x77f570 as _;
-    pub const LOADING_BACKGROUND: *mut *const TGraphic = 0x77f580 as _;
-    pub const LOADING_FOREGROUND: *mut *const TGraphic = 0x77f57c as _;
+    pub const LOADING_BACKGROUND: *mut *mut TBitmap = 0x77f580 as _;
+    pub const LOADING_FOREGROUND: *mut *mut TBitmap = 0x77f57c as _;
     pub const HAS_CUSTOM_LOAD_IMAGE: *mut bool = 0x77f574 as _;
-    pub const CUSTOM_LOAD_IMAGE: *mut *const TGraphic = 0x77f578 as _;
+    pub const CUSTOM_LOAD_IMAGE: *mut *mut TBitmap = 0x77f578 as _;
     pub const LOADING_TRANSPARENT: *mut bool = 0x77f584 as _;
     pub const LOADING_TRANSLUCENCY: *mut u32 = 0x77f588 as _;
     pub const LOADING_PROGRESS_BAR_SCALE: *mut bool = 0x77f58c as _;
-    pub const ICON: *mut *const TGraphic = 0x77f590 as _;
+    pub const ICON: *const *mut TIcon = 0x77f590 as _;
     pub const SHOW_ERROR_MESSAGES: *mut bool = 0x77f594 as _;
     pub const LOG_ERRORS: *mut bool = 0x77f598 as _;
     pub const ALWAYS_ABORT: *mut bool = 0x77f59c as _;
@@ -287,5 +288,13 @@ pub fn alloc_triggers(count: usize) {
     unsafe {
         TRIGGER_COUNT.write(count);
         delphi::DynArraySetLength(TRIGGERS, 0x6bc93c as TypeInfoPtr, 1, count);
+    }
+}
+
+pub fn alloc_included_files(count: usize) {
+    unsafe {
+        INCLUDED_FILE_COUNT.write(count);
+        delphi::DynArraySetLength(INCLUDED_FILES, 0x6cc47c as _, 1, count);
+        delphi::DynArraySetLength(INCLUDED_FILE_TIMESTAMPS, 0x6cc4a8 as _, 1, count);
     }
 }

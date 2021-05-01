@@ -120,16 +120,30 @@ pub struct TTreeView {
     pub nodes: *const TTreeNodes,
 }
 
-pub struct TGraphic {}
+pub struct TBitmap {}
 
-impl TGraphic {
+impl TBitmap {
+    pub unsafe fn new() -> *mut Self {
+        delphi_call!(0x462144, 0x4587d4, 1)
+    }
+
     pub unsafe fn SaveToFile(&self, filename: &UStr) {
-        // NOTE: FILENAME MUST BE FULLY FORMED
         let _: u32 = delphi_call!(0x45e6d8, self, filename.0);
     }
 
     pub unsafe fn LoadFromFile(&self, filename: &UStr) {
-        // NOTE: FILENAME MUST BE FULLY FORMED
+        let _: u32 = delphi_call!(0x45e64c, self, filename.0);
+    }
+}
+
+pub struct TIcon {}
+
+impl TIcon {
+    pub unsafe fn SaveToFile(&self, filename: &UStr) {
+        let _: u32 = delphi_call!(0x45e6d8, self, filename.0);
+    }
+
+    pub unsafe fn LoadFromFile(&self, filename: &UStr) {
         let _: u32 = delphi_call!(0x45e64c, self, filename.0);
     }
 }
@@ -183,7 +197,7 @@ impl TMemoryStream {
 #[repr(C)]
 pub struct THelpForm {
     padding: [u8; 0x388],
-    pub editor: *const TRichEdit,
+    pub editor: *mut TRichEdit,
 }
 
 #[repr(C)]
@@ -191,7 +205,7 @@ pub struct TRichEdit {
     padding: [u8; 0x6c],
     pub colour: u32,
     padding2: [u8; 0x2c0 - 0x70],
-    pub rich_edit_strings: *const TStrings,
+    pub rich_edit_strings: *mut TStrings,
 }
 
 pub struct TStrings {}
@@ -199,6 +213,10 @@ pub struct TStrings {}
 impl TStrings {
     pub unsafe fn SaveToFile(&self, fname: &UStr) {
         let _: u32 = delphi_call!(0x43e204, self, fname.0);
+    }
+
+    pub unsafe fn LoadFromFile(&mut self, fname: &UStr) {
+        let _: u32 = delphi_call!(0x43DEC0, self, fname.0);
     }
 }
 
