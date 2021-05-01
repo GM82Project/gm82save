@@ -267,7 +267,7 @@ unsafe fn load_event(
         if action_code.trim().is_empty() {
             continue
         }
-        let (params, code) = action_code.split_once("*/\n").ok_or_else(|| Error::SyntaxError(path.to_path_buf()))?;
+        let (params, code) = action_code.split_once("*/").ok_or_else(|| Error::SyntaxError(path.to_path_buf()))?;
         let action = &mut *event.add_action(0, 0);
         for line in params.lines() {
             decode_line(path, line, &mut |k, v| {
@@ -309,7 +309,9 @@ unsafe fn load_event(
             return Err(Error::UnknownAction(action.lib_id, action.id))
         }
         if action.action_kind == 7 {
-            action.param_strings[0] = UStr::new(code.as_ref());
+            // first character will always be LF because it doesn't cut the newline when searching for */
+            // so skip it
+            action.param_strings[0] = UStr::new(code[1..].as_ref());
         }
     }
     Ok(())
@@ -367,7 +369,7 @@ unsafe fn load_object(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*con
             _ => ev_numb_s.parse()?,
         };
         let event = &mut *obj.get_event(ev_type, ev_numb);
-        load_event(&path, event, actions.trim(), object_map)?;
+        load_event(&path, event, actions, object_map)?;
     }
     Ok(obj)
 }
@@ -389,7 +391,7 @@ unsafe fn load_timeline(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*c
         let (name, actions) = code.split_once("\n").ok_or_else(err)?;
         *time_p = name.trim().parse()?;
         let event = Event::new();
-        load_event(&path, &mut *event, actions.trim(), object_map)?;
+        load_event(&path, &mut *event, actions, object_map)?;
         *event_p = event;
     }
     Ok(tl)
