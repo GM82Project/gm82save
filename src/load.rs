@@ -39,14 +39,22 @@ fn open_file(path: &std::path::Path) -> Result<BufReader<File>> {
     Ok(BufReader::new(File::open(path)?))
 }
 
+fn decode_line<'a, F: FnMut(&'a str, &'a str) -> Result<()>>(
+    path: &std::path::Path,
+    line: &'a str,
+    func: &mut F,
+) -> Result<()> {
+    if !line.is_empty() {
+        let (key, value) = line.split_once('=').ok_or_else(|| Error::SyntaxError(path.to_path_buf()))?;
+        func(key, value)?;
+    }
+    Ok(())
+}
+
 fn read_txt<F: FnMut(&str, &str) -> Result<()>>(path: &std::path::Path, mut func: F) -> Result<()> {
     let f = open_file(path)?;
     for line in f.lines() {
-        let line = line?;
-        if !line.is_empty() {
-            let (key, value) = line.split_once('=').ok_or_else(|| Error::SyntaxError(path.to_path_buf()))?;
-            func(key, value)?;
-        }
+        decode_line(path, &line?, &mut func)?;
     }
     Ok(())
 }
@@ -253,11 +261,11 @@ unsafe fn load_constants(path: &mut PathBuf) -> Result<()> {
     let lines: Vec<_> = s.par_lines().collect();
     ide::alloc_constants(lines.len());
     for (line, name_p, value_p) in izip!(lines, ide::get_constant_names_mut(), ide::get_constants_mut()) {
-        if !line.is_empty() {
-            let (name, value) = line.split_once('=').ok_or_else(|| Error::SyntaxError(path.to_path_buf()))?;
+        decode_line(&path, line, &mut |name, value| {
             *name_p = UStr::new(name.as_ref());
             *value_p = UStr::new(value.as_ref());
-        }
+            Ok(())
+        })?;
     }
     Ok(())
 }
