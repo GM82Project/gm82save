@@ -275,3 +275,10 @@ pub fn alloc_constants(count: usize) {
         delphi::DynArraySetLength(CONSTANT_VALUES, CONSTANT_VALUE_TYPE, 1, count);
     }
 }
+
+pub fn alloc_triggers(count: usize) {
+    unsafe {
+        TRIGGER_COUNT.write(count);
+        delphi::DynArraySetLength(TRIGGERS, 0x6bc93c as TypeInfoPtr, 1, count);
+    }
+}

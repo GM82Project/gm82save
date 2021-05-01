@@ -14,6 +14,12 @@ pub struct Trigger {
     pub kind: u32,
 }
 
+impl Trigger {
+    pub unsafe fn new() -> *mut Self {
+        delphi_call!(0x62d200, 0x62cf48, 1)
+    }
+}
+
 #[repr(C)]
 pub struct Sound {
     exists: u32,

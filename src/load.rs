@@ -3,6 +3,7 @@ use itertools::izip;
 use rayon::prelude::*;
 use std::{
     collections::HashMap,
+    ffi::OsStr,
     fs::File,
     io::{BufRead, BufReader},
     path::PathBuf,
@@ -87,6 +88,34 @@ unsafe fn read_resource_tree(
             stack.push(node);
         }
     }
+    Ok(())
+}
+
+unsafe fn load_triggers(path: &mut PathBuf) -> Result<()> {
+    path.push("triggers");
+    path.push("index.yyd");
+    let index = std::fs::read_to_string(&path)?;
+    path.pop();
+    let names: Vec<_> = index.par_lines().collect();
+    ide::alloc_constants(names.len());
+    for (name, trig_p) in names.iter().zip(ide::get_triggers_mut()) {
+        let trig = &mut *Trigger::new();
+        trig.name = UStr::new(name.as_ref());
+        path.push(name);
+        path.set_extension("txt");
+        read_txt(&path, |k, v| {
+            Ok(match k {
+                "constant" => trig.constant_name = UStr::new(v.as_ref()),
+                "kind" => trig.kind = v.parse()?,
+                _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
+            })
+        })?;
+        path.set_extension("gml");
+        trig.condition = UStr::new(std::fs::read_to_string(&path)?.as_ref());
+        path.pop();
+        *trig_p = Some(trig);
+    }
+    path.pop();
     Ok(())
 }
 
@@ -201,8 +230,25 @@ unsafe fn load_constants(path: &mut PathBuf) -> Result<()> {
 unsafe fn load_settings(path: &mut PathBuf) -> Result<()> {
     path.push("settings");
     load_constants(path)?;
-    path.pop();
     // TODO
+    {
+        path.push("extensions.txt");
+        let f = open_file(&path)?;
+        for line in f.lines() {
+            let name = line?;
+            if let Some((_, loaded)) = ide::get_extensions()
+                .iter()
+                .zip(ide::get_extensions_loaded_mut())
+                .find(|(ex, _)| ex.name.to_os_string() == OsStr::new(&name))
+            {
+                *loaded = true;
+            } else {
+                crate::show_message(&format!("Cannot find extension package: {}", name));
+            }
+        }
+        path.pop();
+    }
+    path.pop();
     Ok(())
 }
 
@@ -270,6 +316,7 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     })?;
     path.pop();
     load_settings(&mut path)?;
+    load_triggers(&mut path)?;
     let mut asset_maps = AssetMaps::default();
     asset_maps.sprites = Some(load_assets(
         "sprites",
