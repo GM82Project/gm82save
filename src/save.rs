@@ -454,9 +454,6 @@ unsafe fn save_settings(path: &mut PathBuf) -> Result<()> {
     path.push("settings");
     std::fs::create_dir_all(&path)?;
     save_constants(path)?;
-    path.push("information.txt");
-    std::fs::write(&path, (&*ide::settings::INFO_INFORMATION).try_decode()?)?;
-    path.pop();
     path.push("settings.txt");
     let mut f = open_file(&path)?;
     path.pop();
@@ -593,7 +590,7 @@ unsafe fn save_included_files(path: &mut PathBuf) -> Result<()> {
     path.push("include");
     std::fs::create_dir_all(&path)?;
     path.pop();
-    path.push("index.txt");
+    path.push("index.yyd");
     let mut index = open_file(&path)?;
     path.pop();
     let files = ide::get_included_files();
