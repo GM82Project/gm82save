@@ -1,4 +1,4 @@
-use crate::{asset::*, delphi, delphi::UStr, ide, Error, Result};
+use crate::{asset::*, delphi, delphi::UStr, events, ide, Error, Result, ACTION_TOKEN};
 use itertools::izip;
 use rayon::prelude::*;
 use std::{
@@ -29,9 +29,10 @@ impl UStrPtr for *mut UStr {
 
 #[derive(Default)]
 struct AssetMaps {
+    triggers: Option<HashMap<String, usize>>,    // req for objects
     sprites: Option<HashMap<String, usize>>,     // req for objects
     backgrounds: Option<HashMap<String, usize>>, // req for rooms
-    objects: Option<HashMap<String, usize>>,     // req for rooms
+    objects: Option<HashMap<String, usize>>,     // req for rooms and timelines
     rooms: Option<HashMap<String, usize>>,       // req for paths
 }
 
@@ -99,12 +100,14 @@ unsafe fn read_resource_tree(
     Ok(())
 }
 
-unsafe fn load_triggers(path: &mut PathBuf) -> Result<()> {
+unsafe fn load_triggers(path: &mut PathBuf) -> Result<HashMap<String, usize>> {
     path.push("triggers");
     path.push("index.yyd");
     let index = std::fs::read_to_string(&path)?;
     path.pop();
     let names: Vec<_> = index.par_lines().collect();
+    let name_map: HashMap<String, usize> =
+        names.par_iter().enumerate().filter_map(|(i, s)| (!s.is_empty()).then(|| (s.to_string(), i))).collect();
     ide::alloc_constants(names.len());
     for (name, trig_p) in names.iter().zip(ide::get_triggers_mut()) {
         let trig = &mut *Trigger::new();
@@ -124,7 +127,7 @@ unsafe fn load_triggers(path: &mut PathBuf) -> Result<()> {
         *trig_p = Some(trig);
     }
     path.pop();
-    Ok(())
+    Ok(name_map)
 }
 
 unsafe fn load_sound(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*const Sound> {
@@ -254,6 +257,121 @@ unsafe fn load_font(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*cons
     Ok(f)
 }
 
+unsafe fn load_event(
+    path: &std::path::Path,
+    event: &mut Event,
+    event_code: &str,
+    objs: &HashMap<String, usize>,
+) -> Result<()> {
+    for action_code in event_code.split(ACTION_TOKEN) {
+        if action_code.trim().is_empty() {
+            continue
+        }
+        let (params, code) = action_code.split_once("*/\n").ok_or_else(|| Error::SyntaxError(path.to_path_buf()))?;
+        let action = &mut *event.add_action(0, 0);
+        for line in params.lines() {
+            decode_line(path, line, &mut |k, v| {
+                Ok(match k {
+                    "lib_id" => action.lib_id = v.parse()?,
+                    "action_id" => action.id = v.parse()?,
+                    "relative" => action.is_relative = v.parse::<u8>()? != 0,
+                    "applies_to" => {
+                        action.applies_to = match v {
+                            "other" => -2,
+                            "self" => -1,
+                            name => *objs.get(name).ok_or_else(|| Error::AssetNotFound(name.to_string()))? as _,
+                        }
+                    },
+                    "invert" => action.invert_condition = v.parse::<u8>()? != 0,
+                    "arg0" | "var_name" | "repeats" => action.param_strings[0] = UStr::new(v.as_ref()),
+                    "arg1" | "var_value" => action.param_strings[1] = UStr::new(v.as_ref()),
+                    "arg2" => action.param_strings[2] = UStr::new(v.as_ref()),
+                    "arg3" => action.param_strings[3] = UStr::new(v.as_ref()),
+                    "arg4" => action.param_strings[4] = UStr::new(v.as_ref()),
+                    "arg5" => action.param_strings[5] = UStr::new(v.as_ref()),
+                    "arg6" => action.param_strings[6] = UStr::new(v.as_ref()),
+                    "arg7" => action.param_strings[7] = UStr::new(v.as_ref()),
+                    _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
+                })
+            })?;
+        }
+        // manually check if action exists so we can throw an error
+        if ide::get_action_libraries()
+            .iter()
+            .find(|&l| {
+                l.id == action.lib_id
+                    && slice::from_raw_parts(l.actions, l.action_count).iter().find(|&a| a.id == action.id).is_some()
+            })
+            .is_some()
+        {
+            action.fill_in(action.lib_id, action.id);
+        } else {
+            return Err(Error::UnknownAction(action.lib_id, action.id))
+        }
+        if action.action_kind == 7 {
+            action.param_strings[0] = UStr::new(code.as_ref());
+        }
+    }
+    Ok(())
+}
+
+unsafe fn load_object(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const Object> {
+    path.set_extension("txt");
+    let obj = &mut *Object::new();
+    let sprite_map = asset_maps.sprites.as_ref().unwrap();
+    let object_map = asset_maps.objects.as_ref().unwrap();
+    let trigger_map = asset_maps.triggers.as_ref().unwrap();
+    read_txt(&path, |k, v| {
+        Ok(match k {
+            "sprite" => {
+                obj.sprite_index = match sprite_map.get(v) {
+                    Some(&i) => i as _,
+                    None if v.is_empty() => -1,
+                    _ => return Err(Error::AssetNotFound(v.to_string())),
+                }
+            },
+            "visible" => obj.visible = v.parse::<u8>()? != 0,
+            "solid" => obj.solid = v.parse::<u8>()? != 0,
+            "persistent" => obj.persistent = v.parse::<u8>()? != 0,
+            "depth" => obj.depth = v.parse()?,
+            "parent" => {
+                obj.parent_index = match object_map.get(v) {
+                    Some(&i) => i as _,
+                    None if v.is_empty() => -1,
+                    _ => return Err(Error::AssetNotFound(v.to_string())),
+                }
+            },
+            "mask" => {
+                obj.mask_index = match sprite_map.get(v) {
+                    Some(&i) => i as _,
+                    None if v.is_empty() => -1,
+                    _ => return Err(Error::AssetNotFound(v.to_string())),
+                }
+            },
+            _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
+        })
+    })?;
+    path.set_extension("gml");
+    let code = std::fs::read_to_string(&path)?;
+    for event in code.trim_start_matches("#define ").split("\n#define ") {
+        if event.trim().is_empty() {
+            continue
+        }
+        let err = || Error::SyntaxError(path.to_path_buf());
+        let (name, actions) = event.split_once("\n").ok_or_else(err)?;
+        let (ev_type_s, ev_numb_s) = name.trim().split_once("_").ok_or_else(err)?;
+        let ev_type = *events::EVENT_NAME_TO_ID.get(ev_type_s).ok_or_else(err)?;
+        let ev_numb = match ev_type {
+            events::EV_COLLISION => *object_map.get(ev_numb_s).ok_or_else(err)?,
+            events::EV_TRIGGER => *trigger_map.get(ev_numb_s).ok_or_else(err)?,
+            _ => ev_numb_s.parse()?,
+        };
+        let event = &mut *obj.get_event(ev_type, ev_numb);
+        load_event(&path, event, actions.trim(), object_map)?;
+    }
+    Ok(obj)
+}
+
 unsafe fn load_constants(path: &mut PathBuf) -> Result<()> {
     path.push("constants.txt");
     let s = std::fs::read_to_string(&path)?;
@@ -304,7 +422,7 @@ unsafe fn load_assets<'a, T: Sync>(
     get_names: fn() -> &'a mut [UStr],
     alloc: fn(usize),
     path: &mut PathBuf,
-    asset_maps: &AssetMaps,
+    asset_maps: &mut AssetMaps,
 ) -> Result<HashMap<String, usize>> {
     path.push(name);
     path.push("index.yyd");
@@ -312,8 +430,11 @@ unsafe fn load_assets<'a, T: Sync>(
     path.pop();
     let mut names = vec![""];
     names.par_extend(index.par_lines());
-    let name_map: HashMap<String, usize> =
+    let mut name_map: HashMap<String, usize> =
         names.par_iter().enumerate().filter_map(|(i, s)| (!s.is_empty()).then(|| (s.to_string(), i))).collect();
+    if name == "objects" {
+        asset_maps.objects = Some(std::mem::take(&mut name_map));
+    }
     alloc(names.len());
     for (name, asset, name_p) in izip!(&names, get_assets(), get_names()) {
         if !name.is_empty() {
@@ -359,8 +480,8 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     })?;
     path.pop();
     load_settings(&mut path)?;
-    load_triggers(&mut path)?;
     let mut asset_maps = AssetMaps::default();
+    asset_maps.triggers = Some(load_triggers(&mut path)?);
     load_assets(
         "sounds",
         3,
@@ -370,7 +491,7 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         ide::get_sound_names_mut,
         ide::alloc_sounds,
         &mut path,
-        &asset_maps,
+        &mut asset_maps,
     )?;
     asset_maps.sprites = Some(load_assets(
         "sprites",
@@ -381,7 +502,7 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         ide::get_sprite_names_mut,
         ide::alloc_sprites,
         &mut path,
-        &asset_maps,
+        &mut asset_maps,
     )?);
     for (sp, thumb) in ide::get_sprites().iter().zip(ide::get_sprite_thumbs_mut()) {
         if let Some(sp) = sp {
@@ -399,7 +520,7 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         ide::get_background_names_mut,
         ide::alloc_backgrounds,
         &mut path,
-        &asset_maps,
+        &mut asset_maps,
     )?);
     for (bg, thumb) in ide::get_backgrounds().iter().zip(ide::get_background_thumbs_mut()) {
         if let Some(bg) = bg {
@@ -417,7 +538,7 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         ide::get_script_names_mut,
         ide::alloc_scripts,
         &mut path,
-        &asset_maps,
+        &mut asset_maps,
     )?;
     load_assets(
         "fonts",
@@ -428,7 +549,18 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         ide::get_font_names_mut,
         ide::alloc_fonts,
         &mut path,
-        &asset_maps,
+        &mut asset_maps,
+    )?;
+    load_assets(
+        "objects",
+        1,
+        ide::RT_OBJECTS,
+        load_object,
+        ide::get_objects_mut,
+        ide::get_object_names_mut,
+        ide::alloc_objects,
+        &mut path,
+        &mut asset_maps,
     )?;
     Ok(())
 }

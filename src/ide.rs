@@ -192,6 +192,9 @@ pub mod game_info {
     pub const FORM: *mut *const THelpForm = 0x788958 as _;
 }
 
+const ACTION_LIBRARIES: *const &'static ActionLibrary = 0x79a660 as _;
+const ACTION_LIBRARY_COUNT: IntPtr = 0x77f5dc as _;
+
 pub fn initialize_project() {
     unsafe {
         let _: u32 = delphi_call!(0x705964);
@@ -267,6 +270,10 @@ read_array!(get_triggers, Option<&'static Trigger>, TRIGGERS, TRIGGER_COUNT);
 read_array!(get_included_files, &'static IncludedFile, INCLUDED_FILES, INCLUDED_FILE_COUNT);
 read_array!(get_extensions, &'static Extension, EXTENSIONS, EXTENSION_COUNT);
 read_array!(get_extensions_loaded, bool, EXTENSIONS_LOADED, EXTENSION_COUNT);
+
+pub fn get_action_libraries<'a>() -> &'a [&'a ActionLibrary] {
+    unsafe { slice::from_raw_parts(ACTION_LIBRARIES, ACTION_LIBRARY_COUNT.read()) }
+}
 
 pub fn alloc_constants(count: usize) {
     unsafe {

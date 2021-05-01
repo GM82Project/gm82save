@@ -6,6 +6,7 @@ compile_error!("this tool only works on windows 32-bit");
 mod asset;
 #[macro_use]
 mod delphi;
+mod events;
 mod ide;
 mod load;
 mod save;
@@ -27,6 +28,7 @@ pub enum Error {
     AssetNotFound(String),
     SyntaxError(PathBuf),
     UnknownKey(PathBuf, String),
+    UnknownAction(u32, u32),
     ParseIntError(std::num::ParseIntError),
     ParseFloatError(std::num::ParseFloatError),
     InvalidVersion(String),
@@ -42,6 +44,7 @@ impl std::fmt::Display for Error {
             Self::AssetNotFound(s) => write!(f, "couldn't find asset {}", s),
             Self::SyntaxError(p) => write!(f, "syntax error in file {}", p.to_string_lossy()),
             Self::UnknownKey(p, k) => write!(f, "unknown key in {}: {}", p.to_string_lossy(), k),
+            Self::UnknownAction(lib_id, act_id) => write!(f, "unknown action {} in lib with id {}", act_id, lib_id),
             Self::ParseIntError(e) => write!(f, "integer parse error: {}", e),
             Self::ParseFloatError(e) => write!(f, "float parse error: {}", e),
             Self::InvalidVersion(v) => write!(f, "invalid exe_version {}", v),

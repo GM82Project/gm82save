@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 pub const EV_CREATE: usize = 0;
 pub const EV_DESTROY: usize = 1;
 pub const EV_ALARM: usize = 2;

@@ -186,11 +186,27 @@ pub struct Action {
     pub invert_condition: bool,
 }
 
+impl Action {
+    pub unsafe fn fill_in(&mut self, lib_id: u32, act_id: u32) {
+        let _: u32 = delphi_call!(0x710544, self, lib_id, act_id);
+    }
+}
+
 #[repr(C)]
 pub struct Event {
     exists: u32,
     pub actions: *const *const Action,
     pub action_count: u32,
+}
+
+impl Event {
+    pub unsafe fn new() -> *mut Self {
+        delphi_call!(0x5a5048, 0x5a4c6c, 1)
+    }
+
+    pub unsafe fn add_action(&mut self, libid: u32, actid: u32) -> *mut Action {
+        delphi_call!(0x5a51d4, self, libid, actid)
+    }
 }
 
 #[repr(C)]
@@ -213,7 +229,17 @@ pub struct Object {
     pub persistent: bool,
     pub parent_index: i32,
     pub mask_index: i32,
-    pub events: [*const *const Event; 12],
+    pub events: [*mut *mut Event; 12],
+}
+
+impl Object {
+    pub unsafe fn new() -> *mut Object {
+        delphi_call!(0x7049a8, 0x704428, 1)
+    }
+
+    pub unsafe fn get_event(&mut self, ev_type: usize, ev_numb: usize) -> *mut Event {
+        delphi_call!(0x704d74, self, ev_type, ev_numb)
+    }
 }
 
 unsafe impl Sync for Object {}
@@ -341,7 +367,7 @@ pub struct Extension {
 pub struct ActionDefinition {
     exists: u32,
     name: UStr,
-    id: u32,
+    pub id: u32,
     image: u32,      // pointer
     image_list: u32, // also pointer
     image_index: u32,
@@ -370,7 +396,7 @@ pub struct ActionDefinition {
 pub struct ActionLibrary {
     exists: u32,
     caption: UStr,
-    id: u32,
+    pub id: u32,
     author: UStr,
     version: u32,
     padding: u32,
@@ -378,8 +404,8 @@ pub struct ActionLibrary {
     information: UStr,
     pub init_code: UStr,
     advanced: bool,
-    action_count: u32,
-    actions: *const *const ActionDefinition,
+    pub action_count: usize,
+    pub actions: *const &'static ActionDefinition,
     max_id: u32,
     // also an image list but who cares
 }
