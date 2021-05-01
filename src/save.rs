@@ -64,7 +64,7 @@ unsafe fn save_frame(frame: &Frame, path: &std::path::Path) -> Result<()> {
     Ok(())
 }
 
-unsafe fn save_stream(data: &delphi::TStream, path: &std::path::Path) -> Result<()> {
+unsafe fn save_stream(data: &delphi::TMemoryStream, path: &std::path::Path) -> Result<()> {
     let old_pos = data.get_pos();
     data.set_pos(0);
     let len = data.get_size() as usize;

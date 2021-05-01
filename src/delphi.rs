@@ -134,9 +134,13 @@ impl TGraphic {
     }
 }
 
-pub struct TStream {}
+pub struct TMemoryStream {}
 
-impl TStream {
+impl TMemoryStream {
+    pub unsafe fn new() -> *mut Self {
+        delphi_call!(0x405a4c, 0x433630, 1)
+    }
+
     pub unsafe fn get_pos(&self) -> u32 {
         delphi_call!(0x43f234, self)
     }
@@ -168,6 +172,11 @@ impl TStream {
 
     pub unsafe fn read(&self, buf: *mut u8, count: u32) {
         let _: u32 = delphi_call!(0x43f488, self, buf, count);
+    }
+
+    pub unsafe fn load(&self, fname: &UStr) {
+        let s: *const u16 = fname.0;
+        let _: u32 = delphi_call!(0x43ff44, self, s);
     }
 }
 

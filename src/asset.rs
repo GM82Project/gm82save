@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use crate::{
-    delphi::{TStream, UStr},
+    delphi::{TMemoryStream, UStr},
     delphi_call,
 };
 
@@ -31,7 +31,13 @@ pub struct Sound {
     pub volume: f64,
     pub pan: f64,
     pub preload: bool,
-    pub data: *const TStream,
+    pub data: *const TMemoryStream,
+}
+
+impl Sound {
+    pub unsafe fn new() -> *mut Self {
+        delphi_call!(0x64fb70, 0x64f674, 1)
+    }
 }
 
 unsafe impl Sync for Sound {}
@@ -316,7 +322,7 @@ pub struct IncludedFile {
     pub data_exists: bool,
     pub source_length: u32,
     pub stored_in_gmk: bool,
-    pub data: *const TStream,
+    pub data: *const TMemoryStream,
     pub export_setting: u32,
     pub export_custom_folder: UStr,
     pub overwrite_file: bool,

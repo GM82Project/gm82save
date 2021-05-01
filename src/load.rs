@@ -119,6 +119,41 @@ unsafe fn load_triggers(path: &mut PathBuf) -> Result<()> {
     Ok(())
 }
 
+unsafe fn load_sound(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*const Sound> {
+    let snd = &mut *Sound::new();
+    path.set_extension("txt");
+    let mut extension = String::new();
+    let mut exists = false;
+    read_txt(&path, |k, v| {
+        Ok(match k {
+            "extension" => {
+                extension = v.to_string();
+                snd.extension = UStr::new(v.as_ref())
+            },
+            "exists" => exists = v.parse::<u8>()? != 0,
+            "kind" => snd.kind = v.parse()?,
+            "effects" => snd.effects = v.parse()?,
+            "volume" => snd.volume = v.parse()?,
+            "pan" => snd.pan = v.parse()?,
+            "preload" => snd.preload = v.parse::<u8>()? != 0,
+            _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
+        })
+    })?;
+    if exists {
+        path.set_extension(extension.trim_matches('.'));
+        if !path.exists() {
+            return Err(Error::IoError(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("file {} not found", path.to_string_lossy()),
+            )))
+        }
+        let data = &mut *delphi::TMemoryStream::new();
+        data.load(&UStr::new(path.as_ref()));
+        snd.data = data;
+    }
+    Ok(snd)
+}
+
 unsafe fn load_frame(path: &std::path::Path, frame: &mut Frame) -> Result<()> {
     let im = image::open(path)?.into_rgba8();
     frame.width = im.width();
@@ -318,6 +353,17 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     load_settings(&mut path)?;
     load_triggers(&mut path)?;
     let mut asset_maps = AssetMaps::default();
+    load_assets(
+        "sounds",
+        3,
+        ide::RT_SOUNDS,
+        load_sound,
+        ide::get_sounds_mut,
+        ide::get_sound_names_mut,
+        ide::alloc_sounds,
+        &mut path,
+        &asset_maps,
+    )?;
     asset_maps.sprites = Some(load_assets(
         "sprites",
         2,
