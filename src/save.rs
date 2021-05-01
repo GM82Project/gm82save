@@ -2,7 +2,7 @@ use crate::{
     asset::*,
     delphi,
     delphi::{advance_progress_form, TTreeNode, UStr},
-    ide, Error, Result,
+    ide, Error, Result, ACTION_TOKEN,
 };
 use rayon::prelude::*;
 use std::{
@@ -179,8 +179,6 @@ unsafe fn save_font(font: &Font, path: &mut PathBuf) -> Result<()> {
     Ok(())
 }
 
-const ACTION_TOKEN: &str = "/*\"/*'/**//* YYD ACTION";
-
 unsafe fn save_event<F: Write>(ev: &Event, name: &str, file: &mut F) -> Result<()> {
     writeln!(file, "#define {}", name)?;
     let actions = slice::from_raw_parts(ev.actions, ev.action_count as usize);
@@ -189,16 +187,19 @@ unsafe fn save_event<F: Write>(ev: &Event, name: &str, file: &mut F) -> Result<(
         writeln!(file, "{}", ACTION_TOKEN)?;
         writeln!(file, "lib_id={}", action.lib_id)?;
         writeln!(file, "action_id={}", action.id)?;
-        writeln!(file, "kind={}", action.action_kind)?;
+        if action.can_be_relative {
+            writeln!(file, "relative={}", u8::from(action.is_relative))?;
+        }
+        if action.applies_to_something {
+            match action.applies_to {
+                -2 => writeln!(file, "applies_to=other")?,
+                -1 => writeln!(file, "applies_to=self")?,
+                i => writeln!(file, "applies_to={}", ide::get_object_names().get_asset(i))?,
+            }
+        }
         match action.action_kind {
             0 => {
                 // normal
-                if action.can_be_relative {
-                    writeln!(file, "relative={}", u8::from(action.is_relative))?;
-                }
-                if action.applies_to_something {
-                    writeln!(file, "applies_to={}", action.applies_to)?;
-                }
                 writeln!(file, "invert={}", u8::from(action.invert_condition))?;
                 for i in 0..action.param_count as usize {
                     // params can have newlines so delimit
@@ -213,18 +214,6 @@ unsafe fn save_event<F: Write>(ev: &Event, name: &str, file: &mut F) -> Result<(
                 // variable
                 writeln!(file, "var_name={}", action.param_strings[0].try_decode()?)?;
                 writeln!(file, "var_value={}", action.param_strings[1].try_decode()?)?;
-                if action.can_be_relative {
-                    writeln!(file, "relative={}", u8::from(action.is_relative))?;
-                }
-                if action.applies_to_something {
-                    writeln!(file, "applies_to={}", action.applies_to)?;
-                }
-            },
-            7 => {
-                // code
-                if action.applies_to_something {
-                    writeln!(file, "applies_to={}", action.applies_to)?;
-                }
             },
             _ => (),
         }

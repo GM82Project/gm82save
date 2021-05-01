@@ -76,6 +76,8 @@ impl From<std::num::ParseFloatError> for Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+const ACTION_TOKEN: &str = "/*\"/*'/**//* YYD ACTION";
+
 fn show_message(msg: &str) {
     unsafe {
         delphi::ShowMessage(&UStr::new(msg.as_ref()));
