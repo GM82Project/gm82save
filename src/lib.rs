@@ -96,7 +96,10 @@ unsafe extern "C" fn save() -> u32 {
 
     if let Err(e) = save::save_gmk(path.into()) {
         // display the error
+        delphi::close_progress_form();
         show_message(&format!("Failed to save: {}", e));
+    } else {
+        delphi::close_progress_form();
     }
     0
 }
@@ -116,10 +119,12 @@ unsafe extern "C" fn load() -> bool {
 
     if let Err(e) = load::load_gmk(path) {
         // display the error and reload
+        delphi::close_progress_form();
         show_message(&format!("Failed to load: {}", e));
         ide::initialize_project();
+    } else {
+        delphi::close_progress_form();
     }
-    delphi::close_progress_form();
     true
 }
 
@@ -138,19 +143,20 @@ unsafe fn injector() {
     }));
 
     // call save() instead of the "generate gm81" function
-    // and insert a jump call to the post-save code
+    // and insert a jump call to the post-save code (0x705e45)
     let save_dest = 0x705cd0 as *mut u8;
-    let mut save_patch = [0, 0, 0, 0, 0xe9, 0x67, 1, 0, 0];
+    let mut save_patch = [0, 0, 0, 0, 0xe9, 0x6c, 1, 0, 0];
     save_patch[..4].copy_from_slice(&(save as u32 - (save_dest as u32 + 4)).to_le_bytes());
     patch(save_dest, &save_patch);
     // call load() instead of CStream.Create
-    // and insert a JZ to the post-load code
+    // and insert a JZ to the post-load code (0x705af3)
     let load_dest = 0x705a42 as *mut u8;
-    let mut load_patch = [0xe8, 0, 0, 0, 0, 0x0b, 0xc0, 0x0f, 0x85, 0xa4, 0, 0, 0];
+    let mut load_patch = [0xe8, 0, 0, 0, 0, 0x85, 0xc0, 0x0f, 0x85, 0xa4, 0, 0, 0];
     load_patch[1..5].copy_from_slice(&(load as u32 - (load_dest as u32 + 5)).to_le_bytes());
     patch(load_dest, &load_patch);
-    // replace .gm81 with .yyd
+    // replace .gm81 with .yyd in "rename if using an old file extension" code
     patch(0x6e05e0 as *mut u8, &[0x04, 0, 0, 0, b'.', 0, b'y', 0, b'y', 0, b'd', 0, 0, 0]);
+    // replace .gm81 with .yyd in "generate a default filename to save to" code
     patch(0x6e0728 as *mut u8, &[0x04, 0, 0, 0, b'.', 0, b'y', 0, b'y', 0, b'd', 0, 0, 0]);
     // patch out file extension associations
     patch(0x6de76b as *mut u8, &[0x90, 0x90, 0x90, 0x90, 0x90]);
