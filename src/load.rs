@@ -345,7 +345,7 @@ unsafe fn load_event(
                         if (5..=12 | 14).contains(&action.param_types[i]) {
                             action.param_strings[i] = UStr::new(
                                 match action.param_types[i] {
-                                    5..=12 | 14 if v.is_empty() => -1, // TODO verify
+                                    _ if v.is_empty() => -100, // TODO verify
                                     5 => *asset_maps.sprites.map.get(v).ok_or_else(err)? as _,
                                     6 => *asset_maps.sounds.map.get(v).ok_or_else(err)? as _,
                                     7 => *asset_maps.backgrounds.map.get(v).ok_or_else(err)? as _,
