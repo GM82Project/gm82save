@@ -4,6 +4,7 @@ use crate::{
     delphi::{DynArraySetLength, TMemoryStream, UStr},
     delphi_call,
 };
+use std::slice;
 
 #[repr(C)]
 pub struct Trigger {
@@ -126,8 +127,8 @@ pub struct PathPoint {
 #[repr(C)]
 pub struct Path {
     exists: u32,
-    pub points: *const PathPoint,
-    pub point_count: u32,
+    pub points: *mut PathPoint,
+    pub point_count: usize,
     pub connection: u32,
     pub closed: bool,
     pub precision: u32,
@@ -135,6 +136,22 @@ pub struct Path {
     pub path_editor_room_background: i32,
     pub snap_x: u32,
     pub snap_y: u32,
+}
+
+impl Path {
+    pub unsafe fn new() -> *mut Self {
+        delphi_call!(0x5357b0, 0x534924, 1)
+    }
+
+    pub unsafe fn alloc_points(&mut self, count: usize) -> &mut [PathPoint] {
+        self.point_count = count;
+        DynArraySetLength(&mut self.points, 0x534870 as _, 1, count);
+        slice::from_raw_parts_mut(self.points, count)
+    }
+
+    pub unsafe fn commit(&mut self) {
+        let _: u32 = delphi_call!(0x53578c, self);
+    }
 }
 
 unsafe impl Sync for Path {}

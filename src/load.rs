@@ -451,6 +451,45 @@ unsafe fn load_timeline(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*c
     Ok(tl)
 }
 
+unsafe fn load_path(file_path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const Path> {
+    let path = &mut *Path::new();
+    file_path.push("path.txt");
+    read_txt(&file_path, |k, v| {
+        Ok(match k {
+            "connection" => path.connection = v.parse()?,
+            "closed" => path.closed = v.parse::<u8>()? != 0,
+            "precision" => path.precision = v.parse()?,
+            "background" => {
+                path.path_editor_room_background = if v.is_empty() {
+                    -1
+                } else {
+                    *asset_maps.rooms.map.get(v).ok_or_else(|| Error::AssetNotFound(v.to_string()))? as _
+                }
+            },
+            "snap_x" => path.snap_x = v.parse()?,
+            "snap_y" => path.snap_y = v.parse()?,
+            _ => return Err(Error::UnknownKey(file_path.to_path_buf(), k.to_string())),
+        })
+    })?;
+    file_path.pop();
+    file_path.push("points.txt");
+    let points_txt = std::fs::read_to_string(&file_path)?;
+    let point_lines: Vec<_> = points_txt.par_lines().collect();
+    for (point, line) in path.alloc_points(point_lines.len()).iter_mut().zip(point_lines) {
+        let mut iter = line.split(',');
+        let err = || Error::SyntaxError(file_path.to_path_buf());
+        point.x = iter.next().ok_or_else(err)?.parse()?;
+        point.y = iter.next().ok_or_else(err)?.parse()?;
+        point.speed = iter.next().ok_or_else(err)?.parse()?;
+        if iter.next() != None {
+            return Err(err())
+        }
+    }
+    path.commit();
+    file_path.pop();
+    Ok(path)
+}
+
 unsafe fn load_constants(path: &mut PathBuf) -> Result<()> {
     path.push("constants.txt");
     let s = std::fs::read_to_string(&path)?;
@@ -793,6 +832,18 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         ide::get_font_names_mut,
         ide::alloc_fonts,
         &asset_maps.fonts,
+        &mut path,
+        &asset_maps,
+    )?;
+    load_assets(
+        "paths",
+        8,
+        ide::RT_PATHS,
+        load_path,
+        ide::get_paths_mut,
+        ide::get_path_names_mut,
+        ide::alloc_paths,
+        &asset_maps.paths,
         &mut path,
         &asset_maps,
     )?;
