@@ -343,13 +343,13 @@ fn save_instances(instances: &[Instance], path: &mut PathBuf) -> Result<()> {
         let fname = if code.len() != 0 {
             let hash = crc::crc32::checksum_ieee(code.as_ref());
             for i in 0..8 {
-                hash_hex[7 - i] = match (hash >> i) & 0xf {
+                hash_hex[7 - i] = match (hash >> (i * 4)) & 0xf {
                     i if i < 10 => b'0' + i as u8,
                     i => b'A' - 10 + i as u8,
                 };
             }
             let fname = unsafe { str::from_utf8_unchecked(&hash_hex) };
-            if !codes.insert(hash) {
+            if codes.insert(hash) {
                 path.push(fname);
                 path.set_extension("gml");
                 std::fs::write(&path, code)?;
@@ -402,9 +402,9 @@ unsafe fn save_room(room: &Room, path: &mut PathBuf) -> Result<()> {
             writeln!(f, "bg_stretch{}={}", i, u8::from(bg.stretch))?;
         }
         writeln!(f)?;
-        writeln!(f, "views_enabled={}", room.views_enabled)?;
+        writeln!(f, "views_enabled={}", u8::from(room.views_enabled))?;
         for (i, view) in room.views.iter().enumerate() {
-            writeln!(f, "view_visible{}={}", i, view.visible)?;
+            writeln!(f, "view_visible{}={}", i, u8::from(view.visible))?;
             writeln!(f, "view_xview{}={}", i, view.source_x)?;
             writeln!(f, "view_yview{}={}", i, view.source_y)?;
             writeln!(f, "view_wview{}={}", i, view.source_w)?;
