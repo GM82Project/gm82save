@@ -275,11 +275,41 @@ unsafe fn load_event(
         }
         let (params, code) = action_code.split_once("*/").ok_or_else(|| Error::SyntaxError(path.to_path_buf()))?;
         let action = &mut *event.add_action(0, 0);
+        let mut lib_id_set = false;
+        let mut act_id_set = false;
         for line in params.lines() {
             decode_line(path, line, &mut |k, v| {
                 Ok(match k {
-                    "lib_id" => action.lib_id = v.parse()?,
-                    "action_id" => action.id = v.parse()?,
+                    "lib_id" => {
+                        action.lib_id = v.parse()?;
+                        if lib_id_set {
+                            return Err(Error::SyntaxError(path.to_path_buf()))
+                        }
+                        lib_id_set = true;
+                    },
+                    "action_id" => {
+                        action.id = v.parse()?;
+                        if !lib_id_set || act_id_set {
+                            return Err(Error::SyntaxError(path.to_path_buf()))
+                        }
+                        act_id_set = true;
+                        // manually check if action exists so we can throw an error
+                        if ide::get_action_libraries()
+                            .iter()
+                            .find(|&l| {
+                                l.id == action.lib_id
+                                    && slice::from_raw_parts(l.actions, l.action_count)
+                                        .iter()
+                                        .find(|&a| a.id == action.id)
+                                        .is_some()
+                            })
+                            .is_some()
+                        {
+                            action.fill_in(action.lib_id, action.id);
+                        } else {
+                            return Err(Error::UnknownAction(action.lib_id, action.id))
+                        }
+                    },
                     "relative" => action.is_relative = v.parse::<u8>()? != 0,
                     "applies_to" => {
                         action.applies_to = match v {
@@ -289,30 +319,17 @@ unsafe fn load_event(
                         }
                     },
                     "invert" => action.invert_condition = v.parse::<u8>()? != 0,
-                    "arg0" | "var_name" | "repeats" => action.param_strings[0] = UStr::new(v.as_ref()),
-                    "arg1" | "var_value" => action.param_strings[1] = UStr::new(v.as_ref()),
-                    "arg2" => action.param_strings[2] = UStr::new(v.as_ref()),
-                    "arg3" => action.param_strings[3] = UStr::new(v.as_ref()),
-                    "arg4" => action.param_strings[4] = UStr::new(v.as_ref()),
-                    "arg5" => action.param_strings[5] = UStr::new(v.as_ref()),
-                    "arg6" => action.param_strings[6] = UStr::new(v.as_ref()),
-                    "arg7" => action.param_strings[7] = UStr::new(v.as_ref()),
+                    "var_name" | "repeats" => action.param_strings[0] = UStr::new(v.as_ref()),
+                    "var_value" => action.param_strings[1] = UStr::new(v.as_ref()),
+                    "arg0" | "arg1" | "arg2" | "arg3" | "arg4" | "arg5" | "arg6" | "arg7" => {
+                        if !act_id_set {
+                            return Err(Error::SyntaxError(path.to_path_buf()))
+                        }
+                        let i = k.chars().last().unwrap().to_digit(10).unwrap() as usize;
+                        action.param_strings[i] = UStr::new(undelimit(v).as_ref());
                     _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
                 })
             })?;
-        }
-        // manually check if action exists so we can throw an error
-        if ide::get_action_libraries()
-            .iter()
-            .find(|&l| {
-                l.id == action.lib_id
-                    && slice::from_raw_parts(l.actions, l.action_count).iter().find(|&a| a.id == action.id).is_some()
-            })
-            .is_some()
-        {
-            action.fill_in(action.lib_id, action.id);
-        } else {
-            return Err(Error::UnknownAction(action.lib_id, action.id))
         }
         if action.action_kind == 7 {
             // first character will always be LF because it doesn't cut the newline when searching for */
