@@ -320,6 +320,7 @@ pub struct Instance {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct Tile {
     pub x: i32,
     pub y: i32,

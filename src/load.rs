@@ -497,27 +497,29 @@ unsafe fn load_instances(room: &mut Room, path: &mut PathBuf, objs: &HashMap<Str
     let inst_path = path.to_path_buf(); // save instances.txt path for errors
     path.pop();
     let err = || Error::SyntaxError(inst_path.to_path_buf());
-    for (instance, line) in room.alloc_instances(instances.len()).iter_mut().zip(&instances) {
-        let mut iter = line.split(",");
-        instance.object = match iter.next().ok_or_else(err)? {
-            "" => -1,
-            obj => *objs.get(obj).ok_or_else(|| Error::AssetNotFound(obj.to_ascii_lowercase()))? as _,
-        };
-        instance.x = iter.next().ok_or_else(err)?.parse()?;
-        instance.y = iter.next().ok_or_else(err)?.parse()?;
-        let code_hash = iter.next().ok_or_else(err)?;
-        instance.locked = iter.next().ok_or_else(err)?.parse::<u8>()? != 0;
-        instance.id = {
-            *ide::LAST_INSTANCE_ID += 1;
-            *ide::LAST_INSTANCE_ID as _
-        };
-        if !code_hash.is_empty() {
-            path.push(code_hash);
-            path.set_extension("gml");
-            instance.creation_code = UStr::new(std::fs::read_to_string(&path)?.as_ref());
-            path.pop();
-        }
-    }
+    room.alloc_instances(instances.len()).into_par_iter().zip(&instances).try_for_each(
+        |(instance, line)| -> Result<()> {
+            let mut iter = line.split(",");
+            instance.object = match iter.next().ok_or_else(err)? {
+                "" => -1,
+                obj => *objs.get(obj).ok_or_else(|| Error::AssetNotFound(obj.to_ascii_lowercase()))? as _,
+            };
+            instance.x = iter.next().ok_or_else(err)?.parse()?;
+            instance.y = iter.next().ok_or_else(err)?.parse()?;
+            let code_hash = iter.next().ok_or_else(err)?;
+            instance.locked = iter.next().ok_or_else(err)?.parse::<u8>()? != 0;
+            instance.id = {
+                *ide::LAST_INSTANCE_ID += 1;
+                *ide::LAST_INSTANCE_ID as _
+            };
+            if !code_hash.is_empty() {
+                let mut path = path.join(code_hash);
+                path.set_extension("gml");
+                instance.creation_code = UStr::new(std::fs::read_to_string(&path)?.as_ref());
+            }
+            Ok(())
+        },
+    )?;
     Ok(())
 }
 
@@ -538,30 +540,35 @@ unsafe fn load_tiles(path: &mut PathBuf, bgs: &HashMap<String, usize>) -> Result
         let layer: Vec<_> = layer_txt.lines().filter(|s| !s.is_empty()).collect();
         tiles.reserve(layer.len());
         let err = || Error::SyntaxError(path.to_path_buf());
-        for tile in layer {
-            let mut iter = tile.split(",");
-            tiles.push(Tile {
-                source_bg: match iter.next().ok_or_else(err)? {
-                    "" => -1,
-                    bg => *bgs.get(bg).ok_or_else(|| Error::AssetNotFound(bg.to_string()))? as _,
-                },
-                x: iter.next().ok_or_else(err)?.parse()?,
-                y: iter.next().ok_or_else(err)?.parse()?,
-                u: iter.next().ok_or_else(err)?.parse()?,
-                v: iter.next().ok_or_else(err)?.parse()?,
-                width: iter.next().ok_or_else(err)?.parse()?,
-                height: iter.next().ok_or_else(err)?.parse()?,
-                locked: iter.next().ok_or_else(err)?.parse::<u8>()? != 0,
-                depth,
-                id: {
-                    *ide::LAST_TILE_ID += 1;
-                    *ide::LAST_TILE_ID as _
-                },
-            });
-            if iter.next() != None {
-                return Err(err())
-            }
-        }
+        let layer_tiles = layer
+            .par_iter()
+            .map(|tile| {
+                let mut iter = tile.split(",");
+                let t = Tile {
+                    source_bg: match iter.next().ok_or_else(err)? {
+                        "" => -1,
+                        bg => *bgs.get(bg).ok_or_else(|| Error::AssetNotFound(bg.to_string()))? as _,
+                    },
+                    x: iter.next().ok_or_else(err)?.parse()?,
+                    y: iter.next().ok_or_else(err)?.parse()?,
+                    u: iter.next().ok_or_else(err)?.parse()?,
+                    v: iter.next().ok_or_else(err)?.parse()?,
+                    width: iter.next().ok_or_else(err)?.parse()?,
+                    height: iter.next().ok_or_else(err)?.parse()?,
+                    locked: iter.next().ok_or_else(err)?.parse::<u8>()? != 0,
+                    depth,
+                    id: {
+                        *ide::LAST_TILE_ID += 1;
+                        *ide::LAST_TILE_ID as _
+                    },
+                };
+                if iter.next() != None {
+                    return Err(err())
+                }
+                Ok(t)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        tiles.extend_from_slice(&layer_tiles);
         path.pop();
     }
     Ok(tiles)
@@ -868,14 +875,13 @@ unsafe fn load_assets<'a, T: Sync>(
     path.push(name);
     let names = &assets.index;
     alloc(names.len());
-    for (name, asset, name_p) in izip!(names, get_assets(), get_names()) {
+    names.into_par_iter().zip(get_assets()).zip(get_names()).try_for_each(|((name, asset), name_p)| -> Result<()> {
         if !name.is_empty() {
             *name_p = UStr::new(name.as_ref());
-            path.push(name);
-            *asset = load_asset(path, asset_maps)?.as_ref();
-            path.pop();
+            *asset = load_asset(&mut path.join(name), asset_maps)?.as_ref();
         }
-    }
+        Ok(())
+    })?;
     path.push("tree.yyd");
     read_resource_tree(node.read(), &path, kind, &assets.map, true)?;
     path.pop();
