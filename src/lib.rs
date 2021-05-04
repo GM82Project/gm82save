@@ -128,6 +128,20 @@ unsafe extern "C" fn load() -> bool {
     true
 }
 
+unsafe extern "C" fn gm81_or_yyd() -> i32 {
+    let ebp: *const UStr;
+    asm!("mov {}, [ebp]", out(reg) ebp);
+    let real_string = &*ebp.sub(1);
+    // original .gm81 compare
+    let out = delphi::CompareText(real_string, &*(0x6dfbe4 as *const UStr));
+    if out != 0 {
+        // new .yyd compare
+        delphi::CompareText(real_string, &*(0x6e05e4 as *const UStr))
+    } else {
+        out
+    }
+}
+
 unsafe fn patch(dest: *mut u8, source: &[u8]) {
     let mut old_protect = 0;
     VirtualProtect(dest.cast(), source.len(), PAGE_READWRITE, &mut old_protect);
@@ -154,6 +168,10 @@ unsafe fn injector() {
     let mut load_patch = [0xe8, 0, 0, 0, 0, 0x85, 0xc0, 0x0f, 0x85, 0xa4, 0, 0, 0];
     load_patch[1..5].copy_from_slice(&(load as u32 - (load_dest as u32 + 5)).to_le_bytes());
     patch(load_dest, &load_patch);
+    // check for .yyd as well as .gm81 when dragging file onto game maker
+    patch(0x6df7e3 as *mut u8, &(gm81_or_yyd as u32 - 0x6df7e7).to_le_bytes());
+    // check for .yyd as well as .gm81 in open file dialog
+    patch(0x6e02ee as *mut u8, &(gm81_or_yyd as u32 - 0x6e02f2).to_le_bytes());
     // replace .gm81 with .yyd in "rename if using an old file extension" code
     patch(0x6e05e0 as *mut u8, &[0x04, 0, 0, 0, b'.', 0, b'y', 0, b'y', 0, b'd', 0, 0, 0]);
     // replace .gm81 with .yyd in "generate a default filename to save to" code

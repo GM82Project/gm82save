@@ -245,6 +245,10 @@ pub unsafe fn UStrClr(str: &mut UStr) {
     let _: u32 = delphi_call!(0x407ea8, str);
 }
 
+pub unsafe fn CompareText(a: &UStr, b: &UStr) -> i32 {
+    delphi_call!(0x415924, a.0, b.0)
+}
+
 #[repr(transparent)]
 pub struct UStr(pub(self) *const u16);
 
