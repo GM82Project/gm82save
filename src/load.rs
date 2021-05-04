@@ -335,7 +335,7 @@ unsafe fn load_event(
                         if !act_id_set {
                             return Err(Error::SyntaxError(path.to_path_buf()))
                         }
-                        let i = k.chars().last().unwrap().to_digit(10).unwrap() as usize;
+                        let i = k.chars().last().unwrap().to_digit(8).unwrap() as usize;
                         let err = || Error::AssetNotFound(v.to_string());
                         if (5..=12 | 14).contains(&action.param_types[i]) {
                             action.param_strings[i] = UStr::new(
@@ -488,6 +488,170 @@ unsafe fn load_path(file_path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*
     path.commit();
     file_path.pop();
     Ok(path)
+}
+
+unsafe fn load_instances(room: &mut Room, path: &mut PathBuf, objs: &HashMap<String, usize>) -> Result<()> {
+    path.push("instances.txt");
+    let instances_txt = std::fs::read_to_string(&path)?;
+    let instances: Vec<_> = instances_txt.lines().filter(|s| !s.is_empty()).collect();
+    let inst_path = path.to_path_buf(); // save instances.txt path for errors
+    path.pop();
+    let err = || Error::SyntaxError(inst_path.to_path_buf());
+    for (instance, line) in room.alloc_instances(instances.len()).iter_mut().zip(&instances) {
+        let mut iter = line.split(",");
+        instance.object = match iter.next().ok_or_else(err)? {
+            "" => -1,
+            obj => *objs.get(obj).ok_or_else(|| Error::AssetNotFound(obj.to_ascii_lowercase()))? as _,
+        };
+        instance.x = iter.next().ok_or_else(err)?.parse()?;
+        instance.y = iter.next().ok_or_else(err)?.parse()?;
+        let code_hash = iter.next().ok_or_else(err)?;
+        instance.locked = iter.next().ok_or_else(err)?.parse::<u8>()? != 0;
+        instance.id = {
+            *ide::LAST_INSTANCE_ID += 1;
+            *ide::LAST_INSTANCE_ID as _
+        };
+        if !code_hash.is_empty() {
+            path.push(code_hash);
+            path.set_extension("gml");
+            instance.creation_code = UStr::new(std::fs::read_to_string(&path)?.as_ref());
+            path.pop();
+        }
+    }
+    Ok(())
+}
+
+unsafe fn load_tiles(path: &mut PathBuf, bgs: &HashMap<String, usize>) -> Result<Vec<Tile>> {
+    let mut tiles = Vec::new();
+    path.push("layers.txt");
+    let f = open_file(&path)?;
+    path.pop();
+    for line in f.lines() {
+        let line = line?;
+        if line.is_empty() {
+            continue
+        }
+        let depth = line.parse()?;
+        path.push(line);
+        path.set_extension("txt");
+        let layer_txt = std::fs::read_to_string(&path)?;
+        let layer: Vec<_> = layer_txt.lines().filter(|s| !s.is_empty()).collect();
+        tiles.reserve(layer.len());
+        let err = || Error::SyntaxError(path.to_path_buf());
+        for tile in layer {
+            let mut iter = tile.split(",");
+            tiles.push(Tile {
+                source_bg: match iter.next().ok_or_else(err)? {
+                    "" => -1,
+                    bg => *bgs.get(bg).ok_or_else(|| Error::AssetNotFound(bg.to_string()))? as _,
+                },
+                x: iter.next().ok_or_else(err)?.parse()?,
+                y: iter.next().ok_or_else(err)?.parse()?,
+                u: iter.next().ok_or_else(err)?.parse()?,
+                v: iter.next().ok_or_else(err)?.parse()?,
+                width: iter.next().ok_or_else(err)?.parse()?,
+                height: iter.next().ok_or_else(err)?.parse()?,
+                locked: iter.next().ok_or_else(err)?.parse::<u8>()? != 0,
+                depth,
+                id: {
+                    *ide::LAST_TILE_ID += 1;
+                    *ide::LAST_TILE_ID as _
+                },
+            });
+            if iter.next() != None {
+                return Err(err())
+            }
+        }
+        path.pop();
+    }
+    Ok(tiles)
+}
+
+unsafe fn load_room(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const Room> {
+    let room = &mut *Room::new();
+    path.push("room.txt");
+    read_txt(&path, |k, v| {
+        Ok(match k {
+            "caption" => room.caption = UStr::new(v.as_ref()),
+            "width" => room.width = v.parse()?,
+            "height" => room.height = v.parse()?,
+            "snap_x" => room.snap_x = v.parse()?,
+            "snap_y" => room.snap_y = v.parse()?,
+            "isometric" => room.isometric = v.parse::<u8>()? != 0,
+            "roomspeed" => room.speed = v.parse()?,
+            "roompersistent" => room.persistent = v.parse::<u8>()? != 0,
+            "bg_color" => room.bg_colour = v.parse()?,
+            "clear_screen" => room.clear_screen = v.parse::<u8>()? != 0,
+            "clear_view" => room.clear_view = v.parse::<u8>()? != 0,
+            // 8 backgrounds/views
+            k if k.chars().last().map(|c| c.is_digit(8)) == Some(true) => {
+                let i = k.chars().last().and_then(|c| c.to_digit(8)).unwrap() as usize;
+                match &k[..k.len() - 1] {
+                    "bg_visible" => room.backgrounds[i].visible_on_start = v.parse::<u8>()? != 0,
+                    "bg_is_foreground" => room.backgrounds[i].is_foreground = v.parse::<u8>()? != 0,
+                    "bg_source" => {
+                        room.backgrounds[i].source_bg = if v.is_empty() {
+                            -1
+                        } else {
+                            *asset_maps.backgrounds.map.get(v).ok_or_else(|| Error::AssetNotFound(v.to_string()))? as _
+                        }
+                    },
+                    "bg_xoffset" => room.backgrounds[i].xoffset = v.parse()?,
+                    "bg_yoffset" => room.backgrounds[i].yoffset = v.parse()?,
+                    "bg_tile_h" => room.backgrounds[i].tile_horz = v.parse::<u8>()? != 0,
+                    "bg_tile_v" => room.backgrounds[i].tile_vert = v.parse::<u8>()? != 0,
+                    "bg_hspeed" => room.backgrounds[i].hspeed = v.parse()?,
+                    "bg_vspeed" => room.backgrounds[i].vspeed = v.parse()?,
+                    "bg_stretch" => room.backgrounds[i].stretch = v.parse::<u8>()? != 0,
+                    "view_visible" => room.views[i].visible = v.parse::<u8>()? != 0,
+                    "view_xview" => room.views[i].source_x = v.parse()?,
+                    "view_yview" => room.views[i].source_y = v.parse()?,
+                    "view_wview" => room.views[i].source_w = v.parse()?,
+                    "view_hview" => room.views[i].source_h = v.parse()?,
+                    "view_xport" => room.views[i].port_x = v.parse()?,
+                    "view_yport" => room.views[i].port_y = v.parse()?,
+                    "view_wport" => room.views[i].port_w = v.parse()?,
+                    "view_hport" => room.views[i].port_h = v.parse()?,
+                    "view_fol_hbord" => room.views[i].following_hborder = v.parse()?,
+                    "view_fol_vbord" => room.views[i].following_vborder = v.parse()?,
+                    "view_fol_hspeed" => room.views[i].following_hspeed = v.parse()?,
+                    "view_fol_vspeed" => room.views[i].following_vspeed = v.parse()?,
+                    "view_fol_target" => {
+                        room.views[i].following_target = if v.is_empty() {
+                            -1
+                        } else {
+                            *asset_maps.objects.map.get(v).ok_or_else(|| Error::AssetNotFound(v.to_string()))? as _
+                        }
+                    },
+                    _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
+                }
+            },
+            "views_enabled" => room.views_enabled = v.parse::<u8>()? != 0,
+            // views
+            "remember" => room.remember_room_editor_info = v.parse::<u8>()? != 0,
+            "editor_width" => room.editor_width = v.parse()?,
+            "editor_height" => room.editor_height = v.parse()?,
+            "show_grid" => room.show_grid = v.parse::<u8>()? != 0,
+            "show_objects" => room.show_objects = v.parse::<u8>()? != 0,
+            "show_tiles" => room.show_tiles = v.parse::<u8>()? != 0,
+            "show_backgrounds" => room.show_backgrounds = v.parse::<u8>()? != 0,
+            "show_foregrounds" => room.show_foregrounds = v.parse::<u8>()? != 0,
+            "show_views" => room.show_views = v.parse::<u8>()? != 0,
+            "delete_underlying_objects" => room.delete_underlying_objects = v.parse::<u8>()? != 0,
+            "delete_underlying_tiles" => room.delete_underlying_tiles = v.parse::<u8>()? != 0,
+            "tab" => room.tab = v.parse()?, // i still don't know wtf this is
+            "editor_x" => room.x_position_scroll = v.parse()?,
+            "editor_y" => room.y_position_scroll = v.parse()?,
+            _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
+        })
+    })?;
+    path.pop();
+    path.push("code.gml");
+    room.creation_code = UStr::new(std::fs::read_to_string(&path)?.as_ref());
+    path.pop();
+    load_instances(room, path, &asset_maps.objects.map)?;
+    room.put_tiles(load_tiles(path, &asset_maps.rooms.map)?);
+    Ok(room)
 }
 
 unsafe fn load_constants(path: &mut PathBuf) -> Result<()> {
@@ -868,6 +1032,18 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         ide::get_timeline_names_mut,
         ide::alloc_timelines,
         &asset_maps.timelines,
+        &mut path,
+        &asset_maps,
+    )?;
+    load_assets(
+        "rooms",
+        4,
+        ide::RT_ROOMS,
+        load_room,
+        ide::get_rooms_mut,
+        ide::get_room_names_mut,
+        ide::alloc_rooms,
+        &asset_maps.rooms,
         &mut path,
         &asset_maps,
     )?;

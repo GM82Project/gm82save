@@ -351,10 +351,10 @@ pub struct Room {
     pub clear_view: bool,
     pub views: [View; 8],
     pub creation_code: UStr,
-    pub instance_count: u32,
-    pub instances: *const Instance,
-    pub tile_count: u32,
-    pub tiles: *const Tile,
+    pub instance_count: usize,
+    pub instances: *mut Instance,
+    pub tile_count: usize,
+    pub tiles: *mut Tile,
     pub remember_room_editor_info: bool,
     pub editor_width: u32,
     pub editor_height: u32,
@@ -369,6 +369,24 @@ pub struct Room {
     pub tab: u32,
     pub x_position_scroll: u32,
     pub y_position_scroll: u32,
+}
+
+impl Room {
+    pub unsafe fn new() -> *mut Self {
+        delphi_call!(0x6577b8, 0x6564cc, 1)
+    }
+
+    pub unsafe fn alloc_instances(&mut self, count: usize) -> &mut [Instance] {
+        self.instance_count = count;
+        DynArraySetLength(&mut self.instances, 0x656418 as _, 1, count);
+        slice::from_raw_parts_mut(self.instances, count)
+    }
+
+    pub unsafe fn put_tiles(&mut self, tiles: Vec<Tile>) {
+        self.tile_count = tiles.len();
+        DynArraySetLength(&mut self.tiles, 0x656448 as _, 1, tiles.len());
+        tiles.as_ptr().copy_to_nonoverlapping(self.tiles, tiles.len());
+    }
 }
 
 unsafe impl Sync for Room {}

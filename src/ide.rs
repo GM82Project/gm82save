@@ -120,8 +120,8 @@ pub const _RT_GAME_INFO: *const *const TTreeNode = 0x79a9dc as _;
 pub const _RT_GLOBAL_GAME_SETTINGS: *const *const TTreeNode = 0x79a9e0 as _;
 pub const _RT_EXTENSION_PACKAGES: *const *const TTreeNode = 0x79a9e4 as _;
 
-pub const _LAST_INSTANCE_ID: IntPtr = 0x77f2e0 as IntPtr;
-pub const _LAST_TILE_ID: IntPtr = 0x77f2e4 as IntPtr;
+pub const LAST_INSTANCE_ID: IntPtr = 0x77f2e0 as IntPtr;
+pub const LAST_TILE_ID: IntPtr = 0x77f2e4 as IntPtr;
 
 pub mod settings {
     #![allow(dead_code)]
