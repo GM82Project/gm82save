@@ -202,8 +202,19 @@ unsafe fn save_event<F: Write>(ev: &Event, name: &str, file: &mut F) -> Result<(
                 // normal
                 writeln!(file, "invert={}", u8::from(action.invert_condition))?;
                 for i in 0..action.param_count as usize {
-                    // params can have newlines so delimit
-                    writeln!(file, "arg{}={}", i, action.param_strings[i].try_delimit()?)?;
+                    writeln!(file, "arg{}={}", i, match action.param_types[i] {
+                        5 => ide::get_sprite_names().get_asset(action.param_strings[i].try_decode()?.parse()?),
+                        6 => ide::get_sound_names().get_asset(action.param_strings[i].try_decode()?.parse()?),
+                        7 => ide::get_background_names().get_asset(action.param_strings[i].try_decode()?.parse()?),
+                        8 => ide::get_path_names().get_asset(action.param_strings[i].try_decode()?.parse()?),
+                        9 => ide::get_script_names().get_asset(action.param_strings[i].try_decode()?.parse()?),
+                        10 => ide::get_object_names().get_asset(action.param_strings[i].try_decode()?.parse()?),
+                        11 => ide::get_room_names().get_asset(action.param_strings[i].try_decode()?.parse()?),
+                        12 => ide::get_font_names().get_asset(action.param_strings[i].try_decode()?.parse()?),
+                        14 => ide::get_timeline_names().get_asset(action.param_strings[i].try_decode()?.parse()?),
+                        // params can have newlines so delimit
+                        _ => action.param_strings[i].try_delimit()?,
+                    })?;
                 }
             },
             5 => {

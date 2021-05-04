@@ -5,10 +5,15 @@ use std::{
     collections::HashMap,
     ffi::OsStr,
     fs::File,
+    hint::unreachable_unchecked,
     io::{BufRead, BufReader},
     path::PathBuf,
     slice,
 };
+
+fn undelimit(s: &str) -> String {
+    s.replace("*\\/", "*/").replace("\\n", "\n").replace("\\r", "\r").replace("\\\\", "\\")
+}
 
 trait UStrPtr {
     fn asg(self, s: &str);
@@ -23,7 +28,7 @@ impl UStrPtr for *mut UStr {
     }
 
     fn asg_undelimit(self, s: &str) {
-        self.asg(&s.replace("*\\/", "*/").replace("\\n", "\n").replace("\\r", "\r").replace("\\\\", "\\"));
+        self.asg(&undelimit(s));
     }
 }
 
@@ -267,7 +272,7 @@ unsafe fn load_event(
     path: &std::path::Path,
     event: &mut Event,
     event_code: &str,
-    objs: &HashMap<String, usize>,
+    asset_maps: &AssetMaps,
 ) -> Result<()> {
     for action_code in event_code.split(ACTION_TOKEN) {
         if action_code.trim().is_empty() {
@@ -315,7 +320,12 @@ unsafe fn load_event(
                         action.applies_to = match v {
                             "other" => -2,
                             "self" => -1,
-                            name => *objs.get(name).ok_or_else(|| Error::AssetNotFound(name.to_string()))? as _,
+                            name => *asset_maps
+                                .objects
+                                .map
+                                .get(name)
+                                .ok_or_else(|| Error::AssetNotFound(name.to_string()))?
+                                as _,
                         }
                     },
                     "invert" => action.invert_condition = v.parse::<u8>()? != 0,
@@ -326,7 +336,29 @@ unsafe fn load_event(
                             return Err(Error::SyntaxError(path.to_path_buf()))
                         }
                         let i = k.chars().last().unwrap().to_digit(10).unwrap() as usize;
-                        action.param_strings[i] = UStr::new(undelimit(v).as_ref());
+                        let err = || Error::AssetNotFound(v.to_string());
+                        if (5..=12 | 14).contains(&action.param_types[i]) {
+                            action.param_strings[i] = UStr::new(
+                                match action.param_types[i] {
+                                    5..=12 | 14 if v.is_empty() => -1, // TODO verify
+                                    5 => *asset_maps.sprites.map.get(v).ok_or_else(err)? as _,
+                                    6 => *asset_maps.sounds.map.get(v).ok_or_else(err)? as _,
+                                    7 => *asset_maps.backgrounds.map.get(v).ok_or_else(err)? as _,
+                                    8 => *asset_maps.paths.map.get(v).ok_or_else(err)? as _,
+                                    9 => *asset_maps.scripts.map.get(v).ok_or_else(err)? as _,
+                                    10 => *asset_maps.objects.map.get(v).ok_or_else(err)? as _,
+                                    11 => *asset_maps.rooms.map.get(v).ok_or_else(err)? as _,
+                                    12 => *asset_maps.fonts.map.get(v).ok_or_else(err)? as _,
+                                    14 => *asset_maps.timelines.map.get(v).ok_or_else(err)? as _,
+                                    _ => unreachable_unchecked(),
+                                }
+                                .to_string()
+                                .as_ref(),
+                            );
+                        } else {
+                            action.param_strings[i] = UStr::new(undelimit(v).as_ref());
+                        }
+                    },
                     _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
                 })
             })?;
@@ -392,13 +424,12 @@ unsafe fn load_object(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*con
             _ => ev_numb_s.parse()?,
         };
         let event = &mut *obj.get_event(ev_type, ev_numb);
-        load_event(&path, event, actions, object_map)?;
+        load_event(&path, event, actions, asset_maps)?;
     }
     Ok(obj)
 }
 
 unsafe fn load_timeline(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const Timeline> {
-    let object_map = &asset_maps.objects.map;
     let tl = &mut *Timeline::new();
     path.set_extension("gml");
     let code = std::fs::read_to_string(&path)?;
@@ -414,7 +445,7 @@ unsafe fn load_timeline(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*c
         let (name, actions) = code.split_once("\n").ok_or_else(err)?;
         *time_p = name.trim().parse()?;
         let event = Event::new();
-        load_event(&path, &mut *event, actions, object_map)?;
+        load_event(&path, &mut *event, actions, asset_maps)?;
         *event_p = event;
     }
     Ok(tl)
