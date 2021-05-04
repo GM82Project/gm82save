@@ -89,7 +89,7 @@ unsafe fn read_resource_tree(
             continue
         }
         let trimmed = line.trim_start();
-        let level = trimmed.len() - line.len();
+        let level = line.len() - trimmed.len();
         stack.truncate(level + 1);
         let rtype = match trimmed.chars().next() {
             Some('+') => 2,
@@ -650,7 +650,7 @@ unsafe fn load_room(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const
     room.creation_code = UStr::new(std::fs::read_to_string(&path)?.as_ref());
     path.pop();
     load_instances(room, path, &asset_maps.objects.map)?;
-    room.put_tiles(load_tiles(path, &asset_maps.rooms.map)?);
+    room.put_tiles(load_tiles(path, &asset_maps.backgrounds.map)?);
     Ok(room)
 }
 
