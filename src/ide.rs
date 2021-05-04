@@ -180,7 +180,7 @@ pub mod settings {
 
 pub mod game_info {
     use crate::delphi::{THelpForm, UStr};
-    pub const NEW_WINDOW: *mut bool = 0x77f578 as _;
+    pub const NEW_WINDOW: *mut bool = 0x77b578 as _;
     pub const CAPTION: *mut UStr = 0x77b57c as _;
     pub const LEFT: *mut i32 = 0x77b580 as _;
     pub const TOP: *mut i32 = 0x77b584 as _;
