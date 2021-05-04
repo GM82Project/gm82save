@@ -27,13 +27,21 @@ impl UStrPtr for *mut UStr {
     }
 }
 
-#[derive(Default)]
+struct Assets {
+    index: Vec<String>,
+    map: HashMap<String, usize>,
+}
 struct AssetMaps {
-    triggers: Option<HashMap<String, usize>>,    // req for objects
-    sprites: Option<HashMap<String, usize>>,     // req for objects
-    backgrounds: Option<HashMap<String, usize>>, // req for rooms
-    objects: Option<HashMap<String, usize>>,     // req for rooms and timelines
-    rooms: Option<HashMap<String, usize>>,       // req for paths
+    triggers: Assets,
+    sprites: Assets,
+    sounds: Assets,
+    backgrounds: Assets,
+    paths: Assets,
+    scripts: Assets,
+    objects: Assets,
+    rooms: Assets,
+    fonts: Assets,
+    timelines: Assets,
 }
 
 fn open_file(path: &std::path::Path) -> Result<BufReader<File>> {
@@ -64,7 +72,7 @@ unsafe fn read_resource_tree(
     base: *const delphi::TTreeNode,
     path: &std::path::Path,
     kind: u32,
-    names: Vec<&str>,
+    names: &HashMap<String, usize>,
     visible: bool,
 ) -> Result<()> {
     let f = open_file(path)?;
@@ -84,11 +92,8 @@ unsafe fn read_resource_tree(
             _ => return Err(Error::SyntaxError(path.to_path_buf())),
         };
         let name = &trimmed[1..];
-        let index = if rtype == 3 {
-            names.par_iter().position_any(|&s| s == name).ok_or_else(|| Error::AssetNotFound(name.to_string()))?
-        } else {
-            0
-        };
+        let index =
+            if rtype == 3 { *names.get(name).ok_or_else(|| Error::AssetNotFound(name.to_string()))? } else { 0 };
 
         let node = &*nodes.AddChild(*stack.last().unwrap(), &UStr::new(name.as_ref()));
         node.SetData(delphi::TreeNodeData::new(rtype, kind, index as u32));
@@ -100,15 +105,10 @@ unsafe fn read_resource_tree(
     Ok(())
 }
 
-unsafe fn load_triggers(path: &mut PathBuf) -> Result<HashMap<String, usize>> {
+unsafe fn load_triggers(maps: &AssetMaps, path: &mut PathBuf) -> Result<()> {
     path.push("triggers");
-    path.push("index.yyd");
-    let index = std::fs::read_to_string(&path)?;
-    path.pop();
-    let names: Vec<_> = index.par_lines().collect();
-    let name_map: HashMap<String, usize> =
-        names.par_iter().enumerate().filter_map(|(i, s)| (!s.is_empty()).then(|| (s.to_string(), i))).collect();
-    ide::alloc_constants(names.len());
+    let names = &maps.triggers.index;
+    ide::alloc_triggers(names.len());
     for (name, trig_p) in names.iter().zip(ide::get_triggers_mut()) {
         let trig = &mut *Trigger::new();
         trig.name = UStr::new(name.as_ref());
@@ -127,7 +127,7 @@ unsafe fn load_triggers(path: &mut PathBuf) -> Result<HashMap<String, usize>> {
         *trig_p = Some(trig);
     }
     path.pop();
-    Ok(name_map)
+    Ok(())
 }
 
 fn verify_path(path: &std::path::Path) -> Result<()> {
@@ -326,9 +326,9 @@ unsafe fn load_event(
 unsafe fn load_object(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const Object> {
     path.set_extension("txt");
     let obj = &mut *Object::new();
-    let sprite_map = asset_maps.sprites.as_ref().unwrap();
-    let object_map = asset_maps.objects.as_ref().unwrap();
-    let trigger_map = asset_maps.triggers.as_ref().unwrap();
+    let sprite_map = &asset_maps.sprites.map;
+    let object_map = &asset_maps.objects.map;
+    let trigger_map = &asset_maps.triggers.map;
     read_txt(&path, |k, v| {
         Ok(match k {
             "sprite" => {
@@ -381,7 +381,7 @@ unsafe fn load_object(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*con
 }
 
 unsafe fn load_timeline(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const Timeline> {
-    let object_map = asset_maps.objects.as_ref().unwrap();
+    let object_map = &asset_maps.objects.map;
     let tl = &mut *Timeline::new();
     path.set_extension("gml");
     let code = std::fs::read_to_string(&path)?;
@@ -591,6 +591,17 @@ unsafe fn load_settings(path: &mut PathBuf) -> Result<()> {
     Ok(())
 }
 
+fn load_index(name: &str, path: &mut PathBuf) -> Result<Assets> {
+    path.push(name);
+    path.push("index.yyd");
+    let text = std::fs::read_to_string(&path)?;
+    let index: Vec<_> = text.par_lines().map(String::from).collect();
+    let map = index.par_iter().enumerate().filter_map(|(i, s)| (!s.is_empty()).then(|| (s.to_string(), i))).collect();
+    path.pop();
+    path.pop();
+    Ok(Assets { index, map })
+}
+
 unsafe fn load_assets<'a, T: Sync>(
     name: &str,
     kind: u32,
@@ -599,22 +610,14 @@ unsafe fn load_assets<'a, T: Sync>(
     get_assets: fn() -> &'a mut [Option<&'a T>],
     get_names: fn() -> &'a mut [UStr],
     alloc: fn(usize),
+    assets: &Assets,
     path: &mut PathBuf,
-    asset_maps: &mut AssetMaps,
-) -> Result<HashMap<String, usize>> {
+    asset_maps: &AssetMaps,
+) -> Result<()> {
     path.push(name);
-    path.push("index.yyd");
-    let index = std::fs::read_to_string(&path)?;
-    path.pop();
-    let mut names = vec![""];
-    names.par_extend(index.par_lines());
-    let mut name_map: HashMap<String, usize> =
-        names.par_iter().enumerate().filter_map(|(i, s)| (!s.is_empty()).then(|| (s.to_string(), i))).collect();
-    if name == "objects" {
-        asset_maps.objects = Some(std::mem::take(&mut name_map));
-    }
+    let names = &assets.index;
     alloc(names.len());
-    for (name, asset, name_p) in izip!(&names, get_assets(), get_names()) {
+    for (name, asset, name_p) in izip!(names, get_assets(), get_names()) {
         if !name.is_empty() {
             *name_p = UStr::new(name.as_ref());
             path.push(name);
@@ -623,10 +626,10 @@ unsafe fn load_assets<'a, T: Sync>(
         }
     }
     path.push("tree.yyd");
-    read_resource_tree(node.read(), &path, kind, names, true)?;
+    read_resource_tree(node.read(), &path, kind, &assets.map, true)?;
     path.pop();
     path.pop();
-    Ok(name_map)
+    Ok(())
 }
 
 pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
@@ -658,8 +661,19 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     })?;
     path.pop();
     load_settings(&mut path)?;
-    let mut asset_maps = AssetMaps::default();
-    asset_maps.triggers = Some(load_triggers(&mut path)?);
+    let asset_maps = AssetMaps {
+        triggers: load_index("triggers", &mut path)?,
+        sprites: load_index("sprites", &mut path)?,
+        sounds: load_index("sounds", &mut path)?,
+        backgrounds: load_index("backgrounds", &mut path)?,
+        paths: load_index("paths", &mut path)?,
+        scripts: load_index("scripts", &mut path)?,
+        objects: load_index("objects", &mut path)?,
+        rooms: load_index("rooms", &mut path)?,
+        fonts: load_index("fonts", &mut path)?,
+        timelines: load_index("timelines", &mut path)?,
+    };
+    load_triggers(&asset_maps, &mut path)?;
     load_assets(
         "sounds",
         3,
@@ -668,10 +682,11 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         ide::get_sounds_mut,
         ide::get_sound_names_mut,
         ide::alloc_sounds,
+        &asset_maps.sounds,
         &mut path,
-        &mut asset_maps,
+        &asset_maps,
     )?;
-    asset_maps.sprites = Some(load_assets(
+    load_assets(
         "sprites",
         2,
         ide::RT_SPRITES,
@@ -679,9 +694,10 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         ide::get_sprites_mut,
         ide::get_sprite_names_mut,
         ide::alloc_sprites,
+        &asset_maps.sprites,
         &mut path,
-        &mut asset_maps,
-    )?);
+        &asset_maps,
+    )?;
     for (sp, thumb) in ide::get_sprites().iter().zip(ide::get_sprite_thumbs_mut()) {
         if let Some(sp) = sp {
             *thumb = delphi_call!(0x5a9c14, sp.get_icon());
@@ -689,7 +705,7 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
             *thumb = -1;
         }
     }
-    asset_maps.backgrounds = Some(load_assets(
+    load_assets(
         "backgrounds",
         6,
         ide::RT_BACKGROUNDS,
@@ -697,9 +713,10 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         ide::get_backgrounds_mut,
         ide::get_background_names_mut,
         ide::alloc_backgrounds,
+        &asset_maps.backgrounds,
         &mut path,
-        &mut asset_maps,
-    )?);
+        &asset_maps,
+    )?;
     for (bg, thumb) in ide::get_backgrounds().iter().zip(ide::get_background_thumbs_mut()) {
         if let Some(bg) = bg {
             *thumb = delphi_call!(0x5a9c14, bg.get_icon());
@@ -715,8 +732,9 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         ide::get_scripts_mut,
         ide::get_script_names_mut,
         ide::alloc_scripts,
+        &asset_maps.scripts,
         &mut path,
-        &mut asset_maps,
+        &asset_maps,
     )?;
     load_assets(
         "fonts",
@@ -726,8 +744,9 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         ide::get_fonts_mut,
         ide::get_font_names_mut,
         ide::alloc_fonts,
+        &asset_maps.fonts,
         &mut path,
-        &mut asset_maps,
+        &asset_maps,
     )?;
     load_assets(
         "objects",
@@ -737,8 +756,9 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         ide::get_objects_mut,
         ide::get_object_names_mut,
         ide::alloc_objects,
+        &asset_maps.objects,
         &mut path,
-        &mut asset_maps,
+        &asset_maps,
     )?;
     load_assets(
         "timelines",
@@ -748,8 +768,9 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         ide::get_timelines_mut,
         ide::get_timeline_names_mut,
         ide::alloc_timelines,
+        &asset_maps.timelines,
         &mut path,
-        &mut asset_maps,
+        &asset_maps,
     )?;
     load_included_files(&mut path)?;
     Ok(())
