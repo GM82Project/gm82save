@@ -1054,5 +1054,28 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         &asset_maps,
     )?;
     load_included_files(&mut path)?;
+
+    // this is the part where i set all the updated flags to false
+    // i don't feel like doing it nicely so enjoy
+    for ptr in [
+        0x77f5f4, // resource tree
+        0x78a0d4, // objects
+        0x78a1b0, // sounds
+        0x790170, // sprites
+        0x78a1f8, // rooms
+        0x78a168, // backgrounds
+        0x7a4658, // paths
+        0x78a1b8, // scripts
+        0x790190, // fonts
+        0x790188, // timelines
+        0x78895c, // gameinfo
+        0x790824, // settings
+        0x790a0c, // extensions
+        0x7900a0, // included files
+        0x790058, // triggers
+        0x78c154, // constants
+    ].iter().copied() {
+        (ptr as *mut bool).write(false);
+    }
     Ok(())
 }
