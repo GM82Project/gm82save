@@ -787,8 +787,8 @@ unsafe fn load_settings(path: &mut PathBuf) -> Result<()> {
             "priority" => PRIORITY.write(v.parse()?),
             "freeze_on_lose_focus" => FREEZE_ON_LOSE_FOCUS.write(v.parse::<u8>()? != 0),
             "custom_loader" => {
-                custom_load_bg = true;
-                HAS_CUSTOM_LOAD_IMAGE.write(v.parse::<u8>()? != 0);
+                custom_load_bg = v.parse::<u8>()? != 0;
+                HAS_CUSTOM_LOAD_IMAGE.write(custom_load_bg);
             },
             "custom_bar" => {
                 let bar = v.parse()?;
