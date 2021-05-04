@@ -390,13 +390,13 @@ unsafe fn save_room(room: &Room, path: &mut PathBuf) -> Result<()> {
         writeln!(f, "clear_view={}", u8::from(room.clear_view))?;
         writeln!(f)?;
         for (i, bg) in room.backgrounds.iter().enumerate() {
-            writeln!(f, "bg_visible{}={}", i, bg.visible_on_start)?;
-            writeln!(f, "bg_is_foreground{}={}", i, bg.is_foreground)?;
+            writeln!(f, "bg_visible{}={}", i, u8::from(bg.visible_on_start))?;
+            writeln!(f, "bg_is_foreground{}={}", i, u8::from(bg.is_foreground))?;
             writeln!(f, "bg_source{}={}", i, ide::get_background_names().get_asset(bg.source_bg))?;
             writeln!(f, "bg_xoffset{}={}", i, bg.xoffset)?;
             writeln!(f, "bg_yoffset{}={}", i, bg.yoffset)?;
-            writeln!(f, "bg_tile_h{}={}", i, bg.tile_horz)?;
-            writeln!(f, "bg_tile_v{}={}", i, bg.tile_vert)?;
+            writeln!(f, "bg_tile_h{}={}", i, u8::from(bg.tile_horz))?;
+            writeln!(f, "bg_tile_v{}={}", i, u8::from(bg.tile_vert))?;
             writeln!(f, "bg_hspeed{}={}", i, bg.hspeed)?;
             writeln!(f, "bg_vspeed{}={}", i, bg.vspeed)?;
             writeln!(f, "bg_stretch{}={}", i, u8::from(bg.stretch))?;
