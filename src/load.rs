@@ -1,4 +1,9 @@
-use crate::{asset::*, delphi, delphi::UStr, events, ide, Error, Result, ACTION_TOKEN};
+use crate::{
+    asset::*,
+    delphi,
+    delphi::{advance_progress_form, UStr},
+    events, ide, Error, Result, ACTION_TOKEN,
+};
 use itertools::izip;
 use rayon::prelude::*;
 use std::{
@@ -917,7 +922,9 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         })
     })?;
     path.pop();
+    advance_progress_form(5);
     load_settings(&mut path)?;
+    advance_progress_form(10);
     let asset_maps = AssetMaps {
         triggers: load_index("triggers", &mut path)?,
         sprites: load_index("sprites", &mut path)?,
@@ -930,7 +937,9 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         fonts: load_index("fonts", &mut path)?,
         timelines: load_index("timelines", &mut path)?,
     };
+    advance_progress_form(15);
     load_triggers(&asset_maps, &mut path)?;
+    advance_progress_form(20);
     load_assets(
         "sounds",
         3,
@@ -943,6 +952,7 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         &mut path,
         &asset_maps,
     )?;
+    advance_progress_form(30);
     load_assets(
         "sprites",
         2,
@@ -955,6 +965,7 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         &mut path,
         &asset_maps,
     )?;
+    advance_progress_form(50);
     for (sp, thumb) in ide::get_sprites().iter().zip(ide::get_sprite_thumbs_mut()) {
         if let Some(sp) = sp {
             *thumb = delphi_call!(0x5a9c14, sp.get_icon());
@@ -962,6 +973,7 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
             *thumb = -1;
         }
     }
+    advance_progress_form(55);
     load_assets(
         "backgrounds",
         6,
@@ -974,6 +986,7 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         &mut path,
         &asset_maps,
     )?;
+    advance_progress_form(60);
     for (bg, thumb) in ide::get_backgrounds().iter().zip(ide::get_background_thumbs_mut()) {
         if let Some(bg) = bg {
             *thumb = delphi_call!(0x5a9c14, bg.get_icon());
@@ -981,30 +994,7 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
             *thumb = -1;
         }
     }
-    load_assets(
-        "scripts",
-        7,
-        ide::RT_SCRIPTS,
-        load_script,
-        ide::get_scripts_mut,
-        ide::get_script_names_mut,
-        ide::alloc_scripts,
-        &asset_maps.scripts,
-        &mut path,
-        &asset_maps,
-    )?;
-    load_assets(
-        "fonts",
-        9,
-        ide::RT_FONTS,
-        load_font,
-        ide::get_fonts_mut,
-        ide::get_font_names_mut,
-        ide::alloc_fonts,
-        &asset_maps.fonts,
-        &mut path,
-        &asset_maps,
-    )?;
+    advance_progress_form(65);
     load_assets(
         "paths",
         8,
@@ -1017,18 +1007,33 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         &mut path,
         &asset_maps,
     )?;
+    advance_progress_form(70);
     load_assets(
-        "objects",
-        1,
-        ide::RT_OBJECTS,
-        load_object,
-        ide::get_objects_mut,
-        ide::get_object_names_mut,
-        ide::alloc_objects,
-        &asset_maps.objects,
+        "scripts",
+        7,
+        ide::RT_SCRIPTS,
+        load_script,
+        ide::get_scripts_mut,
+        ide::get_script_names_mut,
+        ide::alloc_scripts,
+        &asset_maps.scripts,
         &mut path,
         &asset_maps,
     )?;
+    advance_progress_form(75);
+    load_assets(
+        "fonts",
+        9,
+        ide::RT_FONTS,
+        load_font,
+        ide::get_fonts_mut,
+        ide::get_font_names_mut,
+        ide::alloc_fonts,
+        &asset_maps.fonts,
+        &mut path,
+        &asset_maps,
+    )?;
+    advance_progress_form(80);
     load_assets(
         "timelines",
         12,
@@ -1041,6 +1046,20 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         &mut path,
         &asset_maps,
     )?;
+    advance_progress_form(85);
+    load_assets(
+        "objects",
+        1,
+        ide::RT_OBJECTS,
+        load_object,
+        ide::get_objects_mut,
+        ide::get_object_names_mut,
+        ide::alloc_objects,
+        &asset_maps.objects,
+        &mut path,
+        &asset_maps,
+    )?;
+    advance_progress_form(90);
     load_assets(
         "rooms",
         4,
@@ -1053,6 +1072,7 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         &mut path,
         &asset_maps,
     )?;
+    advance_progress_form(95);
     load_included_files(&mut path)?;
 
     // this is the part where i set all the updated flags to false
@@ -1074,8 +1094,12 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         0x7900a0, // included files
         0x790058, // triggers
         0x78c154, // constants
-    ].iter().copied() {
+    ]
+    .iter()
+    .copied()
+    {
         (ptr as *mut bool).write(false);
     }
+    advance_progress_form(100);
     Ok(())
 }
