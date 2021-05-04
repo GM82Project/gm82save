@@ -124,6 +124,7 @@ unsafe extern "C" fn load() -> bool {
         ide::initialize_project();
     } else {
         delphi::close_progress_form();
+        ebp.cast::<bool>().sub(5).write(true);
     }
     true
 }
@@ -157,10 +158,10 @@ unsafe fn injector() {
     }));
 
     // call save() instead of the "generate gm81" function
-    // and insert a jump call to the post-save code (0x705e45)
-    let save_dest = 0x705cd0 as *mut u8;
-    let mut save_patch = [0, 0, 0, 0, 0xe9, 0x6c, 1, 0, 0];
-    save_patch[..4].copy_from_slice(&(save as u32 - (save_dest as u32 + 4)).to_le_bytes());
+    // jump to 0x705ed1 on failure (return 0) and 0x705e4d on success (return 1)
+    let save_dest = 0x705cbd as *mut u8;
+    let mut save_patch = [0xe8, 0, 0, 0, 0, 0x85, 0xc0, 0x0f, 0x84, 0x07, 0x02, 0, 0, 0xe9, 0x7e, 0x01, 0, 0];
+    save_patch[1..5].copy_from_slice(&(save as u32 - (save_dest as u32 + 5)).to_le_bytes());
     patch(save_dest, &save_patch);
     // call load() instead of CStream.Create
     // and insert a JZ to the post-load code (0x705af3)
