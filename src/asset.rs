@@ -84,7 +84,6 @@ impl Sprite {
     }
 
     pub unsafe fn get_icon(&self) -> *const TBitmap {
-        // technically a pointer but eh
         delphi_call!(0x5b401c, self)
     }
 }
@@ -109,8 +108,7 @@ impl Background {
         delphi_call!(0x062dba4, 0x62d408, 1)
     }
 
-    pub unsafe fn get_icon(&self) -> u32 {
-        // technically a pointer but eh
+    pub unsafe fn get_icon(&self) -> *const TBitmap {
         delphi_call!(0x62e5e8, self)
     }
 }

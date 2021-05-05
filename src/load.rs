@@ -79,15 +79,18 @@ fn read_txt<F: FnMut(&str, &str) -> Result<()>>(path: &std::path::Path, mut func
 }
 
 unsafe fn read_resource_tree(
-    base: *const delphi::TTreeNode,
-    path: &std::path::Path,
+    base: *const *const delphi::TTreeNode,
     kind: u32,
+    type_name: &str,
     names: &HashMap<String, usize>,
     visible: bool,
+    path: &mut PathBuf,
 ) -> Result<()> {
+    path.push(type_name);
+    path.push("tree.yyd");
     let f = open_file(path)?;
     let nodes = &*((&**if visible { ide::RESOURCE_TREE } else { ide::RESOURCE_TREE_HIDDEN }).nodes);
-    let mut stack = vec![base];
+    let mut stack = vec![base.read()];
     for line in f.lines() {
         let line = line?;
         if line.is_empty() {
@@ -112,6 +115,8 @@ unsafe fn read_resource_tree(
             stack.push(node);
         }
     }
+    path.pop();
+    path.pop();
     Ok(())
 }
 
@@ -151,7 +156,7 @@ fn verify_path(path: &std::path::Path) -> Result<()> {
     }
 }
 
-unsafe fn load_sound(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*const Sound> {
+unsafe fn load_sound(path: &mut PathBuf, _asset_maps: &AssetMaps, _id: usize) -> Result<*const Sound> {
     let snd = &mut *Sound::new();
     path.set_extension("txt");
     let mut extension = String::new();
@@ -192,7 +197,7 @@ unsafe fn load_frame(path: &std::path::Path, frame: &mut Frame) -> Result<()> {
     Ok(())
 }
 
-unsafe fn load_background(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*const Background> {
+unsafe fn load_background(path: &mut PathBuf, _asset_maps: &AssetMaps, id: usize) -> Result<*const Background> {
     let bg = &mut *Background::new();
     path.set_extension("txt");
     let mut bg_exists = false;
@@ -213,10 +218,14 @@ unsafe fn load_background(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result
         path.set_extension("png");
         load_frame(path, &mut *bg.frame)?;
     }
+
+    let icon = bg.get_icon();
+    ide::get_background_thumbs_mut()[id] = delphi_call!(0x5a9c14, icon);
+    let _: u32 = delphi_call!(0x405a7c, icon);
     Ok(bg)
 }
 
-unsafe fn load_sprite(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*const Sprite> {
+unsafe fn load_sprite(path: &mut PathBuf, _asset_maps: &AssetMaps, id: usize) -> Result<*const Sprite> {
     let sp = &mut *Sprite::new();
     path.push("sprite.txt");
     read_txt(&path, |k, v| {
@@ -244,17 +253,21 @@ unsafe fn load_sprite(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*co
         load_frame(&path, &mut **f)?;
         path.pop();
     }
+
+    let icon = sp.get_icon();
+    ide::get_sprite_thumbs_mut()[id] = delphi_call!(0x5a9c14, icon);
+    let _: u32 = delphi_call!(0x405a7c, icon);
     Ok(sp)
 }
 
-unsafe fn load_script(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*const Script> {
+unsafe fn load_script(path: &mut PathBuf, _asset_maps: &AssetMaps, _id: usize) -> Result<*const Script> {
     path.set_extension("gml");
     let s = Script::new();
     (&mut *s).source = UStr::new(std::fs::read_to_string(path)?.as_ref());
     Ok(s)
 }
 
-unsafe fn load_font(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*const Font> {
+unsafe fn load_font(path: &mut PathBuf, _asset_maps: &AssetMaps, _id: usize) -> Result<*const Font> {
     let f = &mut *Font::new();
     path.set_extension("txt");
     read_txt(path, |k, v| {
@@ -378,7 +391,7 @@ unsafe fn load_event(
     Ok(())
 }
 
-unsafe fn load_object(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const Object> {
+unsafe fn load_object(path: &mut PathBuf, asset_maps: &AssetMaps, _id: usize) -> Result<*const Object> {
     path.set_extension("txt");
     let obj = &mut *Object::new();
     let sprite_map = &asset_maps.sprites.map;
@@ -435,7 +448,7 @@ unsafe fn load_object(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*con
     Ok(obj)
 }
 
-unsafe fn load_timeline(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const Timeline> {
+unsafe fn load_timeline(path: &mut PathBuf, asset_maps: &AssetMaps, _id: usize) -> Result<*const Timeline> {
     let tl = &mut *Timeline::new();
     path.set_extension("gml");
     let code = std::fs::read_to_string(&path)?;
@@ -457,7 +470,7 @@ unsafe fn load_timeline(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*c
     Ok(tl)
 }
 
-unsafe fn load_path(file_path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const Path> {
+unsafe fn load_path(file_path: &mut PathBuf, asset_maps: &AssetMaps, _id: usize) -> Result<*const Path> {
     let path = &mut *Path::new();
     file_path.push("path.txt");
     read_txt(&file_path, |k, v| {
@@ -580,7 +593,7 @@ unsafe fn load_tiles(path: &mut PathBuf, bgs: &HashMap<String, usize>) -> Result
     Ok(tiles)
 }
 
-unsafe fn load_room(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const Room> {
+unsafe fn load_room(path: &mut PathBuf, asset_maps: &AssetMaps, _id: usize) -> Result<*const Room> {
     let room = &mut *Room::new();
     path.push("room.txt");
     read_txt(&path, |k, v| {
@@ -868,9 +881,7 @@ fn load_index(name: &str, path: &mut PathBuf) -> Result<Assets> {
 
 unsafe fn load_assets<'a, T: Sync>(
     name: &str,
-    kind: u32,
-    node: *const *const delphi::TTreeNode,
-    load_asset: unsafe fn(&mut PathBuf, &AssetMaps) -> Result<*const T>,
+    load_asset: unsafe fn(&mut PathBuf, &AssetMaps, usize) -> Result<*const T>,
     get_assets: fn() -> &'a mut [Option<&'a T>],
     get_names: fn() -> &'a mut [UStr],
     alloc: fn(usize),
@@ -881,16 +892,15 @@ unsafe fn load_assets<'a, T: Sync>(
     path.push(name);
     let names = &assets.index;
     alloc(names.len());
-    names.into_par_iter().zip(get_assets()).zip(get_names()).try_for_each(|((name, asset), name_p)| -> Result<()> {
-        if !name.is_empty() {
-            *name_p = UStr::new(name.as_ref());
-            *asset = load_asset(&mut path.join(name), asset_maps)?.as_ref();
-        }
-        Ok(())
-    })?;
-    path.push("tree.yyd");
-    read_resource_tree(node.read(), &path, kind, &assets.map, true)?;
-    path.pop();
+    names.into_iter().zip(get_assets()).zip(get_names()).enumerate().try_for_each(
+        |(i, ((name, asset), name_p))| -> Result<()> {
+            if !name.is_empty() {
+                *name_p = UStr::new(name.as_ref());
+                *asset = load_asset(&mut path.join(name), asset_maps, i)?.as_ref();
+            }
+            Ok(())
+        },
+    )?;
     path.pop();
     Ok(())
 }
@@ -943,8 +953,6 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     advance_progress_form(20);
     load_assets(
         "sounds",
-        3,
-        ide::RT_SOUNDS,
         load_sound,
         ide::get_sounds_mut,
         ide::get_sound_names_mut,
@@ -956,8 +964,6 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     advance_progress_form(30);
     load_assets(
         "sprites",
-        2,
-        ide::RT_SPRITES,
         load_sprite,
         ide::get_sprites_mut,
         ide::get_sprite_names_mut,
@@ -966,19 +972,9 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         &mut path,
         &asset_maps,
     )?;
-    advance_progress_form(50);
-    for (sp, thumb) in ide::get_sprites().iter().zip(ide::get_sprite_thumbs_mut()) {
-        if let Some(sp) = sp {
-            *thumb = delphi_call!(0x5a9c14, sp.get_icon());
-        } else {
-            *thumb = -1;
-        }
-    }
     advance_progress_form(55);
     load_assets(
         "backgrounds",
-        6,
-        ide::RT_BACKGROUNDS,
         load_background,
         ide::get_backgrounds_mut,
         ide::get_background_names_mut,
@@ -987,19 +983,9 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         &mut path,
         &asset_maps,
     )?;
-    advance_progress_form(60);
-    for (bg, thumb) in ide::get_backgrounds().iter().zip(ide::get_background_thumbs_mut()) {
-        if let Some(bg) = bg {
-            *thumb = delphi_call!(0x5a9c14, bg.get_icon());
-        } else {
-            *thumb = -1;
-        }
-    }
     advance_progress_form(65);
     load_assets(
         "paths",
-        8,
-        ide::RT_PATHS,
         load_path,
         ide::get_paths_mut,
         ide::get_path_names_mut,
@@ -1011,8 +997,6 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     advance_progress_form(70);
     load_assets(
         "scripts",
-        7,
-        ide::RT_SCRIPTS,
         load_script,
         ide::get_scripts_mut,
         ide::get_script_names_mut,
@@ -1024,8 +1008,6 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     advance_progress_form(75);
     load_assets(
         "fonts",
-        9,
-        ide::RT_FONTS,
         load_font,
         ide::get_fonts_mut,
         ide::get_font_names_mut,
@@ -1037,8 +1019,6 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     advance_progress_form(80);
     load_assets(
         "timelines",
-        12,
-        ide::RT_TIMELINES,
         load_timeline,
         ide::get_timelines_mut,
         ide::get_timeline_names_mut,
@@ -1050,8 +1030,6 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     advance_progress_form(85);
     load_assets(
         "objects",
-        1,
-        ide::RT_OBJECTS,
         load_object,
         ide::get_objects_mut,
         ide::get_object_names_mut,
@@ -1063,8 +1041,6 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     advance_progress_form(90);
     load_assets(
         "rooms",
-        4,
-        ide::RT_ROOMS,
         load_room,
         ide::get_rooms_mut,
         ide::get_room_names_mut,
@@ -1075,6 +1051,16 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     )?;
     advance_progress_form(95);
     load_included_files(&mut path)?;
+
+    read_resource_tree(ide::RT_SOUNDS, 3, "sounds", &asset_maps.sounds.map, true, &mut path)?;
+    read_resource_tree(ide::RT_SPRITES, 2, "sprites", &asset_maps.sprites.map, true, &mut path)?;
+    read_resource_tree(ide::RT_BACKGROUNDS, 6, "backgrounds", &asset_maps.backgrounds.map, true, &mut path)?;
+    read_resource_tree(ide::RT_PATHS, 8, "paths", &asset_maps.paths.map, true, &mut path)?;
+    read_resource_tree(ide::RT_SCRIPTS, 7, "scripts", &asset_maps.scripts.map, true, &mut path)?;
+    read_resource_tree(ide::RT_FONTS, 9, "fonts", &asset_maps.fonts.map, true, &mut path)?;
+    read_resource_tree(ide::RT_TIMELINES, 12, "timelines", &asset_maps.timelines.map, true, &mut path)?;
+    read_resource_tree(ide::RT_OBJECTS, 1, "objects", &asset_maps.objects.map, true, &mut path)?;
+    read_resource_tree(ide::RT_ROOMS, 4, "rooms", &asset_maps.rooms.map, true, &mut path)?;
 
     // this is the part where i set all the updated flags to false
     // i don't feel like doing it nicely so enjoy

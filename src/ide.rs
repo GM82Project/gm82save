@@ -248,6 +248,7 @@ macro_rules! get_graphics {
                     for i in 0..5 {
                         delphi::DynArraySetLength($assets_p.add(i), $type_p.add($type_size*i), 1, count);
                     }
+                    [<get_ $lo _thumbs_mut>]().fill(-1);
                 }
             }
         }
