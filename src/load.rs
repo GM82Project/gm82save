@@ -849,6 +849,7 @@ unsafe fn load_settings(path: &mut PathBuf) -> Result<()> {
     {
         path.push("extensions.txt");
         let f = open_file(&path)?;
+        let mut any = false;
         for line in f.lines() {
             let name = line?;
             if let Some((_, loaded)) = ide::get_extensions()
@@ -857,9 +858,14 @@ unsafe fn load_settings(path: &mut PathBuf) -> Result<()> {
                 .find(|(ex, _)| ex.name.to_os_string() == OsStr::new(&name))
             {
                 *loaded = true;
+                any = true;
             } else {
                 crate::show_message(&format!("Cannot find extension package: {}", name));
             }
+        }
+        if any {
+            // reload action libraries, including the extensions
+            let _: u32 = delphi_call!(0x7149c4);
         }
         path.pop();
     }
