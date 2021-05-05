@@ -156,7 +156,7 @@ fn verify_path(path: &std::path::Path) -> Result<()> {
     }
 }
 
-unsafe fn load_sound(path: &mut PathBuf, _asset_maps: &AssetMaps, _id: usize) -> Result<*const Sound> {
+unsafe fn load_sound(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*const Sound> {
     let snd = &mut *Sound::new();
     path.set_extension("txt");
     let mut extension = String::new();
@@ -197,7 +197,7 @@ unsafe fn load_frame(path: &std::path::Path, frame: &mut Frame) -> Result<()> {
     Ok(())
 }
 
-unsafe fn load_background(path: &mut PathBuf, _asset_maps: &AssetMaps, id: usize) -> Result<*const Background> {
+unsafe fn load_background(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*const Background> {
     let bg = &mut *Background::new();
     path.set_extension("txt");
     let mut bg_exists = false;
@@ -218,14 +218,10 @@ unsafe fn load_background(path: &mut PathBuf, _asset_maps: &AssetMaps, id: usize
         path.set_extension("png");
         load_frame(path, &mut *bg.frame)?;
     }
-
-    let icon = bg.get_icon();
-    ide::get_background_thumbs_mut()[id] = delphi_call!(0x5a9c14, icon);
-    let _: u32 = delphi_call!(0x405a7c, icon);
     Ok(bg)
 }
 
-unsafe fn load_sprite(path: &mut PathBuf, _asset_maps: &AssetMaps, id: usize) -> Result<*const Sprite> {
+unsafe fn load_sprite(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*const Sprite> {
     let sp = &mut *Sprite::new();
     path.push("sprite.txt");
     read_txt(&path, |k, v| {
@@ -253,21 +249,17 @@ unsafe fn load_sprite(path: &mut PathBuf, _asset_maps: &AssetMaps, id: usize) ->
         load_frame(&path, &mut **f)?;
         path.pop();
     }
-
-    let icon = sp.get_icon();
-    ide::get_sprite_thumbs_mut()[id] = delphi_call!(0x5a9c14, icon);
-    let _: u32 = delphi_call!(0x405a7c, icon);
     Ok(sp)
 }
 
-unsafe fn load_script(path: &mut PathBuf, _asset_maps: &AssetMaps, _id: usize) -> Result<*const Script> {
+unsafe fn load_script(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*const Script> {
     path.set_extension("gml");
     let s = Script::new();
     (&mut *s).source = UStr::new(std::fs::read_to_string(path)?.as_ref());
     Ok(s)
 }
 
-unsafe fn load_font(path: &mut PathBuf, _asset_maps: &AssetMaps, _id: usize) -> Result<*const Font> {
+unsafe fn load_font(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*const Font> {
     let f = &mut *Font::new();
     path.set_extension("txt");
     read_txt(path, |k, v| {
@@ -391,7 +383,7 @@ unsafe fn load_event(
     Ok(())
 }
 
-unsafe fn load_object(path: &mut PathBuf, asset_maps: &AssetMaps, _id: usize) -> Result<*const Object> {
+unsafe fn load_object(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const Object> {
     path.set_extension("txt");
     let obj = &mut *Object::new();
     let sprite_map = &asset_maps.sprites.map;
@@ -448,7 +440,7 @@ unsafe fn load_object(path: &mut PathBuf, asset_maps: &AssetMaps, _id: usize) ->
     Ok(obj)
 }
 
-unsafe fn load_timeline(path: &mut PathBuf, asset_maps: &AssetMaps, _id: usize) -> Result<*const Timeline> {
+unsafe fn load_timeline(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const Timeline> {
     let tl = &mut *Timeline::new();
     path.set_extension("gml");
     let code = std::fs::read_to_string(&path)?;
@@ -470,7 +462,7 @@ unsafe fn load_timeline(path: &mut PathBuf, asset_maps: &AssetMaps, _id: usize) 
     Ok(tl)
 }
 
-unsafe fn load_path(file_path: &mut PathBuf, asset_maps: &AssetMaps, _id: usize) -> Result<*const Path> {
+unsafe fn load_path(file_path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const Path> {
     let path = &mut *Path::new();
     file_path.push("path.txt");
     read_txt(&file_path, |k, v| {
@@ -593,7 +585,7 @@ unsafe fn load_tiles(path: &mut PathBuf, bgs: &HashMap<String, usize>) -> Result
     Ok(tiles)
 }
 
-unsafe fn load_room(path: &mut PathBuf, asset_maps: &AssetMaps, _id: usize) -> Result<*const Room> {
+unsafe fn load_room(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const Room> {
     let room = &mut *Room::new();
     path.push("room.txt");
     read_txt(&path, |k, v| {
@@ -887,7 +879,7 @@ fn load_index(name: &str, path: &mut PathBuf) -> Result<Assets> {
 
 unsafe fn load_assets<'a, T: Sync>(
     name: &str,
-    load_asset: unsafe fn(&mut PathBuf, &AssetMaps, usize) -> Result<*const T>,
+    load_asset: unsafe fn(&mut PathBuf, &AssetMaps) -> Result<*const T>,
     get_assets: fn() -> &'a mut [Option<&'a T>],
     get_names: fn() -> &'a mut [UStr],
     alloc: fn(usize),
@@ -898,15 +890,13 @@ unsafe fn load_assets<'a, T: Sync>(
     path.push(name);
     let names = &assets.index;
     alloc(names.len());
-    names.into_iter().zip(get_assets()).zip(get_names()).enumerate().try_for_each(
-        |(i, ((name, asset), name_p))| -> Result<()> {
-            if !name.is_empty() {
-                *name_p = UStr::new(name.as_ref());
-                *asset = load_asset(&mut path.join(name), asset_maps, i)?.as_ref();
-            }
-            Ok(())
-        },
-    )?;
+    names.into_iter().zip(get_assets()).zip(get_names()).try_for_each(|((name, asset), name_p)| -> Result<()> {
+        if !name.is_empty() {
+            *name_p = UStr::new(name.as_ref());
+            *asset = load_asset(&mut path.join(name), asset_maps)?.as_ref();
+        }
+        Ok(())
+    })?;
     path.pop();
     Ok(())
 }
@@ -978,6 +968,14 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         &mut path,
         &asset_maps,
     )?;
+    advance_progress_form(50);
+    for (sp, thumb) in ide::get_sprites().iter().zip(ide::get_sprite_thumbs_mut()) {
+        if let Some(sp) = sp {
+            *thumb = delphi_call!(0x5a9c14, sp.get_icon());
+        } else {
+            *thumb = -1;
+        }
+    }
     advance_progress_form(55);
     load_assets(
         "backgrounds",
@@ -989,6 +987,14 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         &mut path,
         &asset_maps,
     )?;
+    advance_progress_form(60);
+    for (bg, thumb) in ide::get_backgrounds().iter().zip(ide::get_background_thumbs_mut()) {
+        if let Some(bg) = bg {
+            *thumb = delphi_call!(0x5a9c14, bg.get_icon());
+        } else {
+            *thumb = -1;
+        }
+    }
     advance_progress_form(65);
     load_assets(
         "paths",
