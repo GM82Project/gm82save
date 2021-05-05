@@ -87,7 +87,7 @@ fn show_message(msg: &str) {
     }
 }
 
-unsafe extern "C" fn save() -> u32 {
+unsafe extern "C" fn save() -> bool {
     // get the path to the yyd file
     let ebp: *const UStr;
     asm!("mov {}, [ebp]", out(reg) ebp);
@@ -98,10 +98,11 @@ unsafe extern "C" fn save() -> u32 {
         // display the error
         delphi::close_progress_form();
         show_message(&format!("Failed to save: {}", e));
+        false
     } else {
         delphi::close_progress_form();
+        true
     }
-    0
 }
 
 unsafe extern "C" fn load() -> bool {
@@ -131,13 +132,13 @@ unsafe extern "C" fn load() -> bool {
 
 unsafe extern "C" fn gm81_or_yyd() -> i32 {
     let ebp: *const UStr;
-    asm!("mov {}, [ebp]", out(reg) ebp);
-    let real_string = &*ebp.sub(1);
+    asm!("mov {}, ebp", out(reg) ebp); // no [] because this function doesn't push ebp when compiled
+    let real_string = &*ebp.sub(8);
     // original .gm81 compare
-    let out = delphi::CompareText(real_string, &*(0x6dfbe4 as *const UStr));
+    let out = delphi::CompareText(real_string, &UStr::from_static_pointer(0x6dfbe4 as _));
     if out != 0 {
         // new .yyd compare
-        delphi::CompareText(real_string, &*(0x6e05e4 as *const UStr))
+        delphi::CompareText(real_string, &UStr::from_static_pointer(0x6e05e4 as _))
     } else {
         out
     }

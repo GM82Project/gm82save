@@ -342,7 +342,8 @@ unsafe fn load_event(
                         }
                         let i = k.chars().last().unwrap().to_digit(8).unwrap() as usize;
                         let err = || Error::AssetNotFound(v.to_string());
-                        if (5..=12 | 14).contains(&action.param_types[i]) {
+                        let ptype = action.param_types[i];
+                        if (5..=14).contains(&ptype) && ptype != 13 {
                             action.param_strings[i] = UStr::new(
                                 match action.param_types[i] {
                                     _ if v.is_empty() => -100, // TODO verify

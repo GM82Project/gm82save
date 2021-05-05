@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use crate::{
-    delphi::{DynArraySetLength, TMemoryStream, UStr},
+    delphi::{DynArraySetLength, TBitmap, TMemoryStream, UStr},
     delphi_call,
 };
 use std::slice;
@@ -83,7 +83,7 @@ impl Sprite {
         delphi_call!(0x5b325c, 0x5b27dc, 1)
     }
 
-    pub unsafe fn get_icon(&self) -> u32 {
+    pub unsafe fn get_icon(&self) -> *const TBitmap {
         // technically a pointer but eh
         delphi_call!(0x5b401c, self)
     }

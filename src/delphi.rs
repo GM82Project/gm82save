@@ -262,6 +262,10 @@ impl UStr {
         out
     }
 
+    pub fn from_static_pointer(ptr: *const u16) -> Self {
+        Self(ptr)
+    }
+
     pub fn to_os_string(&self) -> OsString {
         if self.0.is_null() {
             OsString::new()
