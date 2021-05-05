@@ -971,7 +971,9 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     advance_progress_form(50);
     for (sp, thumb) in ide::get_sprites().iter().zip(ide::get_sprite_thumbs_mut()) {
         if let Some(sp) = sp {
-            *thumb = delphi_call!(0x5a9c14, sp.get_icon());
+            let icon = sp.get_icon();
+            *thumb = delphi_call!(0x5a9c14, icon);
+            let _: u32 = delphi_call!(0x405a7c, icon);
         } else {
             *thumb = -1;
         }
@@ -990,7 +992,9 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     advance_progress_form(60);
     for (bg, thumb) in ide::get_backgrounds().iter().zip(ide::get_background_thumbs_mut()) {
         if let Some(bg) = bg {
-            *thumb = delphi_call!(0x5a9c14, bg.get_icon());
+            let icon = bg.get_icon();
+            *thumb = delphi_call!(0x5a9c14, icon);
+            let _: u32 = delphi_call!(0x405a7c, icon);
         } else {
             *thumb = -1;
         }
