@@ -187,13 +187,30 @@ unsafe fn load_sound(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*con
 }
 
 unsafe fn load_frame(path: &std::path::Path, frame: &mut Frame) -> Result<()> {
-    let im = image::open(path)?.into_rgba8();
-    frame.width = im.width();
-    frame.height = im.height();
-    let data = im.as_raw();
-    let data_ptr = delphi::GetMem(data.len());
-    data.as_ptr().copy_to_nonoverlapping(data_ptr, data.len());
-    frame.data = data_ptr;
+    use image::{codecs::png::PngDecoder, DynamicImage, GenericImageView, ImageBuffer, ImageDecoder};
+    let decoder = PngDecoder::new(open_file(path)?)?;
+    let (w, h) = decoder.dimensions();
+    frame.width = w;
+    frame.height = h;
+    // do this calculation myself in case the png is a weird format
+    let data_size = w as usize * h as usize * 4;
+    let data = slice::from_raw_parts_mut(delphi::GetMem(data_size), data_size);
+    frame.data = match decoder.color_type() {
+        image::ColorType::Rgba8 => {
+            decoder.read_image(data)?;
+            data.as_ptr()
+        },
+        _ => {
+            // strange, but i'll allow it
+            let tmp = DynamicImage::from_decoder(decoder)?;
+            let mut out = ImageBuffer::from_raw(w, h, data).unwrap();
+            for (to, from) in out.pixels_mut().zip(tmp.pixels()) {
+                // am just relying on pixels() going in the correct order, should be fine though
+                *to = from.2;
+            }
+            out.into_raw().as_ptr()
+        },
+    };
     Ok(())
 }
 
