@@ -61,6 +61,7 @@ fn write_gml<F: Write>(f: &mut F, code: &UStr) -> Result<()> {
 fn save_gml(path: &std::path::Path, code: &UStr) -> Result<()> {
     let mut f = open_file(path)?;
     write_gml(&mut f, code)?;
+    f.flush()?;
     Ok(())
 }
 
@@ -74,6 +75,7 @@ unsafe fn save_frame(frame: &Frame, path: &std::path::Path) -> Result<()> {
             image::ColorType::Rgba8,
         )
         .map_err(|_| Error::Other(format!("failed to save frame {}", path.to_string_lossy())))?;
+    f.flush()?;
     Ok(())
 }
 
@@ -104,6 +106,7 @@ unsafe fn save_sound(sound: &Sound, path: &mut PathBuf) -> Result<()> {
     writeln!(f, "volume={}", sound.volume)?;
     writeln!(f, "pan={}", sound.pan)?;
     writeln!(f, "preload={}", u8::from(sound.preload))?;
+    f.flush()?;
     Ok(())
 }
 
@@ -128,6 +131,7 @@ unsafe fn save_sprite(sprite: &Sprite, path: &mut PathBuf) -> Result<()> {
     writeln!(f, "bbox_bottom={}", sprite.bbox_bottom)?;
     writeln!(f, "bbox_right={}", sprite.bbox_right)?;
     writeln!(f, "bbox_top={}", sprite.bbox_top)?;
+    f.flush()?;
     path.pop();
     Ok(())
 }
@@ -148,6 +152,7 @@ unsafe fn save_background(back: &Background, path: &mut PathBuf) -> Result<()> {
     writeln!(f, "tile_voffset={}", back.v_offset)?;
     writeln!(f, "tile_hsep={}", back.h_sep)?;
     writeln!(f, "tile_vsep={}", back.v_sep)?;
+    f.flush()?;
     Ok(())
 }
 
@@ -161,6 +166,7 @@ unsafe fn save_path(path: &Path, file_path: &mut PathBuf) -> Result<()> {
     writeln!(f, "background={}", ide::get_room_names().get_asset(path.path_editor_room_background))?;
     writeln!(f, "snap_x={}", path.snap_x)?;
     writeln!(f, "snap_y={}", path.snap_y)?;
+    f.flush()?;
     file_path.pop();
     file_path.push("points.txt");
     let mut f = open_file(&file_path)?;
@@ -168,6 +174,7 @@ unsafe fn save_path(path: &Path, file_path: &mut PathBuf) -> Result<()> {
     for p in points {
         writeln!(f, "{},{},{}", p.x, p.y, p.speed)?;
     }
+    f.flush()?;
     file_path.pop();
     Ok(())
 }
@@ -189,6 +196,7 @@ unsafe fn save_font(font: &Font, path: &mut PathBuf) -> Result<()> {
     writeln!(f, "aa_level={}", font.aa_level)?;
     writeln!(f, "range_start={}", font.range_start)?;
     writeln!(f, "range_end={}", font.range_end)?;
+    f.flush()?;
     Ok(())
 }
 
@@ -260,6 +268,7 @@ unsafe fn save_timeline(tl: &Timeline, path: &mut PathBuf) -> Result<()> {
         let event = &**event;
         save_event(event, &time.to_string(), &mut f)?;
     }
+    f.flush()?;
     Ok(())
 }
 
@@ -288,6 +297,7 @@ unsafe fn save_object(obj: &Object, path: &mut PathBuf) -> Result<()> {
         writeln!(f, "depth={}", obj.depth)?;
         writeln!(f, "parent={}", ide::get_object_names().get_asset(obj.parent_index))?;
         writeln!(f, "mask={}", ide::get_sprite_names().get_asset(obj.mask_index))?;
+        f.flush()?;
     }
     path.set_extension("gml");
     {
@@ -303,6 +313,7 @@ unsafe fn save_object(obj: &Object, path: &mut PathBuf) -> Result<()> {
                 }
             }
         }
+        f.flush()?;
     }
     Ok(())
 }
@@ -332,11 +343,13 @@ unsafe fn save_tiles(tiles: &[Tile], path: &mut PathBuf) -> Result<()> {
             u8::from(tile.locked)
         )?;
     }
+    layers.values_mut().try_for_each(Write::flush)?;
     path.push("layers.txt");
     let mut f = open_file(&path)?;
     for depth in layers.keys() {
         writeln!(f, "{}", depth)?;
     }
+    f.flush()?;
     path.pop();
     Ok(())
 }
@@ -378,6 +391,7 @@ fn save_instances(instances: &[Instance], path: &mut PathBuf) -> Result<()> {
             u8::from(instance.locked),
         )?;
     }
+    f.flush()?;
     Ok(())
 }
 
@@ -443,6 +457,7 @@ unsafe fn save_room(room: &Room, path: &mut PathBuf) -> Result<()> {
         writeln!(f, "tab={}", room.tab)?; // wtf is this
         writeln!(f, "editor_x={}", room.x_position_scroll)?;
         writeln!(f, "editor_y={}", room.y_position_scroll)?;
+        f.flush()?;
     }
     path.pop();
     {
@@ -468,6 +483,7 @@ unsafe fn save_constants(path: &mut PathBuf) -> Result<()> {
     for (name, value) in names.iter().zip(values) {
         writeln!(f, "{}={}", name.try_decode()?, value.try_decode()?)?;
     }
+    f.flush()?;
     Ok(())
 }
 
@@ -476,43 +492,46 @@ unsafe fn save_settings(path: &mut PathBuf) -> Result<()> {
     path.push("settings");
     std::fs::create_dir_all(&path)?;
     save_constants(path)?;
-    path.push("settings.txt");
-    let mut f = open_file(&path)?;
-    path.pop();
-    writeln!(f, "fullscreen={}", u8::from(FULLSCREEN.read()))?;
-    writeln!(f, "interpolate_pixels={}", u8::from(INTERPOLATE_PIXELS.read()))?;
-    writeln!(f, "dont_draw_border={}", u8::from(DONT_DRAW_BORDER.read()))?;
-    writeln!(f, "display_cursor={}", u8::from(DISPLAY_CURSOR.read()))?;
-    writeln!(f, "scaling={}", SCALING.read())?;
-    writeln!(f, "allow_resize={}", u8::from(ALLOW_RESIZE.read()))?;
-    writeln!(f, "window_on_top={}", u8::from(*WINDOW_ON_TOP))?;
-    writeln!(f, "clear_color={}", *CLEAR_COLOUR)?;
-    writeln!(f, "set_resolution={}", u8::from(*SET_RESOLUTION))?;
-    writeln!(f, "color_depth={}", *COLOUR_DEPTH)?;
-    writeln!(f, "resolution={}", *RESOLUTION)?;
-    writeln!(f, "frequency={}", *FREQUENCY)?;
-    writeln!(f, "dont_show_buttons={}", u8::from(*DONT_SHOW_BUTTONS))?;
-    writeln!(f, "vsync={}", *VSYNC_AND_FORCE_CPU & 1)?;
-    writeln!(f, "force_cpu_render={}", u8::from(*VSYNC_AND_FORCE_CPU & (1 << 7) != 0))?;
-    writeln!(f, "disable_screensaver={}", u8::from(*DISABLE_SCREENSAVER))?;
-    writeln!(f, "f4_fullscreen_toggle={}", u8::from(*F4_FULLSCREEN))?;
-    writeln!(f, "f1_help_menu={}", u8::from(*F1_HELP))?;
-    writeln!(f, "esc_close_game={}", u8::from(*ESC_CLOSE))?;
-    writeln!(f, "f5_save_f6_load={}", u8::from(*F5_SAVE_F6_LOAD))?;
-    writeln!(f, "f9_screenshot={}", u8::from(*F9_SCREENSHOT))?;
-    writeln!(f, "treat_close_as_esc={}", u8::from(*TREAT_CLOSE_AS_ESC))?;
-    writeln!(f, "priority={}", *PRIORITY)?;
-    writeln!(f, "freeze_on_lose_focus={}", u8::from(*FREEZE_ON_LOSE_FOCUS))?;
-    writeln!(f, "custom_loader={}", u8::from(*HAS_CUSTOM_LOAD_IMAGE))?;
-    writeln!(f, "custom_bar={}", *LOADING_BAR)?;
-    writeln!(f, "transparent={}", u8::from(*LOADING_TRANSPARENT))?;
-    writeln!(f, "translucency={}", *LOADING_TRANSLUCENCY)?;
-    writeln!(f, "scale_progress_bar={}", u8::from(*LOADING_PROGRESS_BAR_SCALE))?;
-    writeln!(f, "show_error_messages={}", u8::from(*SHOW_ERROR_MESSAGES))?;
-    writeln!(f, "log_errors={}", u8::from(*LOG_ERRORS))?;
-    writeln!(f, "always_abort={}", u8::from(*ALWAYS_ABORT))?;
-    writeln!(f, "zero_uninitialized_vars={}", u8::from(*ZERO_UNINITIALIZED_VARS))?;
-    writeln!(f, "error_on_uninitialized_args={}", u8::from(*ERROR_ON_UNINITIALIZED_ARGS))?;
+    {
+        path.push("settings.txt");
+        let mut f = open_file(&path)?;
+        path.pop();
+        writeln!(f, "fullscreen={}", u8::from(FULLSCREEN.read()))?;
+        writeln!(f, "interpolate_pixels={}", u8::from(INTERPOLATE_PIXELS.read()))?;
+        writeln!(f, "dont_draw_border={}", u8::from(DONT_DRAW_BORDER.read()))?;
+        writeln!(f, "display_cursor={}", u8::from(DISPLAY_CURSOR.read()))?;
+        writeln!(f, "scaling={}", SCALING.read())?;
+        writeln!(f, "allow_resize={}", u8::from(ALLOW_RESIZE.read()))?;
+        writeln!(f, "window_on_top={}", u8::from(*WINDOW_ON_TOP))?;
+        writeln!(f, "clear_color={}", *CLEAR_COLOUR)?;
+        writeln!(f, "set_resolution={}", u8::from(*SET_RESOLUTION))?;
+        writeln!(f, "color_depth={}", *COLOUR_DEPTH)?;
+        writeln!(f, "resolution={}", *RESOLUTION)?;
+        writeln!(f, "frequency={}", *FREQUENCY)?;
+        writeln!(f, "dont_show_buttons={}", u8::from(*DONT_SHOW_BUTTONS))?;
+        writeln!(f, "vsync={}", *VSYNC_AND_FORCE_CPU & 1)?;
+        writeln!(f, "force_cpu_render={}", u8::from(*VSYNC_AND_FORCE_CPU & (1 << 7) != 0))?;
+        writeln!(f, "disable_screensaver={}", u8::from(*DISABLE_SCREENSAVER))?;
+        writeln!(f, "f4_fullscreen_toggle={}", u8::from(*F4_FULLSCREEN))?;
+        writeln!(f, "f1_help_menu={}", u8::from(*F1_HELP))?;
+        writeln!(f, "esc_close_game={}", u8::from(*ESC_CLOSE))?;
+        writeln!(f, "f5_save_f6_load={}", u8::from(*F5_SAVE_F6_LOAD))?;
+        writeln!(f, "f9_screenshot={}", u8::from(*F9_SCREENSHOT))?;
+        writeln!(f, "treat_close_as_esc={}", u8::from(*TREAT_CLOSE_AS_ESC))?;
+        writeln!(f, "priority={}", *PRIORITY)?;
+        writeln!(f, "freeze_on_lose_focus={}", u8::from(*FREEZE_ON_LOSE_FOCUS))?;
+        writeln!(f, "custom_loader={}", u8::from(*HAS_CUSTOM_LOAD_IMAGE))?;
+        writeln!(f, "custom_bar={}", *LOADING_BAR)?;
+        writeln!(f, "transparent={}", u8::from(*LOADING_TRANSPARENT))?;
+        writeln!(f, "translucency={}", *LOADING_TRANSLUCENCY)?;
+        writeln!(f, "scale_progress_bar={}", u8::from(*LOADING_PROGRESS_BAR_SCALE))?;
+        writeln!(f, "show_error_messages={}", u8::from(*SHOW_ERROR_MESSAGES))?;
+        writeln!(f, "log_errors={}", u8::from(*LOG_ERRORS))?;
+        writeln!(f, "always_abort={}", u8::from(*ALWAYS_ABORT))?;
+        writeln!(f, "zero_uninitialized_vars={}", u8::from(*ZERO_UNINITIALIZED_VARS))?;
+        writeln!(f, "error_on_uninitialized_args={}", u8::from(*ERROR_ON_UNINITIALIZED_ARGS))?;
+        f.flush()?;
+    }
     if LOADING_BAR.read() == 2 {
         path.push("back.bmp");
         (&*LOADING_BACKGROUND.read()).SaveToFile(&UStr::new(path.as_ref()));
@@ -532,11 +551,14 @@ unsafe fn save_settings(path: &mut PathBuf) -> Result<()> {
     path.push("extensions.txt");
     let extensions = ide::get_extensions();
     let extensions_loaded = ide::get_extensions_loaded();
-    let mut f = open_file(&path)?;
-    for (extension, &loaded) in extensions.iter().zip(extensions_loaded) {
-        if loaded {
-            writeln!(f, "{}", &(&**extension).name.try_decode()?)?;
+    {
+        let mut f = open_file(&path)?;
+        for (extension, &loaded) in extensions.iter().zip(extensions_loaded) {
+            if loaded {
+                writeln!(f, "{}", &(&**extension).name.try_decode()?)?;
+            }
         }
+        f.flush()?;
     }
     path.pop();
     save_game_information(path)?;
@@ -558,6 +580,7 @@ unsafe fn save_triggers(path: &mut PathBuf) -> Result<()> {
                 writeln!(index)?;
             }
         }
+        index.flush()?;
     }
     path.pop();
     for trigger in triggers {
@@ -569,6 +592,7 @@ unsafe fn save_triggers(path: &mut PathBuf) -> Result<()> {
                 let mut f = open_file(&path)?;
                 writeln!(f, "constant={}", trigger.constant_name.try_decode()?)?;
                 writeln!(f, "kind={}", trigger.kind)?;
+                f.flush()?;
             }
             path.set_extension("gml");
             save_gml(&path, &trigger.condition)?;
@@ -591,14 +615,17 @@ unsafe fn save_assets<'a, T: Sync>(
 ) -> Result<()> {
     path.push(name);
     std::fs::create_dir_all(&path)?;
-    path.push("index.yyd");
-    let mut index = open_file(&path)?;
-    path.pop();
-    for name in names {
-        let name = name.try_decode()?;
-        if !name.is_empty() {
-            writeln!(index, "{}", name)?;
+    {
+        path.push("index.yyd");
+        let mut index = open_file(&path)?;
+        path.pop();
+        for name in names {
+            let name = name.try_decode()?;
+            if !name.is_empty() {
+                writeln!(index, "{}", name)?;
+            }
         }
+        index.flush()?;
     }
     (assets, names).into_par_iter().try_for_each(|(asset, name)| -> Result<()> {
         if let Some(asset) = asset {
@@ -610,7 +637,9 @@ unsafe fn save_assets<'a, T: Sync>(
     })?;
     path.push("tree.yyd");
     if let Some(tree) = tree.as_ref() {
-        write_tree_children(&**tree, &mut String::new(), &mut open_file(&path)?)?;
+        let mut f = open_file(&path)?;
+        write_tree_children(&**tree, &mut String::new(), &mut f)?;
+        f.flush()?;
     }
     path.pop();
     path.pop();
@@ -630,6 +659,7 @@ unsafe fn save_included_files(path: &mut PathBuf) -> Result<()> {
         for file in files {
             writeln!(index, "{}", file.file_name.try_decode()?)?;
         }
+        index.flush()?;
     }
     for file in files {
         let file = &**file;
@@ -654,6 +684,7 @@ unsafe fn save_included_files(path: &mut PathBuf) -> Result<()> {
         if file.export_setting == 3 {
             writeln!(f, "export_folder={}", file.export_custom_folder.try_decode()?)?;
         }
+        f.flush()?;
     }
     path.pop();
     Ok(())
@@ -661,20 +692,23 @@ unsafe fn save_included_files(path: &mut PathBuf) -> Result<()> {
 
 unsafe fn save_game_information(path: &mut PathBuf) -> Result<()> {
     use ide::game_info::*;
-    path.push("game_information.txt");
-    let mut f = open_file(&path)?;
     let editor = &*(&**FORM).editor;
-    writeln!(f, "color={}", editor.colour)?;
-    writeln!(f, "new_window={}", u8::from(*NEW_WINDOW))?;
-    writeln!(f, "caption={}", (&*CAPTION).try_decode()?)?;
-    writeln!(f, "left={}", *LEFT)?;
-    writeln!(f, "top={}", *TOP)?;
-    writeln!(f, "width={}", *WIDTH)?;
-    writeln!(f, "height={}", *HEIGHT)?;
-    writeln!(f, "border={}", u8::from(*BORDER))?;
-    writeln!(f, "resizable={}", u8::from(*RESIZABLE))?;
-    writeln!(f, "window_on_top={}", u8::from(*WINDOW_ON_TOP))?;
-    writeln!(f, "freeze_game={}", u8::from(*FREEZE_GAME))?;
+    path.push("game_information.txt");
+    {
+        let mut f = open_file(&path)?;
+        writeln!(f, "color={}", editor.colour)?;
+        writeln!(f, "new_window={}", u8::from(*NEW_WINDOW))?;
+        writeln!(f, "caption={}", (&*CAPTION).try_decode()?)?;
+        writeln!(f, "left={}", *LEFT)?;
+        writeln!(f, "top={}", *TOP)?;
+        writeln!(f, "width={}", *WIDTH)?;
+        writeln!(f, "height={}", *HEIGHT)?;
+        writeln!(f, "border={}", u8::from(*BORDER))?;
+        writeln!(f, "resizable={}", u8::from(*RESIZABLE))?;
+        writeln!(f, "window_on_top={}", u8::from(*WINDOW_ON_TOP))?;
+        writeln!(f, "freeze_game={}", u8::from(*FREEZE_GAME))?;
+        f.flush()?;
+    }
     path.set_extension("rtf");
     (&*editor.rich_edit_strings).SaveToFile(&UStr::new(path.as_ref()));
     path.pop();
@@ -728,6 +762,7 @@ pub unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
         writeln!(f, "last_instance_id={}", *ide::_LAST_INSTANCE_ID)?;
         writeln!(f, "last_tile_id={}", *ide::_LAST_TILE_ID)?;
          */
+        f.flush()?;
     }
     path.pop();
     advance_progress_form(5);
