@@ -110,9 +110,9 @@ unsafe extern "C" fn load() -> bool {
     asm!("mov {}, [ebp]", out(reg) ebp);
     let real_string = &*ebp.sub(1);
     let path: PathBuf = real_string.to_os_string().into();
-    // .yyd works in the ui but rust doesn't get it so check for that specifically
-    let is_yyd = path.extension() == Some("yyd".as_ref()) || path.file_name() == Some(".yyd".as_ref());
-    if !is_yyd {
+    // .gm82 works in the ui but rust doesn't get it so check for that specifically
+    let is_gm82 = path.extension() == Some("gm82".as_ref()) || path.file_name() == Some(".gm82".as_ref());
+    if !is_gm82 {
         let obj = delphi_call!(0x405a4c, 0x52e8fc, 1);
         ebp.sub(3).cast::<u32>().write(obj);
         return false
@@ -130,14 +130,14 @@ unsafe extern "C" fn load() -> bool {
     true
 }
 
-unsafe extern "C" fn gm81_or_yyd() -> i32 {
+unsafe extern "C" fn gm81_or_gm82() -> i32 {
     let ebp: *const UStr;
     asm!("mov {}, ebp", out(reg) ebp); // no [] because this function doesn't push ebp when compiled
     let real_string = &*ebp.sub(8);
     // original .gm81 compare
     let out = delphi::CompareText(real_string, &UStr::from_static_pointer(0x6dfbe4 as _));
     if out != 0 {
-        // new .yyd compare
+        // new .gm82 compare
         delphi::CompareText(real_string, &UStr::from_static_pointer(0x6e05e4 as _))
     } else {
         out
@@ -170,14 +170,15 @@ unsafe fn injector() {
     let mut load_patch = [0xe8, 0, 0, 0, 0, 0x85, 0xc0, 0x0f, 0x85, 0xa4, 0, 0, 0];
     load_patch[1..5].copy_from_slice(&(load as u32 - (load_dest as u32 + 5)).to_le_bytes());
     patch(load_dest, &load_patch);
-    // check for .yyd as well as .gm81 when dragging file onto game maker
-    patch(0x6df7e3 as *mut u8, &(gm81_or_yyd as u32 - 0x6df7e7).to_le_bytes());
-    // check for .yyd as well as .gm81 in open file dialog
-    patch(0x6e02ee as *mut u8, &(gm81_or_yyd as u32 - 0x6e02f2).to_le_bytes());
-    // replace .gm81 with .yyd in "rename if using an old file extension" code
-    patch(0x6e05e0 as *mut u8, &[0x04, 0, 0, 0, b'.', 0, b'y', 0, b'y', 0, b'd', 0, 0, 0]);
-    // replace .gm81 with .yyd in "generate a default filename to save to" code
-    patch(0x6e0728 as *mut u8, &[0x04, 0, 0, 0, b'.', 0, b'y', 0, b'y', 0, b'd', 0, 0, 0]);
+
+    // check for .gm82 as well as .gm81 when dragging file onto game maker
+    patch(0x6df7e3 as *mut u8, &(gm81_or_gm82 as u32 - 0x6df7e7).to_le_bytes());
+    // check for .gm82 as well as .gm81 in open file dialog
+    patch(0x6e02ee as *mut u8, &(gm81_or_gm82 as u32 - 0x6e02f2).to_le_bytes());
+    // replace .gm81 with .gm82 in "rename if using an old file extension" code
+    patch(0x6e05ec as *mut u8, &[b'2']);
+    // replace .gm81 with .gm82 in "generate a default filename to save to" code
+    patch(0x6e0734 as *mut u8, &[b'2']);
     // patch out file extension associations
     patch(0x6de76b as *mut u8, &[0x90, 0x90, 0x90, 0x90, 0x90]);
 }
