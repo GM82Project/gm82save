@@ -51,6 +51,19 @@ fn open_file(path: &std::path::Path) -> Result<BufWriter<File>> {
     Ok(BufWriter::new(File::create(path)?))
 }
 
+fn write_gml<F: Write>(f: &mut F, code: &UStr) -> Result<()> {
+    for line in code.try_decode()?.lines() {
+        writeln!(f, "{}", line)?;
+    }
+    Ok(())
+}
+
+fn save_gml(path: &std::path::Path, code: &UStr) -> Result<()> {
+    let mut f = open_file(path)?;
+    write_gml(&mut f, code)?;
+    Ok(())
+}
+
 unsafe fn save_frame(frame: &Frame, path: &std::path::Path) -> Result<()> {
     let f = open_file(path)?;
     image::codecs::png::PngEncoder::new(f)
@@ -161,7 +174,7 @@ unsafe fn save_path(path: &Path, file_path: &mut PathBuf) -> Result<()> {
 
 unsafe fn save_script(script: &Script, path: &mut PathBuf) -> Result<()> {
     path.set_extension("gml");
-    std::fs::write(path, script.source.try_decode()?)?;
+    save_gml(&path, &script.source)?;
     Ok(())
 }
 
@@ -231,11 +244,7 @@ unsafe fn save_event<F: Write>(ev: &Event, name: &str, file: &mut F) -> Result<(
         writeln!(file, "*/")?;
         if action.action_kind == 7 {
             // code
-            let code = action.param_strings[0].try_decode()?;
-            write!(file, "{}", &code)?;
-            if !code.ends_with('\n') {
-                writeln!(file)?;
-            }
+            write_gml(file, &action.param_strings[0])?;
         }
     }
     Ok(())
@@ -436,9 +445,11 @@ unsafe fn save_room(room: &Room, path: &mut PathBuf) -> Result<()> {
         writeln!(f, "editor_y={}", room.y_position_scroll)?;
     }
     path.pop();
-    path.push("code.gml");
-    std::fs::write(&path, room.creation_code.try_decode()?)?;
-    path.pop();
+    {
+        path.push("code.gml");
+        save_gml(&path, &room.creation_code)?;
+        path.pop();
+    }
 
     let tiles = slice::from_raw_parts(room.tiles, room.tile_count as usize);
     save_tiles(tiles, path)?;
@@ -549,7 +560,7 @@ unsafe fn save_triggers(path: &mut PathBuf) -> Result<()> {
             writeln!(f, "constant={}", trigger.constant_name.try_decode()?)?;
             writeln!(f, "kind={}", trigger.kind)?;
             path.set_extension("gml");
-            std::fs::write(&path, trigger.condition.try_decode()?)?;
+            save_gml(&path, &trigger.condition)?;
             path.pop();
             writeln!(index, "{}", name)?;
         }
