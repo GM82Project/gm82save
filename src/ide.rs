@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use crate::{
     asset::*,
     delphi::{self, TTreeNode, TTreeView, UStr},
