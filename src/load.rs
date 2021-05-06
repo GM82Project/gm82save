@@ -907,7 +907,7 @@ unsafe fn load_assets<'a, T: Sync>(
     path.push(name);
     let names = &assets.index;
     alloc(names.len());
-    names.into_iter().zip(get_assets()).zip(get_names()).try_for_each(|((name, asset), name_p)| -> Result<()> {
+    names.par_iter().zip(get_assets()).zip(get_names()).try_for_each(|((name, asset), name_p)| -> Result<()> {
         if !name.is_empty() {
             *name_p = UStr::new(name.as_ref());
             *asset = load_asset(&mut path.join(name), asset_maps)?.as_ref();
