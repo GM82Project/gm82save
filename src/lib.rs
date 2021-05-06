@@ -87,21 +87,34 @@ fn show_message(msg: &str) {
     }
 }
 
-unsafe extern "C" fn save() -> bool {
-    // get the path to the yyd file
-    let ebp: *const UStr;
+// set the high byte to nonzero if YYD save code was used
+// set the low byte to nonzero on success
+unsafe extern "C" fn save() -> u16 {
+    const IS_YYD: u16 = 0x100;
+    // get the path to the project file
+    let ebp: *mut UStr;
     asm!("mov {}, [ebp]", out(reg) ebp);
     let real_string = &*ebp.sub(1);
-    let path = real_string.to_os_string();
+    let path: PathBuf = real_string.to_os_string().into();
+    // filename ".gm82" works in the ui but rust doesn't get it so check for that specifically
+    let is_gm82 = path.extension() == Some("gm82".as_ref()) || path.file_name() == Some(".gm82".as_ref());
+    if !is_gm82 {
+        // CStream.Create
+        let buf = delphi_call!(0x405a4c, 0x52e8fc, 1);
+        ebp.sub(5).cast::<u32>().write(buf);
+        // save gmk
+        let success: u32 = delphi_call!(0x705798, buf);
+        return success as u16
+    }
 
-    if let Err(e) = save::save_gmk(path.into()) {
+    if let Err(e) = save::save_gmk(path) {
         // display the error
         delphi::close_progress_form();
         show_message(&format!("Failed to save: {}", e));
-        false
+        0 | IS_YYD
     } else {
         delphi::close_progress_form();
-        true
+        1 | IS_YYD
     }
 }
 
@@ -158,16 +171,29 @@ unsafe fn injector() {
         show_message(&info.to_string());
     }));
 
-    // call save() instead of the "generate gm81" function
-    // jump to 0x705ed1 on failure (return 0) and 0x705e4d on success (return 1)
+    // call save() instead of CStream.Create and the "save gmk" function
     let save_dest = 0x705cbd as *mut u8;
-    let mut save_patch = [0xe8, 0, 0, 0, 0, 0x85, 0xc0, 0x0f, 0x84, 0x07, 0x02, 0, 0, 0xe9, 0x7e, 0x01, 0, 0];
+    #[rustfmt::skip]
+    let mut save_patch = [
+        0xe8, 0x00, 0x00, 0x00, 0x00, // call save (my save)
+        0x84, 0xe4, // test ah,ah
+        0x74, 0x0e, // je 0x705cd4 (after this patch)
+        0x84, 0xc0, // test al,al
+        0x74, 0x25, // je 0x705cef (after save fail)
+        0xe9, 0x7e, 0x01, 0x00, 0x00, // jmp 0x705e4d (after save success)
+    ];
     save_patch[1..5].copy_from_slice(&(save as u32 - (save_dest as u32 + 5)).to_le_bytes());
     patch(save_dest, &save_patch);
+
     // call load() instead of CStream.Create
     // and insert a JZ to the post-load code (0x705af3)
     let load_dest = 0x705a42 as *mut u8;
-    let mut load_patch = [0xe8, 0, 0, 0, 0, 0x85, 0xc0, 0x0f, 0x85, 0xa4, 0, 0, 0];
+    #[rustfmt::skip]
+    let mut load_patch = [
+        0xe8, 0x00, 0x00, 0x00, 0x00, // call load (my load)
+        0x84, 0xc0, // test al,al
+        0x0f, 0x85, 0xa4, 0x00, 0x00, 0x00, // jne 0x705af3 (after load)
+    ];
     load_patch[1..5].copy_from_slice(&(load as u32 - (load_dest as u32 + 5)).to_le_bytes());
     patch(load_dest, &load_patch);
 
