@@ -393,7 +393,7 @@ unsafe fn load_event(
         if action.action_kind == 7 {
             // first character will always be LF because it doesn't cut the newline when searching for */
             // so skip it
-            action.param_strings[0] = UStr::new(code[1..].as_ref());
+            action.param_strings[0] = UStr::new(code.get(1..).unwrap_or("").as_ref());
         }
     }
     Ok(())
