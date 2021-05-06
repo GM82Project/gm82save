@@ -547,22 +547,32 @@ unsafe fn save_settings(path: &mut PathBuf) -> Result<()> {
 unsafe fn save_triggers(path: &mut PathBuf) -> Result<()> {
     path.push("triggers");
     std::fs::create_dir_all(&path)?;
-    path.push("index.yyd");
-    let mut index = open_file(&path)?;
-    path.pop();
     let triggers = ide::get_triggers();
+    path.push("index.yyd");
+    {
+        let mut index = open_file(&path)?;
+        for trigger in triggers {
+            if let Some(trigger) = trigger.as_ref() {
+                writeln!(index, "{}", trigger.name.try_decode()?)?;
+            } else {
+                writeln!(index)?;
+            }
+        }
+    }
+    path.pop();
     for trigger in triggers {
         if let Some(trigger) = trigger.as_ref() {
             let name = trigger.name.try_decode()?;
             path.push(&name);
             path.set_extension("txt");
-            let mut f = open_file(&path)?;
-            writeln!(f, "constant={}", trigger.constant_name.try_decode()?)?;
-            writeln!(f, "kind={}", trigger.kind)?;
+            {
+                let mut f = open_file(&path)?;
+                writeln!(f, "constant={}", trigger.constant_name.try_decode()?)?;
+                writeln!(f, "kind={}", trigger.kind)?;
+            }
             path.set_extension("gml");
             save_gml(&path, &trigger.condition)?;
             path.pop();
-            writeln!(index, "{}", name)?;
         }
     }
     path.pop();
@@ -612,14 +622,18 @@ unsafe fn save_included_files(path: &mut PathBuf) -> Result<()> {
     path.push("include");
     std::fs::create_dir_all(&path)?;
     path.pop();
-    path.push("index.yyd");
-    let mut index = open_file(&path)?;
-    path.pop();
     let files = ide::get_included_files();
+    {
+        path.push("index.yyd");
+        let mut index = open_file(&path)?;
+        path.pop();
+        for file in files {
+            writeln!(index, "{}", file.file_name.try_decode()?)?;
+        }
+    }
     for file in files {
         let file = &**file;
         let mut name = file.file_name.try_decode()?;
-        writeln!(index, "{}", &name)?;
         if file.data_exists && file.stored_in_gmk {
             if let Some(stream) = file.data.as_ref() {
                 path.push("include");
