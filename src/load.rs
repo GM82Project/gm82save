@@ -89,7 +89,7 @@ unsafe fn read_resource_tree(
     path.push(type_name);
     path.push("tree.yyd");
     let f = open_file(path)?;
-    let nodes = &*((&**if visible { ide::RESOURCE_TREE } else { ide::RESOURCE_TREE_HIDDEN }).nodes);
+    let nodes = &*((**if visible { ide::RESOURCE_TREE } else { ide::RESOURCE_TREE_HIDDEN }).nodes);
     let mut stack = vec![base.read()];
     for line in f.lines() {
         let line = line?;
@@ -130,11 +130,12 @@ unsafe fn load_triggers(maps: &AssetMaps, path: &mut PathBuf) -> Result<()> {
         path.push(name);
         path.set_extension("txt");
         read_txt(&path, |k, v| {
-            Ok(match k {
+            match k {
                 "constant" => trig.constant_name = UStr::new(v.as_ref()),
                 "kind" => trig.kind = v.parse()?,
                 _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
-            })
+            }
+            Ok(())
         })?;
         path.set_extension("gml");
         trig.condition = UStr::new(std::fs::read_to_string(&path)?.as_ref());
@@ -162,7 +163,7 @@ unsafe fn load_sound(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*con
     let mut extension = String::new();
     let mut exists = false;
     read_txt(&path, |k, v| {
-        Ok(match k {
+        match k {
             "extension" => {
                 extension = v.to_string();
                 snd.extension = UStr::new(v.as_ref())
@@ -174,7 +175,8 @@ unsafe fn load_sound(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*con
             "pan" => snd.pan = v.parse()?,
             "preload" => snd.preload = v.parse::<u8>()? != 0,
             _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
-        })
+        }
+        Ok(())
     })?;
     if exists {
         path.set_extension(extension.trim_matches('.'));
@@ -219,7 +221,7 @@ unsafe fn load_background(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result
     path.set_extension("txt");
     let mut bg_exists = false;
     read_txt(path, |k, v| {
-        Ok(match k {
+        match k {
             "exists" => bg_exists = v.parse::<u8>()? != 0,
             "tileset" => bg.is_tileset = v.parse::<u8>()? != 0,
             "tile_width" => bg.tile_width = v.parse()?,
@@ -229,7 +231,8 @@ unsafe fn load_background(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result
             "tile_hsep" => bg.h_sep = v.parse()?,
             "tile_vsep" => bg.v_sep = v.parse()?,
             _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
-        })
+        }
+        Ok(())
     })?;
     if bg_exists {
         path.set_extension("png");
@@ -242,7 +245,7 @@ unsafe fn load_sprite(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*co
     let sp = &mut *Sprite::new();
     path.push("sprite.txt");
     read_txt(&path, |k, v| {
-        Ok(match k {
+        match k {
             "frames" => sp.frame_count = v.parse()?,
             "origin_x" => sp.origin_x = v.parse()?,
             "origin_y" => sp.origin_y = v.parse()?,
@@ -255,7 +258,8 @@ unsafe fn load_sprite(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*co
             "bbox_right" => sp.bbox_right = v.parse()?,
             "bbox_top" => sp.bbox_top = v.parse()?,
             _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
-        })
+        }
+        Ok(())
     })?;
     path.pop();
     delphi::DynArraySetLength(&mut sp.frames, 0x5b2754 as *const u8, 1, sp.frame_count as _);
@@ -272,7 +276,7 @@ unsafe fn load_sprite(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*co
 unsafe fn load_script(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*const Script> {
     path.set_extension("gml");
     let s = Script::new();
-    (&mut *s).source = UStr::new(std::fs::read_to_string(path)?.as_ref());
+    (*s).source = UStr::new(std::fs::read_to_string(path)?.as_ref());
     Ok(s)
 }
 
@@ -280,7 +284,7 @@ unsafe fn load_font(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*cons
     let f = &mut *Font::new();
     path.set_extension("txt");
     read_txt(path, |k, v| {
-        Ok(match k {
+        match k {
             "name" => f.sys_name = UStr::new(v.as_ref()),
             "size" => f.size = v.parse()?,
             "bold" => f.bold = v.parse::<u8>()? != 0,
@@ -290,7 +294,8 @@ unsafe fn load_font(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*cons
             "range_start" => f.range_start = v.parse()?,
             "range_end" => f.range_end = v.parse()?,
             _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
-        })
+        }
+        Ok(())
     })?;
     Ok(f)
 }
@@ -311,7 +316,7 @@ unsafe fn load_event(
         let mut act_id_set = false;
         for line in params.lines() {
             decode_line(path, line, &mut |k, v| {
-                Ok(match k {
+                match k {
                     "lib_id" => {
                         action.lib_id = v.parse()?;
                         if lib_id_set {
@@ -326,17 +331,10 @@ unsafe fn load_event(
                         }
                         act_id_set = true;
                         // manually check if action exists so we can throw an error
-                        if ide::get_action_libraries()
-                            .iter()
-                            .find(|&l| {
-                                l.id == action.lib_id
-                                    && slice::from_raw_parts(l.actions, l.action_count)
-                                        .iter()
-                                        .find(|&a| a.id == action.id)
-                                        .is_some()
-                            })
-                            .is_some()
-                        {
+                        if ide::get_action_libraries().iter().any(|&l| {
+                            l.id == action.lib_id
+                                && slice::from_raw_parts(l.actions, l.action_count).iter().any(|&a| a.id == action.id)
+                        }) {
                             action.fill_in(action.lib_id, action.id);
                         } else {
                             return Err(Error::UnknownAction(action.lib_id, action.id))
@@ -388,7 +386,8 @@ unsafe fn load_event(
                         }
                     },
                     _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
-                })
+                }
+                Ok(())
             })?;
         }
         if action.action_kind == 7 {
@@ -407,7 +406,7 @@ unsafe fn load_object(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*con
     let object_map = &asset_maps.objects.map;
     let trigger_map = &asset_maps.triggers.map;
     read_txt(&path, |k, v| {
-        Ok(match k {
+        match k {
             "sprite" => {
                 obj.sprite_index = match sprite_map.get(v) {
                     Some(&i) => i as _,
@@ -434,7 +433,8 @@ unsafe fn load_object(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*con
                 }
             },
             _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
-        })
+        }
+        Ok(())
     })?;
     path.set_extension("gml");
     let code = std::fs::read_to_string(&path)?;
@@ -483,7 +483,7 @@ unsafe fn load_path(file_path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*
     let path = &mut *Path::new();
     file_path.push("path.txt");
     read_txt(&file_path, |k, v| {
-        Ok(match k {
+        match k {
             "connection" => path.connection = v.parse()?,
             "closed" => path.closed = v.parse::<u8>()? != 0,
             "precision" => path.precision = v.parse()?,
@@ -497,7 +497,8 @@ unsafe fn load_path(file_path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*
             "snap_x" => path.snap_x = v.parse()?,
             "snap_y" => path.snap_y = v.parse()?,
             _ => return Err(Error::UnknownKey(file_path.to_path_buf(), k.to_string())),
-        })
+        }
+        Ok(())
     })?;
     file_path.pop();
     file_path.push("points.txt");
@@ -527,7 +528,7 @@ unsafe fn load_instances(room: &mut Room, path: &mut PathBuf, objs: &HashMap<Str
     let err = || Error::SyntaxError(inst_path.to_path_buf());
     room.alloc_instances(instances.len()).into_par_iter().zip(&instances).try_for_each(
         |(instance, line)| -> Result<()> {
-            let mut iter = line.split(",");
+            let mut iter = line.split(',');
             instance.object = match iter.next().ok_or_else(err)? {
                 "" => -1,
                 obj => *objs.get(obj).ok_or_else(|| Error::AssetNotFound(obj.to_ascii_lowercase()))? as _,
@@ -571,7 +572,7 @@ unsafe fn load_tiles(path: &mut PathBuf, bgs: &HashMap<String, usize>) -> Result
         let layer_tiles = layer
             .par_iter()
             .map(|tile| {
-                let mut iter = tile.split(",");
+                let mut iter = tile.split(',');
                 let t = Tile {
                     source_bg: match iter.next().ok_or_else(err)? {
                         "" => -1,
@@ -606,7 +607,7 @@ unsafe fn load_room(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const
     let room = &mut *Room::new();
     path.push("room.txt");
     read_txt(&path, |k, v| {
-        Ok(match k {
+        match k {
             "caption" => room.caption = UStr::new(v.as_ref()),
             "width" => room.width = v.parse()?,
             "height" => room.height = v.parse()?,
@@ -678,7 +679,8 @@ unsafe fn load_room(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const
             "editor_x" => room.x_position_scroll = v.parse()?,
             "editor_y" => room.y_position_scroll = v.parse()?,
             _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
-        })
+        }
+        Ok(())
     })?;
     path.pop();
     path.push("code.gml");
@@ -717,7 +719,7 @@ unsafe fn load_included_files(path: &mut PathBuf) -> Result<()> {
         file.file_name = UStr::new(fname.as_ref());
         path.push(fname.to_string() + ".txt");
         read_txt(&path, |k, v| {
-            Ok(match k {
+            match k {
                 "store" => file.stored_in_gmk = v.parse::<u8>()? != 0,
                 "free" => file.free_memory = v.parse::<u8>()? != 0,
                 "overwrite" => file.overwrite_file = v.parse::<u8>()? != 0,
@@ -725,7 +727,8 @@ unsafe fn load_included_files(path: &mut PathBuf) -> Result<()> {
                 "export" => file.export_setting = v.parse()?,
                 "export_folder" => file.export_custom_folder = UStr::new(v.as_ref()),
                 _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
-            })
+            }
+            Ok(())
         })?;
         path.pop();
         path.push("include");
@@ -750,10 +753,10 @@ unsafe fn load_included_files(path: &mut PathBuf) -> Result<()> {
 
 unsafe fn load_game_information(path: &mut PathBuf) -> Result<()> {
     use ide::game_info::*;
-    let editor = &mut *(&**FORM).editor;
+    let editor = &mut *(**FORM).editor;
     path.push("game_information.txt");
     read_txt(&path, |k, v| {
-        Ok(match k {
+        match k {
             "color" => editor.colour = v.parse()?,
             "new_window" => NEW_WINDOW.write(v.parse::<u8>()? != 0),
             "caption" => CAPTION.asg(v),
@@ -766,7 +769,8 @@ unsafe fn load_game_information(path: &mut PathBuf) -> Result<()> {
             "window_on_top" => WINDOW_ON_TOP.write(v.parse::<u8>()? != 0),
             "freeze_game" => FREEZE_GAME.write(v.parse::<u8>()? != 0),
             _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
-        })
+        }
+        Ok(())
     })?;
     path.set_extension("rtf");
     verify_path(&path)?;
@@ -784,7 +788,7 @@ unsafe fn load_settings(path: &mut PathBuf) -> Result<()> {
     path.push("settings.txt");
     // TODO
     read_txt(&path, |k, v| {
-        Ok(match k {
+        match k {
             "fullscreen" => FULLSCREEN.write(v.parse::<u8>()? != 0),
             "interpolate_pixels" => INTERPOLATE_PIXELS.write(v.parse::<u8>()? != 0),
             "dont_draw_border" => DONT_DRAW_BORDER.write(v.parse::<u8>()? != 0),
@@ -827,7 +831,8 @@ unsafe fn load_settings(path: &mut PathBuf) -> Result<()> {
             "zero_uninitialized_vars" => ZERO_UNINITIALIZED_VARS.write(v.parse::<u8>()? != 0),
             "error_on_uninitialized_args" => ERROR_ON_UNINITIALIZED_ARGS.write(v.parse::<u8>()? != 0),
             _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
-        })
+        }
+        Ok(())
     })?;
     path.pop();
     if custom_load_bar {
@@ -921,7 +926,7 @@ unsafe fn load_assets<'a, T: Sync>(
 pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     ide::initialize_project();
     read_txt(&path, |k, v| {
-        Ok(match k {
+        match k {
             "gameid" => ide::GAME_ID.write(v.parse()?),
             "info_author" => ide::settings::INFO_AUTHOR.asg(v),
             "info_version" => ide::settings::INFO_VERSION.asg(v),
@@ -943,7 +948,8 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
                 }
             },
             _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
-        })
+        }
+        Ok(())
     })?;
     path.pop();
     advance_progress_form(5);

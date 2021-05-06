@@ -46,7 +46,7 @@ const BACKGROUND_TIMESTAMPS: Timestamps = 0x77f1b8 as _;
 const BACKGROUND_THUMBS: ThumbIDs = 0x77f1bc as _;
 const BACKGROUND_COUNT: IntPtr = 0x77f1c0 as _;
 const BACKGROUND_TYPEINFO: TypeInfoPtr = 0x64d734 as _;
-const BACKGROUND_TYPESIZE: usize = 0x30 as _;
+const BACKGROUND_TYPESIZE: usize = 0x30;
 
 const PATHS: AssetList<Path> = 0x77f608 as _;
 const PATH_FORMS: Forms = 0x77f60c as _;

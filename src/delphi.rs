@@ -143,7 +143,7 @@ impl TIcon {
         let _: u32 = delphi_call!(0x45e6d8, self, filename.0);
     }
 
-    pub unsafe fn LoadFromFile(&self, filename: &UStr) {
+    pub unsafe fn LoadFromFile(&mut self, filename: &UStr) {
         let _: u32 = delphi_call!(0x45e64c, self, filename.0);
     }
 }

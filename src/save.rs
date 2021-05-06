@@ -36,14 +36,14 @@ trait GetAsset<T> {
 
 impl<'a, T> GetAsset<Option<&'a T>> for &'a [Option<&'a T>] {
     fn get_asset(&self, id: i32) -> Option<&'a T> {
-        self.get(usize::try_from(id).ok()?)?.clone()
+        *self.get(usize::try_from(id).ok()?)?
     }
 }
 
 impl<'a> GetAsset<String> for &'a [UStr] {
     fn get_asset(&self, id: i32) -> String {
         // it's ok to ignore errors here because it's invalid UTF-16 that'll get caught elsewhere
-        usize::try_from(id).ok().and_then(|id| self.get(id)).and_then(|s| s.try_decode_opt()).unwrap_or(String::new())
+        usize::try_from(id).ok().and_then(|id| self.get(id)).and_then(|s| s.try_decode_opt()).unwrap_or_default()
     }
 }
 
@@ -281,7 +281,7 @@ unsafe fn event_name(ev_type: usize, ev_numb: usize) -> String {
         events::EV_TRIGGER => format!(
             "{}_{}",
             events::EVENT_ID_TO_NAME[ev_type],
-            ide::get_triggers().get_asset(ev_numb as _).and_then(|t| t.name.try_decode_opt()).unwrap_or("".into())
+            ide::get_triggers().get_asset(ev_numb as _).and_then(|t| t.name.try_decode_opt()).unwrap_or_default()
         ),
         _ => format!("{}_{}", events::EVENT_ID_TO_NAME[ev_type], ev_numb),
     }
@@ -363,7 +363,7 @@ fn save_instances(instances: &[Instance], path: &mut PathBuf) -> Result<()> {
     for instance in instances {
         let code = instance.creation_code.try_decode()?;
         let mut hash_hex = [0; 8];
-        let fname = if code.len() != 0 {
+        let fname = if !code.is_empty() {
             let hash = crc::crc32::checksum_ieee(code.as_ref());
             for i in 0..8 {
                 hash_hex[7 - i] = match (hash >> (i * 4)) & 0xf {
@@ -556,7 +556,7 @@ unsafe fn save_settings(path: &mut PathBuf) -> Result<()> {
         let mut f = open_file(&path)?;
         for (extension, &loaded) in extensions.iter().zip(extensions_loaded) {
             if loaded {
-                writeln!(f, "{}", &(&**extension).name.try_decode()?)?;
+                writeln!(f, "{}", &(**extension).name.try_decode()?)?;
             }
         }
         f.flush()?;
@@ -693,7 +693,7 @@ unsafe fn save_included_files(path: &mut PathBuf) -> Result<()> {
 
 unsafe fn save_game_information(path: &mut PathBuf) -> Result<()> {
     use ide::game_info::*;
-    let editor = &*(&**FORM).editor;
+    let editor = &*(**FORM).editor;
     path.push("game_information.txt");
     {
         let mut f = open_file(&path)?;
