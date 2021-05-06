@@ -66,15 +66,16 @@ fn save_gml(path: &std::path::Path, code: &UStr) -> Result<()> {
 }
 
 unsafe fn save_frame(frame: &Frame, path: &std::path::Path) -> Result<()> {
-    let f = open_file(path)?;
-    image::codecs::png::PngEncoder::new(f)
-        .encode(
-            slice::from_raw_parts(frame.data, (frame.width * frame.height * 4) as usize),
-            frame.width,
-            frame.height,
-            image::ColorType::Rgba8,
-        )
-        .map_err(|_| Error::Other(format!("failed to save frame {}", path.to_string_lossy())))?;
+    let err = |_| Error::Other(format!("failed to save frame {}", path.to_string_lossy()));
+    let mut f = open_file(path)?;
+    let mut encoder = png::Encoder::new(&mut f, frame.width, frame.height);
+    encoder.set_color(png::ColorType::RGBA);
+    encoder.set_filter(png::FilterType::NoFilter);
+    let mut writer = encoder.write_header().map_err(err)?;
+    writer
+        .write_image_data(slice::from_raw_parts(frame.data, frame.width as usize * frame.height as usize * 4))
+        .map_err(err)?;
+    drop(writer);
     f.flush()?;
     Ok(())
 }

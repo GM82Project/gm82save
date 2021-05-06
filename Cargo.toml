@@ -13,5 +13,6 @@ image = { version = "0.23", default-features = false, features = ["png"] }
 itertools = "0.10"
 paste = "1.0"
 phf = { version = "0.7.24", features = ["macros"] }
+png = "0.16"
 rayon = "1.5"
 winapi = { version = "0.3.9", features = ["memoryapi", "processthreadsapi"] }
