@@ -523,6 +523,8 @@ unsafe fn save_settings(path: &mut PathBuf) -> Result<()> {
         writeln!(f, "freeze_on_lose_focus={}", u8::from(*FREEZE_ON_LOSE_FOCUS))?;
         writeln!(f, "custom_loader={}", u8::from(*HAS_CUSTOM_LOAD_IMAGE))?;
         writeln!(f, "custom_bar={}", *LOADING_BAR)?;
+        writeln!(f, "bar_has_bg={}", u8::from(!LOADING_BACKGROUND.read().is_null()))?;
+        writeln!(f, "bar_has_fg={}", u8::from(!LOADING_FOREGROUND.read().is_null()))?;
         writeln!(f, "transparent={}", u8::from(*LOADING_TRANSPARENT))?;
         writeln!(f, "translucency={}", *LOADING_TRANSLUCENCY)?;
         writeln!(f, "scale_progress_bar={}", u8::from(*LOADING_PROGRESS_BAR_SCALE))?;
@@ -534,12 +536,16 @@ unsafe fn save_settings(path: &mut PathBuf) -> Result<()> {
         f.flush()?;
     }
     if LOADING_BAR.read() == 2 {
-        path.push("back.bmp");
-        (&*LOADING_BACKGROUND.read()).SaveToFile(&UStr::new(path.as_ref()));
-        path.pop();
-        path.push("front.bmp");
-        (&*LOADING_FOREGROUND.read()).SaveToFile(&UStr::new(path.as_ref()));
-        path.pop();
+        if let Some(bg) = LOADING_BACKGROUND.read().as_ref() {
+            path.push("back.bmp");
+            bg.SaveToFile(&UStr::new(path.as_ref()));
+            path.pop();
+        }
+        if let Some(fg) = LOADING_FOREGROUND.read().as_ref() {
+            path.push("front.bmp");
+            fg.SaveToFile(&UStr::new(path.as_ref()));
+            path.pop();
+        }
     }
     if HAS_CUSTOM_LOAD_IMAGE.read() {
         path.push("loader.bmp");

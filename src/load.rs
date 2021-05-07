@@ -784,6 +784,8 @@ unsafe fn load_settings(path: &mut PathBuf) -> Result<()> {
     path.push("settings");
     load_constants(path)?;
     let mut custom_load_bar = false;
+    let mut bar_bg = false;
+    let mut bar_fg = false;
     let mut custom_load_bg = false;
     path.push("settings.txt");
     // TODO
@@ -822,6 +824,8 @@ unsafe fn load_settings(path: &mut PathBuf) -> Result<()> {
                 custom_load_bar = bar == 2;
                 LOADING_BAR.write(bar);
             },
+            "bar_has_bg" => bar_bg = v.parse::<u8>()? != 0,
+            "bar_has_fg" => bar_fg = v.parse::<u8>()? != 0,
             "transparent" => LOADING_TRANSPARENT.write(v.parse::<u8>()? != 0),
             "translucency" => LOADING_TRANSLUCENCY.write(v.parse()?),
             "scale_progress_bar" => LOADING_PROGRESS_BAR_SCALE.write(v.parse::<u8>()? != 0),
@@ -836,18 +840,22 @@ unsafe fn load_settings(path: &mut PathBuf) -> Result<()> {
     })?;
     path.pop();
     if custom_load_bar {
-        path.push("back.bmp");
-        verify_path(&path)?;
-        let bg = &mut *delphi::TBitmap::new();
-        bg.LoadFromFile(&UStr::new(path.as_ref()));
-        *LOADING_BACKGROUND = bg;
-        path.pop();
-        path.push("front.bmp");
-        verify_path(&path)?;
-        let fg = &mut *delphi::TBitmap::new();
-        fg.LoadFromFile(&UStr::new(path.as_ref()));
-        *LOADING_FOREGROUND = fg;
-        path.pop();
+        if bar_bg {
+            path.push("back.bmp");
+            verify_path(&path)?;
+            let bg = &mut *delphi::TBitmap::new();
+            bg.LoadFromFile(&UStr::new(path.as_ref()));
+            *LOADING_BACKGROUND = bg;
+            path.pop();
+        }
+        if bar_fg {
+            path.push("front.bmp");
+            verify_path(&path)?;
+            let fg = &mut *delphi::TBitmap::new();
+            fg.LoadFromFile(&UStr::new(path.as_ref()));
+            *LOADING_FOREGROUND = fg;
+            path.pop();
+        }
     }
     if custom_load_bg {
         path.push("loader.bmp");
