@@ -375,7 +375,7 @@ fn save_instances(instances: &[Instance], path: &mut PathBuf) -> Result<()> {
             if codes.insert(hash) {
                 path.push(fname);
                 path.set_extension("gml");
-                std::fs::write(&path, code)?;
+                save_gml(&path, &instance.creation_code)?;
                 path.pop();
             }
             fname
