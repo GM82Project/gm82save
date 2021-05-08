@@ -362,10 +362,12 @@ fn save_instances(instances: &[Instance], path: &mut PathBuf) -> Result<()> {
     path.pop();
     let mut codes = HashSet::with_capacity(instances.len());
     for instance in instances {
-        let code = instance.creation_code.try_decode()?;
+        // pre-process the code so the hash stays consistent
+        let mut code = Vec::with_capacity(instance.creation_code.len());
+        write_gml(&mut code, &instance.creation_code)?;
         let mut hash_hex = [0; 8];
         let fname = if !code.is_empty() {
-            let hash = crc::crc32::checksum_ieee(code.as_ref());
+            let hash = crc::crc32::checksum_ieee(&code);
             for i in 0..8 {
                 hash_hex[7 - i] = match (hash >> (i * 4)) & 0xf {
                     i if i < 10 => b'0' + i as u8,
@@ -376,7 +378,7 @@ fn save_instances(instances: &[Instance], path: &mut PathBuf) -> Result<()> {
             if codes.insert(hash) {
                 path.push(fname);
                 path.set_extension("gml");
-                save_gml(&path, &instance.creation_code)?;
+                std::fs::write(&path, code)?;
                 path.pop();
             }
             fname

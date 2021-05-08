@@ -266,14 +266,15 @@ impl UStr {
         Self(ptr)
     }
 
+    pub fn len(&self) -> usize {
+        if self.0.is_null() { 0 } else { unsafe { self.0.cast::<usize>().sub(1).read() } }
+    }
+
     pub fn to_os_string(&self) -> OsString {
         if self.0.is_null() {
             OsString::new()
         } else {
-            unsafe {
-                let len = self.0.cast::<u32>().sub(1).read();
-                OsString::from_wide(slice::from_raw_parts(self.0, len as usize))
-            }
+            unsafe { OsString::from_wide(slice::from_raw_parts(self.0, self.len())) }
         }
     }
 }
