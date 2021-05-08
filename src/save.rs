@@ -53,7 +53,7 @@ fn open_file(path: &std::path::Path) -> Result<BufWriter<File>> {
 }
 
 fn write_gml<F: Write>(f: &mut F, code: &UStr) -> Result<()> {
-    for line in code.try_decode()?.lines() {
+    for line in code.try_decode()?.trim_end().lines() {
         writeln!(f, "{}", line.trim_end())?;
     }
     Ok(())
