@@ -750,7 +750,6 @@ pub unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
         writeln!(f)?;
         writeln!(f, "info_author={}", (&*ide::settings::INFO_AUTHOR).try_decode()?)?;
         writeln!(f, "info_version={}", (&*ide::settings::INFO_VERSION).try_decode()?)?;
-        writeln!(f, "info_timestamp={}", delphi::Now())?;
         writeln!(f, "info_information={}", (&*ide::settings::INFO_INFORMATION).try_delimit()?)?;
         writeln!(f)?;
         writeln!(f, "exe_company={}", (&*ide::settings::EXE_COMPANY).try_decode()?)?;
