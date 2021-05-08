@@ -4,6 +4,7 @@ use crate::{
     delphi::{advance_progress_form, TTreeNode, UStr},
     events, ide, Error, Result, ACTION_TOKEN,
 };
+use itertools::Itertools;
 use rayon::prelude::*;
 use std::{
     collections::{HashMap, HashSet},
@@ -347,7 +348,7 @@ unsafe fn save_tiles(tiles: &[Tile], path: &mut PathBuf) -> Result<()> {
     layers.values_mut().try_for_each(Write::flush)?;
     path.push("layers.txt");
     let mut f = open_file(&path)?;
-    for depth in layers.keys() {
+    for depth in layers.keys().sorted() {
         writeln!(f, "{}", depth)?;
     }
     f.flush()?;
