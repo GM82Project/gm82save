@@ -240,7 +240,7 @@ unsafe fn injector() {
     // check for .gm82 as well as .gm81 in open file dialog
     patch(0x6e02ee as *mut u8, &(gm81_or_gm82_open_file as u32 - 0x6e02f2).to_le_bytes());
     // replace .gm81 with .gm82 in "rename if using an old file extension" code
-    patch(0x6e05ec as *mut u8, &[b'2']);
+    patch(0x6e0575 as *mut u8, &(gm81_or_gm82_drag_file as u32 - 0x6e0579).to_le_bytes());
     // replace .gm81 with .gm82 in "generate a default filename to save to" code
     patch(0x6e0734 as *mut u8, &[b'2']);
     // patch out file extension associations
