@@ -143,19 +143,26 @@ unsafe extern "C" fn load() -> bool {
     true
 }
 
-unsafe extern "C" fn gm81_or_gm82() -> i32 {
-    let ebp: *const UStr;
-    asm!("mov {}, ebp", out(reg) ebp); // no [] because this function doesn't push ebp when compiled
-    let real_string = &*ebp.sub(8);
-    // original .gm81 compare
-    let out = delphi::CompareText(real_string, &UStr::from_static_pointer(0x6dfbe4 as _));
-    if out != 0 {
-        // new .gm82 compare
-        delphi::CompareText(real_string, &UStr::from_static_pointer(0x6e05e4 as _))
-    } else {
-        out
+macro_rules! gm81_or_gm82 {
+    ($name: ident, $ebpdiff: literal) => {
+        unsafe extern "C" fn $name() -> i32 {
+            let ebp: *const UStr;
+            asm!("mov {}, ebp", out(reg) ebp); // no [] because this function doesn't update ebp when compiled
+            let real_string = &*ebp.sub($ebpdiff);
+            // original .gm81 compare
+            let out = delphi::CompareText(real_string, &UStr::from_static_pointer(0x6dfbe4 as _));
+            if out != 0 {
+                // new .gm82 compare
+                delphi::CompareText(real_string, &UStr::from_static_pointer(0x6e05e4 as _))
+            } else {
+                out
+            }
+        }
     }
 }
+
+gm81_or_gm82!(gm81_or_gm82_open_file, 8);
+gm81_or_gm82!(gm81_or_gm82_drag_file, 1);
 
 unsafe fn patch(dest: *mut u8, source: &[u8]) {
     let mut old_protect = 0;
@@ -198,9 +205,9 @@ unsafe fn injector() {
     patch(load_dest, &load_patch);
 
     // check for .gm82 as well as .gm81 when dragging file onto game maker
-    patch(0x6df7e3 as *mut u8, &(gm81_or_gm82 as u32 - 0x6df7e7).to_le_bytes());
+    patch(0x6df7e3 as *mut u8, &(gm81_or_gm82_drag_file as u32 - 0x6df7e7).to_le_bytes());
     // check for .gm82 as well as .gm81 in open file dialog
-    patch(0x6e02ee as *mut u8, &(gm81_or_gm82 as u32 - 0x6e02f2).to_le_bytes());
+    patch(0x6e02ee as *mut u8, &(gm81_or_gm82_open_file as u32 - 0x6e02f2).to_le_bytes());
     // replace .gm81 with .gm82 in "rename if using an old file extension" code
     patch(0x6e05ec as *mut u8, &[b'2']);
     // replace .gm81 with .gm82 in "generate a default filename to save to" code
