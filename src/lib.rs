@@ -12,7 +12,7 @@ mod load;
 mod save;
 mod stub;
 
-use crate::delphi::UStr;
+use crate::delphi::{advance_progress_form, UStr};
 use ctor::ctor;
 use std::path::PathBuf;
 use winapi::um::{
@@ -84,6 +84,37 @@ const ACTION_TOKEN: &str = "/*\"/*'/**//* YYD ACTION";
 fn show_message(msg: &str) {
     unsafe {
         delphi::ShowMessage(&UStr::new(msg.as_ref()));
+    }
+}
+
+fn run_while_updating_bar<OP>(bar_start: u32, bar_end: u32, count: u32, op: OP) -> Result<()>
+where
+    OP: Fn(crossbeam_channel::Sender<()>) -> Result<()> + Sync + Send,
+{
+    if count > 0 {
+        crossbeam_utils::thread::scope(|scope| {
+            let (tx, rx) = crossbeam_channel::unbounded();
+            let handle = scope.spawn(|_| op(tx));
+            let mut progress = 0;
+            'outer: loop {
+                'inner: loop {
+                    match rx.try_recv() {
+                        Ok(()) => progress += 1,
+                        Err(crossbeam_channel::TryRecvError::Empty) => break 'inner,
+                        Err(_) => break 'outer,
+                    }
+                }
+                advance_progress_form(progress * (bar_end - bar_start) / count + bar_start);
+                match rx.recv_timeout(std::time::Duration::from_millis(20)) {
+                    Ok(()) => progress += 1,
+                    Err(_) => (),
+                }
+            }
+            handle.join().unwrap()
+        })
+        .unwrap()
+    } else {
+        Ok(())
     }
 }
 

@@ -2,7 +2,7 @@ use crate::{
     asset::*,
     delphi,
     delphi::{advance_progress_form, UStr},
-    events, ide, Error, Result, ACTION_TOKEN,
+    events, ide, run_while_updating_bar, Error, Result, ACTION_TOKEN,
 };
 use itertools::izip;
 use rayon::prelude::*;
@@ -914,18 +914,26 @@ unsafe fn load_assets<'a, T: Sync>(
     get_names: fn() -> &'a mut [UStr],
     alloc: fn(usize),
     assets: &Assets,
+    bar_start: u32,
+    bar_end: u32,
     path: &mut PathBuf,
     asset_maps: &AssetMaps,
 ) -> Result<()> {
     path.push(name);
     let names = &assets.index;
     alloc(names.len());
-    names.par_iter().zip(get_assets()).zip(get_names()).try_for_each(|((name, asset), name_p)| -> Result<()> {
-        if !name.is_empty() {
-            *name_p = UStr::new(name.as_ref());
-            *asset = load_asset(&mut path.join(name), asset_maps)?.as_ref();
-        }
-        Ok(())
+    run_while_updating_bar(bar_start, bar_end, names.len() as u32, |tx| {
+        names.par_iter().zip(get_assets()).zip(get_names()).try_for_each_with(
+            tx,
+            |tx, ((name, asset), name_p)| -> Result<()> {
+                if !name.is_empty() {
+                    *name_p = UStr::new(name.as_ref());
+                    *asset = load_asset(&mut path.join(name), asset_maps)?.as_ref();
+                }
+                let _ = tx.send(());
+                Ok(())
+            },
+        )
     })?;
     path.pop();
     Ok(())
@@ -985,6 +993,8 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         ide::get_sound_names_mut,
         ide::alloc_sounds,
         &asset_maps.sounds,
+        20,
+        30,
         &mut path,
         &asset_maps,
     )?;
@@ -996,15 +1006,23 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         ide::get_sprite_names_mut,
         ide::alloc_sprites,
         &asset_maps.sprites,
+        30,
+        40,
         &mut path,
         &asset_maps,
     )?;
-    advance_progress_form(50);
-    for (sp, thumb) in ide::get_sprites().iter().zip(ide::get_sprite_thumbs_mut()) {
+    advance_progress_form(40);
+    let mut last_refresh = std::time::Instant::now();
+    let sprites_len = ide::get_sprites().len();
+    for (i, (sp, thumb)) in ide::get_sprites().iter().zip(ide::get_sprite_thumbs_mut()).enumerate() {
         if let Some(sp) = sp {
             let icon = sp.get_icon();
             *thumb = delphi_call!(0x5a9c14, icon);
             let _: u32 = delphi_call!(0x405a7c, icon);
+            if last_refresh.elapsed() > std::time::Duration::from_secs(1) {
+                advance_progress_form((i * 15 / sprites_len + 40) as u32);
+                last_refresh = std::time::Instant::now();
+            }
         } else {
             *thumb = -1;
         }
@@ -1017,15 +1035,23 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         ide::get_background_names_mut,
         ide::alloc_backgrounds,
         &asset_maps.backgrounds,
+        55,
+        60,
         &mut path,
         &asset_maps,
     )?;
     advance_progress_form(60);
-    for (bg, thumb) in ide::get_backgrounds().iter().zip(ide::get_background_thumbs_mut()) {
+    let mut last_refresh = std::time::Instant::now();
+    let bg_len = ide::get_backgrounds().len();
+    for (i, (bg, thumb)) in ide::get_backgrounds().iter().zip(ide::get_background_thumbs_mut()).enumerate() {
         if let Some(bg) = bg {
             let icon = bg.get_icon();
             *thumb = delphi_call!(0x5a9c14, icon);
             let _: u32 = delphi_call!(0x405a7c, icon);
+            if last_refresh.elapsed() > std::time::Duration::from_secs(1) {
+                advance_progress_form((i * 5 / bg_len + 60) as u32);
+                last_refresh = std::time::Instant::now();
+            }
         } else {
             *thumb = -1;
         }
@@ -1038,6 +1064,8 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         ide::get_path_names_mut,
         ide::alloc_paths,
         &asset_maps.paths,
+        65,
+        70,
         &mut path,
         &asset_maps,
     )?;
@@ -1049,6 +1077,8 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         ide::get_script_names_mut,
         ide::alloc_scripts,
         &asset_maps.scripts,
+        70,
+        75,
         &mut path,
         &asset_maps,
     )?;
@@ -1060,6 +1090,8 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         ide::get_font_names_mut,
         ide::alloc_fonts,
         &asset_maps.fonts,
+        75,
+        80,
         &mut path,
         &asset_maps,
     )?;
@@ -1071,6 +1103,8 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         ide::get_timeline_names_mut,
         ide::alloc_timelines,
         &asset_maps.timelines,
+        80,
+        85,
         &mut path,
         &asset_maps,
     )?;
@@ -1082,6 +1116,8 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         ide::get_object_names_mut,
         ide::alloc_objects,
         &asset_maps.objects,
+        85,
+        90,
         &mut path,
         &asset_maps,
     )?;
@@ -1093,6 +1129,8 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         ide::get_room_names_mut,
         ide::alloc_rooms,
         &asset_maps.rooms,
+        90,
+        95,
         &mut path,
         &asset_maps,
     )?;

@@ -2,7 +2,7 @@ use crate::{
     asset::*,
     delphi,
     delphi::{advance_progress_form, TTreeNode, UStr},
-    events, ide, Error, Result, ACTION_TOKEN,
+    events, ide, run_while_updating_bar, Error, Result, ACTION_TOKEN,
 };
 use itertools::Itertools;
 use rayon::prelude::*;
@@ -625,25 +625,30 @@ unsafe fn save_assets<'a, T: Sync>(
 ) -> Result<()> {
     path.push(name);
     std::fs::create_dir_all(&path)?;
+    let mut count = 0;
     {
         path.push("index.yyd");
         let mut index = open_file(&path)?;
         path.pop();
         for name in names {
             let name = name.try_decode()?;
+            writeln!(index, "{}", name)?;
             if !name.is_empty() {
-                writeln!(index, "{}", name)?;
+                count += 1;
             }
         }
         index.flush()?;
     }
-    (assets, names).into_par_iter().try_for_each(|(asset, name)| -> Result<()> {
-        if let Some(asset) = asset {
-            let name = name.try_decode()?;
-            let mut p = path.join(name);
-            save_func(asset, &mut p)?;
-        }
-        Ok(())
+    run_while_updating_bar(_bar_start, _bar_end, count, |tx| {
+        (assets, names).into_par_iter().try_for_each_with(tx, |tx, (asset, name)| -> Result<()> {
+            if let Some(asset) = asset {
+                let name = name.try_decode()?;
+                let mut p = path.join(name);
+                save_func(asset, &mut p)?;
+                let _ = tx.send(());
+            }
+            Ok(())
+        })
     })?;
     path.push("tree.yyd");
     if let Some(tree) = tree.as_ref() {
