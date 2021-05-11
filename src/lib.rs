@@ -181,10 +181,10 @@ macro_rules! gm81_or_gm82 {
             asm!("mov {}, ebp", out(reg) ebp); // no [] because this function doesn't update ebp when compiled
             let real_string = &*ebp.sub($ebpdiff);
             // original .gm81 compare
-            let out = delphi::CompareText(real_string, &UStr::from_static_pointer(0x6dfbe4 as _));
+            let out = delphi::CompareText(real_string, 0x6dfbe4 as _);
             if out != 0 {
                 // new .gm82 compare
-                delphi::CompareText(real_string, &UStr::from_static_pointer(0x6e05e4 as _))
+                delphi::CompareText(real_string, 0x6e072c as _)
             } else {
                 out
             }
@@ -239,7 +239,7 @@ unsafe fn injector() {
     patch(0x6df7e3 as *mut u8, &(gm81_or_gm82_drag_file as u32 - 0x6df7e7).to_le_bytes());
     // check for .gm82 as well as .gm81 in open file dialog
     patch(0x6e02ee as *mut u8, &(gm81_or_gm82_open_file as u32 - 0x6e02f2).to_le_bytes());
-    // replace .gm81 with .gm82 in "rename if using an old file extension" code
+    // check for .gm82 as well as .gm81 in "rename if using an old file extension" code
     patch(0x6e0575 as *mut u8, &(gm81_or_gm82_drag_file as u32 - 0x6e0579).to_le_bytes());
     // replace .gm81 with .gm82 in "generate a default filename to save to" code
     patch(0x6e0734 as *mut u8, &[b'2']);

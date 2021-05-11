@@ -245,8 +245,9 @@ pub unsafe fn UStrClr(str: &mut UStr) {
     let _: u32 = delphi_call!(0x407ea8, str);
 }
 
-pub unsafe fn CompareText(a: &UStr, b: &UStr) -> i32 {
-    delphi_call!(0x415924, a.0, b.0)
+// terrible hack for the second operand i'm sorry
+pub unsafe fn CompareText(a: &UStr, b: *const u16) -> i32 {
+    delphi_call!(0x415924, a.0, b)
 }
 
 #[repr(transparent)]
@@ -260,10 +261,6 @@ impl UStr {
             UStrFromPWCharLen(&mut out, s.as_ptr(), s.len());
         }
         out
-    }
-
-    pub fn from_static_pointer(ptr: *const u16) -> Self {
-        Self(ptr)
     }
 
     pub fn len(&self) -> usize {
