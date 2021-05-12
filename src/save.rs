@@ -580,19 +580,24 @@ unsafe fn save_triggers(path: &mut PathBuf) -> Result<()> {
     path.push("triggers");
     std::fs::create_dir_all(&path)?;
     let triggers = ide::get_triggers();
-    path.push("index.yyd");
     {
-        let mut index = open_file(&path)?;
+        let mut index = Vec::with_capacity(triggers.len());
+        let mut name_set = HashSet::with_capacity(triggers.len());
         for trigger in triggers {
             if let Some(trigger) = trigger.as_ref() {
-                writeln!(index, "{}", trigger.name.try_decode()?)?;
+                let name = trigger.name.try_decode()?;
+                writeln!(index, "{}", name)?;
+                if !name_set.insert(name) {
+                    return Err(Error::DuplicateTrigger(trigger.name.try_decode()?))
+                }
             } else {
                 writeln!(index)?;
             }
         }
-        index.flush()?;
+        path.push("index.yyd");
+        std::fs::write(&path, index)?;
+        path.pop();
     }
-    path.pop();
     for trigger in triggers {
         if let Some(trigger) = trigger.as_ref() {
             let name = trigger.name.try_decode()?;
@@ -627,17 +632,21 @@ unsafe fn save_assets<'a, T: Sync>(
     std::fs::create_dir_all(&path)?;
     let mut count = 0;
     {
-        path.push("index.yyd");
-        let mut index = open_file(&path)?;
-        path.pop();
-        for name in names {
-            let name = name.try_decode()?;
-            writeln!(index, "{}", name)?;
+        let mut name_set = HashSet::with_capacity(names.len());
+        let mut index = Vec::with_capacity(names.len());
+        for name_wide in names {
+            let name = name_wide.try_decode()?;
+            writeln!(&mut index, "{}", name)?;
             if !name.is_empty() {
                 count += 1;
+                if !name_set.insert(name) {
+                    return Err(Error::DuplicateAsset(name_wide.try_decode()?))
+                }
             }
         }
-        index.flush()?;
+        path.push("index.yyd");
+        std::fs::write(&path, index)?;
+        path.pop();
     }
     run_while_updating_bar(_bar_start, _bar_end, count, |tx| {
         (assets, names).into_par_iter().try_for_each_with(tx, |tx, (asset, name)| -> Result<()> {
@@ -668,13 +677,18 @@ unsafe fn save_included_files(path: &mut PathBuf) -> Result<()> {
     path.pop();
     let files = ide::get_included_files();
     {
-        path.push("index.yyd");
-        let mut index = open_file(&path)?;
-        path.pop();
+        let mut index = Vec::with_capacity(files.len());
+        let mut names_set = HashSet::with_capacity(files.len());
         for file in files {
-            writeln!(index, "{}", file.file_name.try_decode()?)?;
+            let name = file.file_name.try_decode()?;
+            writeln!(index, "{}", name)?;
+            if !names_set.insert(name) {
+                return Err(Error::DuplicateAsset(file.file_name.try_decode()?))
+            }
         }
-        index.flush()?;
+        path.push("index.yyd");
+        std::fs::write(&path, index)?;
+        path.pop();
     }
     for file in files {
         let file = &**file;

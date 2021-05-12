@@ -32,6 +32,9 @@ pub enum Error {
     ParseIntError(std::num::ParseIntError),
     ParseFloatError(std::num::ParseFloatError),
     InvalidVersion(String),
+    DuplicateAsset(String),
+    DuplicateIncludedFile(String),
+    DuplicateTrigger(String),
     Other(String),
 }
 
@@ -48,6 +51,9 @@ impl std::fmt::Display for Error {
             Self::ParseIntError(e) => write!(f, "integer parse error: {}", e),
             Self::ParseFloatError(e) => write!(f, "float parse error: {}", e),
             Self::InvalidVersion(v) => write!(f, "invalid exe_version {}", v),
+            Self::DuplicateAsset(n) => write!(f, "multiple assets named {}", n),
+            Self::DuplicateIncludedFile(n) => write!(f, "multiple included files named {}", n),
+            Self::DuplicateTrigger(n) => write!(f, "multiple triggers named {}", n),
             Self::Other(s) => write!(f, "other error: {}", s),
         }
     }
