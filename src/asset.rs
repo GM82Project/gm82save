@@ -386,6 +386,10 @@ impl Room {
         DynArraySetLength(&mut self.tiles, 0x656448 as _, 1, tiles.len());
         tiles.as_ptr().copy_to_nonoverlapping(self.tiles, tiles.len());
     }
+
+    pub unsafe fn calc_extents(&mut self) {
+        let _: u32 = delphi_call!(0x657b48, self);
+    }
 }
 
 unsafe impl Sync for Room {}

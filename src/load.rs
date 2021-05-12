@@ -688,6 +688,7 @@ unsafe fn load_room(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const
     path.pop();
     load_instances(room, path, &asset_maps.objects.map)?;
     room.put_tiles(load_tiles(path, &asset_maps.backgrounds.map)?);
+    room.calc_extents();
     Ok(room)
 }
 
