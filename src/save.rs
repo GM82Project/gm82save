@@ -68,14 +68,17 @@ fn save_gml(path: &std::path::Path, code: &UStr) -> Result<()> {
 
 unsafe fn save_frame(frame: &Frame, path: &std::path::Path) -> Result<()> {
     let err = |_| Error::Other(format!("failed to save frame {}", path.to_string_lossy()));
+    // set up encoder
     let mut f = open_file(path)?;
     let mut encoder = png::Encoder::new(&mut f, frame.width, frame.height);
     encoder.set_color(png::ColorType::RGBA);
     encoder.set_filter(png::FilterType::NoFilter);
     let mut writer = encoder.write_header().map_err(err)?;
-    writer
-        .write_image_data(slice::from_raw_parts(frame.data, frame.width as usize * frame.height as usize * 4))
-        .map_err(err)?;
+    // BGRA8 -> RGBA8
+    let mut pixels = slice::from_raw_parts(frame.data, frame.width as usize * frame.height as usize * 4).to_vec();
+    pixels.par_chunks_exact_mut(4).for_each(|px| px.swap(0, 2));
+    // save
+    writer.write_image_data(&pixels).map_err(err)?;
     drop(writer);
     f.flush()?;
     Ok(())

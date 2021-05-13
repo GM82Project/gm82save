@@ -200,6 +200,8 @@ unsafe fn load_frame(path: &std::path::Path, frame: &mut Frame) -> Result<()> {
     frame.data = match decoder.color_type() {
         image::ColorType::Rgba8 => {
             decoder.read_image(data)?;
+            // RGBA8 -> BGRA8
+            data.par_chunks_exact_mut(4).for_each(|px| px.swap(0, 2));
             data.as_ptr()
         },
         _ => {
