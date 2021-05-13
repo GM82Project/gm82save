@@ -249,6 +249,4 @@ unsafe fn injector() {
     patch(0x6e0575 as *mut u8, &(gm81_or_gm82_drag_file as u32 - 0x6e0579).to_le_bytes());
     // replace .gm81 with .gm82 in "generate a default filename to save to" code
     patch(0x6e0734 as *mut u8, &[b'2']);
-    // patch out file extension associations
-    patch(0x6de76b as *mut u8, &[0x90, 0x90, 0x90, 0x90, 0x90]);
 }
