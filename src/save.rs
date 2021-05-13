@@ -654,7 +654,7 @@ unsafe fn save_assets<'a, T: Sync>(
         path.pop();
     }
     run_while_updating_bar(_bar_start, _bar_end, count, |tx| {
-        (assets, names).into_par_iter().try_for_each_with(tx, |tx, (asset, name)| -> Result<()> {
+        (assets, names).into_par_iter().try_for_each(|(asset, name)| -> Result<()> {
             if let Some(asset) = asset {
                 let name = name.try_decode()?;
                 let mut p = path.join(name);

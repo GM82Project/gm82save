@@ -924,17 +924,14 @@ unsafe fn load_assets<'a, T: Sync>(
     let names = &assets.index;
     alloc(names.len());
     run_while_updating_bar(bar_start, bar_end, names.len() as u32, |tx| {
-        names.par_iter().zip(get_assets()).zip(get_names()).try_for_each_with(
-            tx,
-            |tx, ((name, asset), name_p)| -> Result<()> {
-                if !name.is_empty() {
-                    *name_p = UStr::new(name.as_ref());
-                    *asset = load_asset(&mut path.join(name), asset_maps)?.as_ref();
-                }
-                let _ = tx.send(());
-                Ok(())
-            },
-        )
+        names.par_iter().zip(get_assets()).zip(get_names()).try_for_each(|((name, asset), name_p)| -> Result<()> {
+            if !name.is_empty() {
+                *name_p = UStr::new(name.as_ref());
+                *asset = load_asset(&mut path.join(name), asset_maps)?.as_ref();
+            }
+            let _ = tx.send(());
+            Ok(())
+        })
     })?;
     path.pop();
     Ok(())
