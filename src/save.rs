@@ -496,6 +496,10 @@ unsafe fn save_settings(path: &mut PathBuf) -> Result<()> {
     path.push("settings");
     std::fs::create_dir_all(&path)?;
     save_constants(path)?;
+    // not the usual behaviour, but i don't feel like adding more flags than necessary
+    if *HAS_CUSTOM_LOAD_IMAGE && CUSTOM_LOAD_IMAGE.read().is_null() {
+        HAS_CUSTOM_LOAD_IMAGE.write(false);
+    }
     {
         path.push("settings.txt");
         let mut f = open_file(&path)?;
@@ -555,6 +559,7 @@ unsafe fn save_settings(path: &mut PathBuf) -> Result<()> {
         (&*CUSTOM_LOAD_IMAGE.read()).SaveToFile(&UStr::new(path.as_ref()));
         path.pop();
     }
+    // icon is never legally null, so no need to check
     path.push("icon.ico");
     (&*ICON.read()).SaveToFile(&UStr::new(path.as_ref()));
     path.pop();
