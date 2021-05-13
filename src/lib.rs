@@ -111,9 +111,9 @@ where
                     }
                 }
                 advance_progress_form(progress * (bar_end - bar_start) / count + bar_start);
-                match rx.recv_timeout(std::time::Duration::from_millis(20)) {
-                    Ok(()) => progress += 1,
-                    Err(_) => (),
+                // if this errors, it'll error next time too so no need to check
+                if let Ok(()) = rx.recv_timeout(std::time::Duration::from_millis(20)) {
+                    progress += 1;
                 }
             }
             handle.join().unwrap()
