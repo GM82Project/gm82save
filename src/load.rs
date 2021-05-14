@@ -28,7 +28,7 @@ trait UStrPtr {
 impl UStrPtr for *mut UStr {
     fn asg(self, s: &str) {
         unsafe {
-            delphi::UStrAsg(self.as_mut().unwrap(), &UStr::new(s.as_ref()));
+            delphi::UStrAsg(self.as_mut().unwrap(), &UStr::new(s));
         }
     }
 
@@ -108,7 +108,7 @@ unsafe fn read_resource_tree(
         let index =
             if rtype == 3 { *names.get(name).ok_or_else(|| Error::AssetNotFound(name.to_string()))? } else { 0 };
 
-        let node = &*nodes.AddChild(*stack.last().unwrap(), &UStr::new(name.as_ref()));
+        let node = &*nodes.AddChild(*stack.last().unwrap(), &UStr::new(name));
         node.SetData(delphi::TreeNodeData::new(rtype, kind, index as u32));
         node.SetImageIndex(1);
         if rtype == 2 {
@@ -126,19 +126,19 @@ unsafe fn load_triggers(maps: &AssetMaps, path: &mut PathBuf) -> Result<()> {
     ide::alloc_triggers(names.len());
     for (name, trig_p) in names.iter().zip(ide::get_triggers_mut()) {
         let trig = &mut *Trigger::new();
-        trig.name = UStr::new(name.as_ref());
+        trig.name = UStr::new(name);
         path.push(name);
         path.set_extension("txt");
         read_txt(&path, |k, v| {
             match k {
-                "constant" => trig.constant_name = UStr::new(v.as_ref()),
+                "constant" => trig.constant_name = UStr::new(v),
                 "kind" => trig.kind = v.parse()?,
                 _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
             }
             Ok(())
         })?;
         path.set_extension("gml");
-        trig.condition = UStr::new(std::fs::read_to_string(&path)?.as_ref());
+        trig.condition = UStr::new(std::fs::read_to_string(&path)?);
         path.pop();
         *trig_p = Some(trig);
     }
@@ -166,7 +166,7 @@ unsafe fn load_sound(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*con
         match k {
             "extension" => {
                 extension = v.to_string();
-                snd.extension = UStr::new(v.as_ref())
+                snd.extension = UStr::new(v)
             },
             "exists" => exists = v.parse::<u8>()? != 0,
             "kind" => snd.kind = v.parse()?,
@@ -182,7 +182,7 @@ unsafe fn load_sound(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*con
         path.set_extension(extension.trim_matches('.'));
         verify_path(&path)?;
         let data = &mut *delphi::TMemoryStream::new();
-        data.load(&UStr::new(path.as_ref()));
+        data.load(&UStr::new(path));
         snd.data = data;
     }
     Ok(snd)
@@ -278,7 +278,7 @@ unsafe fn load_sprite(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*co
 unsafe fn load_script(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*const Script> {
     path.set_extension("gml");
     let s = Script::new();
-    (*s).source = UStr::new(std::fs::read_to_string(path)?.as_ref());
+    (*s).source = UStr::new(std::fs::read_to_string(path)?);
     Ok(s)
 }
 
@@ -287,7 +287,7 @@ unsafe fn load_font(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*cons
     path.set_extension("txt");
     read_txt(path, |k, v| {
         match k {
-            "name" => f.sys_name = UStr::new(v.as_ref()),
+            "name" => f.sys_name = UStr::new(v),
             "size" => f.size = v.parse()?,
             "bold" => f.bold = v.parse::<u8>()? != 0,
             "italic" => f.italic = v.parse::<u8>()? != 0,
@@ -356,8 +356,8 @@ unsafe fn load_event(
                         }
                     },
                     "invert" => action.invert_condition = v.parse::<u8>()? != 0,
-                    "var_name" | "repeats" => action.param_strings[0] = UStr::new(v.as_ref()),
-                    "var_value" => action.param_strings[1] = UStr::new(v.as_ref()),
+                    "var_name" | "repeats" => action.param_strings[0] = UStr::new(v),
+                    "var_value" => action.param_strings[1] = UStr::new(v),
                     "arg0" | "arg1" | "arg2" | "arg3" | "arg4" | "arg5" | "arg6" | "arg7" => {
                         if !act_id_set {
                             return Err(Error::SyntaxError(path.to_path_buf()))
@@ -380,11 +380,10 @@ unsafe fn load_event(
                                     14 => *asset_maps.timelines.map.get(v).ok_or_else(err)? as _,
                                     _ => unreachable_unchecked(),
                                 }
-                                .to_string()
-                                .as_ref(),
+                                .to_string(),
                             );
                         } else {
-                            action.param_strings[i] = UStr::new(undelimit(v).as_ref());
+                            action.param_strings[i] = UStr::new(undelimit(v));
                         }
                     },
                     _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
@@ -395,7 +394,7 @@ unsafe fn load_event(
         if action.action_kind == 7 {
             // first character will always be LF because it doesn't cut the newline when searching for */
             // so skip it
-            action.param_strings[0] = UStr::new(code.get(1..).unwrap_or("").as_ref());
+            action.param_strings[0] = UStr::new(code.get(1..).unwrap_or(""));
         }
     }
     Ok(())
@@ -546,7 +545,7 @@ unsafe fn load_instances(room: &mut Room, path: &mut PathBuf, objs: &HashMap<Str
             if !code_hash.is_empty() {
                 let mut path = path.join(code_hash);
                 path.set_extension("gml");
-                instance.creation_code = UStr::new(std::fs::read_to_string(&path)?.as_ref());
+                instance.creation_code = UStr::new(std::fs::read_to_string(&path)?);
             }
             Ok(())
         },
@@ -610,7 +609,7 @@ unsafe fn load_room(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const
     path.push("room.txt");
     read_txt(&path, |k, v| {
         match k {
-            "caption" => room.caption = UStr::new(v.as_ref()),
+            "caption" => room.caption = UStr::new(v),
             "width" => room.width = v.parse()?,
             "height" => room.height = v.parse()?,
             "snap_x" => room.snap_x = v.parse()?,
@@ -686,7 +685,7 @@ unsafe fn load_room(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const
     })?;
     path.pop();
     path.push("code.gml");
-    room.creation_code = UStr::new(std::fs::read_to_string(&path)?.as_ref());
+    room.creation_code = UStr::new(std::fs::read_to_string(&path)?);
     path.pop();
     load_instances(room, path, &asset_maps.objects.map)?;
     room.put_tiles(load_tiles(path, &asset_maps.backgrounds.map)?);
@@ -702,8 +701,8 @@ unsafe fn load_constants(path: &mut PathBuf) -> Result<()> {
     ide::alloc_constants(lines.len());
     for (line, name_p, value_p) in izip!(lines, ide::get_constant_names_mut(), ide::get_constants_mut()) {
         decode_line(&path, line, &mut |name, value| {
-            *name_p = UStr::new(name.as_ref());
-            *value_p = UStr::new(value.as_ref());
+            *name_p = UStr::new(name);
+            *value_p = UStr::new(value);
             Ok(())
         })?;
     }
@@ -719,7 +718,7 @@ unsafe fn load_included_files(path: &mut PathBuf) -> Result<()> {
     ide::alloc_included_files(files.len());
     for (fname, file_p) in files.iter().zip(ide::get_included_files_mut()) {
         let file = &mut *IncludedFile::new();
-        file.file_name = UStr::new(fname.as_ref());
+        file.file_name = UStr::new(fname);
         path.push(fname.to_string() + ".txt");
         read_txt(&path, |k, v| {
             match k {
@@ -728,7 +727,7 @@ unsafe fn load_included_files(path: &mut PathBuf) -> Result<()> {
                 "overwrite" => file.overwrite_file = v.parse::<u8>()? != 0,
                 "remove" => file.remove_at_end = v.parse::<u8>()? != 0,
                 "export" => file.export_setting = v.parse()?,
-                "export_folder" => file.export_custom_folder = UStr::new(v.as_ref()),
+                "export_folder" => file.export_custom_folder = UStr::new(v),
                 _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
             }
             Ok(())
@@ -736,13 +735,13 @@ unsafe fn load_included_files(path: &mut PathBuf) -> Result<()> {
         path.pop();
         path.push("include");
         path.push(fname);
-        file.source_path = UStr::new(path.as_ref());
+        file.source_path = UStr::new(&path);
         file.source_length = std::fs::metadata(&path)?.len() as _;
         if file.stored_in_gmk {
             verify_path(&path)?;
             file.data_exists = true;
             let data = &mut *delphi::TMemoryStream::new();
-            data.load(&UStr::new(path.as_ref()));
+            data.load(&UStr::new(&path));
             file.source_length = data.get_size();
             file.data = data;
         }
@@ -777,7 +776,7 @@ unsafe fn load_game_information(path: &mut PathBuf) -> Result<()> {
     })?;
     path.set_extension("rtf");
     verify_path(&path)?;
-    (&mut *editor.rich_edit_strings).LoadFromFile(&UStr::new(path.as_ref()));
+    (&mut *editor.rich_edit_strings).LoadFromFile(&UStr::new(&path));
     path.pop();
     Ok(())
 }
@@ -847,7 +846,7 @@ unsafe fn load_settings(path: &mut PathBuf) -> Result<()> {
             path.push("back.bmp");
             verify_path(&path)?;
             let bg = &mut *delphi::TBitmap::new();
-            bg.LoadFromFile(&UStr::new(path.as_ref()));
+            bg.LoadFromFile(&UStr::new(&path));
             *LOADING_BACKGROUND = bg;
             path.pop();
         }
@@ -855,7 +854,7 @@ unsafe fn load_settings(path: &mut PathBuf) -> Result<()> {
             path.push("front.bmp");
             verify_path(&path)?;
             let fg = &mut *delphi::TBitmap::new();
-            fg.LoadFromFile(&UStr::new(path.as_ref()));
+            fg.LoadFromFile(&UStr::new(&path));
             *LOADING_FOREGROUND = fg;
             path.pop();
         }
@@ -863,13 +862,13 @@ unsafe fn load_settings(path: &mut PathBuf) -> Result<()> {
     if custom_load_bg {
         path.push("loader.bmp");
         let im = &mut *delphi::TBitmap::new();
-        im.LoadFromFile(&UStr::new(path.as_ref()));
+        im.LoadFromFile(&UStr::new(&path));
         *CUSTOM_LOAD_IMAGE = im;
         path.pop();
     }
     path.push("icon.ico");
     verify_path(&path)?;
-    (&mut **ICON).LoadFromFile(&UStr::new(path.as_ref()));
+    (&mut **ICON).LoadFromFile(&UStr::new(&path));
     path.pop();
     {
         path.push("extensions.txt");
@@ -928,7 +927,7 @@ unsafe fn load_assets<'a, T: Sync>(
     run_while_updating_bar(bar_start, bar_end, names.len() as u32, |tx| {
         names.par_iter().zip(get_assets()).zip(get_names()).try_for_each(|((name, asset), name_p)| -> Result<()> {
             if !name.is_empty() {
-                *name_p = UStr::new(name.as_ref());
+                *name_p = UStr::new(name);
                 *asset = load_asset(&mut path.join(name), asset_maps)?.as_ref();
             }
             let _ = tx.send(());

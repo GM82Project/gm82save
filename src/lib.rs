@@ -89,7 +89,7 @@ const ACTION_TOKEN: &str = "/*\"/*'/**//* YYD ACTION";
 
 fn show_message(msg: &str) {
     unsafe {
-        delphi::ShowMessage(&UStr::new(msg.as_ref()));
+        delphi::ShowMessage(&UStr::new(msg));
     }
 }
 

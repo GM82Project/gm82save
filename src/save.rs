@@ -548,23 +548,23 @@ unsafe fn save_settings(path: &mut PathBuf) -> Result<()> {
     if LOADING_BAR.read() == 2 {
         if let Some(bg) = LOADING_BACKGROUND.read().as_ref() {
             path.push("back.bmp");
-            bg.SaveToFile(&UStr::new(path.as_ref()));
+            bg.SaveToFile(&UStr::new(&path));
             path.pop();
         }
         if let Some(fg) = LOADING_FOREGROUND.read().as_ref() {
             path.push("front.bmp");
-            fg.SaveToFile(&UStr::new(path.as_ref()));
+            fg.SaveToFile(&UStr::new(&path));
             path.pop();
         }
     }
     if HAS_CUSTOM_LOAD_IMAGE.read() {
         path.push("loader.bmp");
-        (&*CUSTOM_LOAD_IMAGE.read()).SaveToFile(&UStr::new(path.as_ref()));
+        (&*CUSTOM_LOAD_IMAGE.read()).SaveToFile(&UStr::new(&path));
         path.pop();
     }
     // icon is never legally null, so no need to check
     path.push("icon.ico");
-    (&*ICON.read()).SaveToFile(&UStr::new(path.as_ref()));
+    (&*ICON.read()).SaveToFile(&UStr::new(&path));
     path.pop();
     path.push("extensions.txt");
     let extensions = ide::get_extensions();
@@ -747,7 +747,7 @@ unsafe fn save_game_information(path: &mut PathBuf) -> Result<()> {
         f.flush()?;
     }
     path.set_extension("rtf");
-    (&*editor.rich_edit_strings).SaveToFile(&UStr::new(path.as_ref()));
+    (&*editor.rich_edit_strings).SaveToFile(&UStr::new(&path));
     path.pop();
     Ok(())
 }

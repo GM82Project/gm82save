@@ -254,9 +254,9 @@ pub unsafe fn CompareText(a: &UStr, b: *const u16) -> i32 {
 pub struct UStr(pub(self) *const u16);
 
 impl UStr {
-    pub fn new(s: &OsStr) -> Self {
+    pub fn new(s: impl AsRef<OsStr>) -> Self {
         let mut out = UStr(std::ptr::null());
-        let s = s.encode_wide().collect::<Vec<_>>();
+        let s = s.as_ref().encode_wide().collect::<Vec<_>>();
         unsafe {
             UStrFromPWCharLen(&mut out, s.as_ptr(), s.len());
         }
