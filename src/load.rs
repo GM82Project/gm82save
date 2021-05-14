@@ -372,7 +372,7 @@ unsafe fn load_event(
                         if (5..=14).contains(&ptype) && ptype != 13 {
                             action.param_strings[i] = UStr::new(
                                 match action.param_types[i] {
-                                    _ if v.is_empty() => -100, // TODO verify
+                                    _ if v.is_empty() => -1,
                                     5 => *asset_maps.sprites.map.get(v).ok_or_else(err)? as _,
                                     6 => *asset_maps.sounds.map.get(v).ok_or_else(err)? as _,
                                     7 => *asset_maps.backgrounds.map.get(v).ok_or_else(err)? as _,
