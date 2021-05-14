@@ -37,6 +37,10 @@ impl UStrPtr for *mut UStr {
     }
 }
 
+fn load_gml(code: &str) -> UStr {
+    UStr::new(code.replace('\n', "\r\n"))
+}
+
 struct Assets {
     index: Vec<String>,
     map: HashMap<String, usize>,
@@ -278,7 +282,7 @@ unsafe fn load_sprite(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*co
 unsafe fn load_script(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*const Script> {
     path.set_extension("gml");
     let s = Script::new();
-    (*s).source = UStr::new(std::fs::read_to_string(path)?);
+    (*s).source = load_gml(&std::fs::read_to_string(path)?);
     Ok(s)
 }
 
@@ -394,7 +398,7 @@ unsafe fn load_event(
         if action.action_kind == 7 {
             // first character will always be LF because it doesn't cut the newline when searching for */
             // so skip it
-            action.param_strings[0] = UStr::new(code.get(1..).unwrap_or(""));
+            action.param_strings[0] = load_gml(&code.get(1..).unwrap_or(""));
         }
     }
     Ok(())
@@ -545,7 +549,7 @@ unsafe fn load_instances(room: &mut Room, path: &mut PathBuf, objs: &HashMap<Str
             if !code_hash.is_empty() {
                 let mut path = path.join(code_hash);
                 path.set_extension("gml");
-                instance.creation_code = UStr::new(std::fs::read_to_string(&path)?);
+                instance.creation_code = load_gml(&std::fs::read_to_string(&path)?);
             }
             Ok(())
         },
@@ -685,7 +689,7 @@ unsafe fn load_room(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const
     })?;
     path.pop();
     path.push("code.gml");
-    room.creation_code = UStr::new(std::fs::read_to_string(&path)?);
+    room.creation_code = load_gml(&std::fs::read_to_string(&path)?);
     path.pop();
     load_instances(room, path, &asset_maps.objects.map)?;
     room.put_tiles(load_tiles(path, &asset_maps.backgrounds.map)?);
