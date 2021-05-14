@@ -794,7 +794,6 @@ unsafe fn load_settings(path: &mut PathBuf) -> Result<()> {
     let mut bar_fg = false;
     let mut custom_load_bg = false;
     path.push("settings.txt");
-    // TODO
     read_txt(&path, |k, v| {
         match k {
             "fullscreen" => FULLSCREEN.write(v.parse::<u8>()? != 0),
