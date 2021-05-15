@@ -131,8 +131,7 @@ unsafe extern "C" fn save_inj() {
         "sub ecx, 4",
         "mov edx, ebp",
         "sub edx, 20",
-        "call {}",
-        "ret",
+        "jmp {}",
         sym save,
         options(noreturn),
     }
