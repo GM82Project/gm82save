@@ -207,7 +207,7 @@ unsafe extern "fastcall" fn make_new_folder(_: u32, path_ptr: *const u16) {
     let mut path: PathBuf = path_delphi.to_os_string().into();
     // .gm82 works in the ui but rust doesn't get it so check for that specifically
     let is_gm82 = path.extension() == Some("gm82".as_ref()) || path.file_name() == Some(".gm82".as_ref());
-    if is_gm82 {
+    if is_gm82 && !path.is_file() {
         path.push(path.file_name().unwrap().to_owned());
     }
     ide::PROJECT_PATH.asg(path);
