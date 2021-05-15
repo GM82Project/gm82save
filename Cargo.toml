@@ -9,7 +9,10 @@ edition = "2018"
 crate-type = ["cdylib"]
 
 [profile.release]
+codegen-units = 1
+lto = true
 strip = true
+panic = "abort"
 
 [dependencies]
 crc = "1.8"
