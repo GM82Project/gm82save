@@ -1,4 +1,4 @@
-#![feature(asm)]
+#![feature(asm, naked_functions)]
 
 #[cfg(not(all(windows, target_arch = "x86")))]
 compile_error!("this tool only works on windows 32-bit");
@@ -124,21 +124,31 @@ where
     }
 }
 
+#[naked]
+unsafe extern "C" fn save_inj() {
+    asm! {
+        "mov ecx, ebp",
+        "sub ecx, 4",
+        "mov edx, ebp",
+        "sub edx, 20",
+        "call {}",
+        "ret",
+        sym save,
+        options(noreturn),
+    }
+}
+
 // set the high byte to nonzero if YYD save code was used
 // set the low byte to nonzero on success
-unsafe extern "C" fn save() -> u16 {
+unsafe extern "fastcall" fn save(proj_path: &UStr, stream_ptr: *mut u32) -> u16 {
     const IS_YYD: u16 = 0x100;
-    // get the path to the project file
-    let ebp: *mut UStr;
-    asm!("mov {}, [ebp]", out(reg) ebp);
-    let real_string = &*ebp.sub(1);
-    let path: PathBuf = real_string.to_os_string().into();
+    let path: PathBuf = proj_path.to_os_string().into();
     // filename ".gm82" works in the ui but rust doesn't get it so check for that specifically
     let is_gm82 = path.extension() == Some("gm82".as_ref()) || path.file_name() == Some(".gm82".as_ref());
     if !is_gm82 {
         // CStream.Create
         let buf = delphi_call!(0x405a4c, 0x52e8fc, 1);
-        ebp.sub(5).cast::<u32>().write(buf);
+        stream_ptr.write(buf);
         // save gmk
         let success: u32 = delphi_call!(0x705798, buf);
         return success as u16
@@ -155,16 +165,30 @@ unsafe extern "C" fn save() -> u16 {
     }
 }
 
-unsafe extern "C" fn load() -> bool {
-    let ebp: *mut UStr;
-    asm!("mov {}, [ebp]", out(reg) ebp);
-    let real_string = &*ebp.sub(1);
-    let path: PathBuf = real_string.to_os_string().into();
+#[naked]
+unsafe extern "C" fn load_inj() {
+    asm! {
+        "mov ecx, ebp",
+        "sub ecx, 4",
+        "mov edx, ebp",
+        "sub edx, 12",
+        "mov eax,ebp",
+        "sub eax, 5",
+        "push eax",
+        "call {}",
+        "ret",
+        sym load,
+        options(noreturn),
+    };
+}
+
+unsafe extern "fastcall" fn load(proj_path: &UStr, obj_ptr: *mut u32, result_ptr: *mut bool) -> bool {
+    let path: PathBuf = proj_path.to_os_string().into();
     // .gm82 works in the ui but rust doesn't get it so check for that specifically
     let is_gm82 = path.extension() == Some("gm82".as_ref()) || path.file_name() == Some(".gm82".as_ref());
     if !is_gm82 {
         let obj = delphi_call!(0x405a4c, 0x52e8fc, 1);
-        ebp.sub(3).cast::<u32>().write(obj);
+        obj_ptr.write(obj);
         return false
     }
 
@@ -175,31 +199,30 @@ unsafe extern "C" fn load() -> bool {
         ide::initialize_project();
     } else {
         delphi::close_progress_form();
-        ebp.cast::<bool>().sub(5).write(true);
+        result_ptr.write(true);
     }
     true
 }
 
-macro_rules! gm81_or_gm82 {
-    ($name: ident, $ebpdiff: literal) => {
-        unsafe extern "C" fn $name() -> i32 {
-            let ebp: *const UStr;
-            asm!("mov {}, ebp", out(reg) ebp); // no [] because this function doesn't update ebp when compiled
-            let real_string = &*ebp.sub($ebpdiff);
-            // original .gm81 compare
-            let out = delphi::CompareText(real_string, 0x6dfbe4 as _);
-            if out != 0 {
-                // new .gm82 compare
-                delphi::CompareText(real_string, 0x6e072c as _)
-            } else {
-                out
-            }
-        }
+#[naked]
+unsafe extern "C" fn gm81_or_gm82_inj() {
+    asm! {
+        "mov ecx, eax",
+        "jmp {}",
+        sym gm81_or_gm82,
+        options(noreturn),
     }
 }
 
-gm81_or_gm82!(gm81_or_gm82_open_file, 8);
-gm81_or_gm82!(gm81_or_gm82_drag_file, 1);
+unsafe extern "fastcall" fn gm81_or_gm82(s: *const u16) -> i32 {
+    let s = UStr::from_ptr(&s);
+    let out = delphi::CompareText(s, 0x6dfbe4 as _);
+    if out != 0 {
+        delphi::CompareText(s, 0x6e072c as _)
+    } else {
+        out
+    }
+}
 
 unsafe extern "fastcall" fn make_new_folder(_: u32, path_ptr: *const u16) {
     use load::UStrPtr;
@@ -238,7 +261,7 @@ unsafe fn injector() {
         0x74, 0x25, // je 0x705cef (after save fail)
         0xe9, 0x7e, 0x01, 0x00, 0x00, // jmp 0x705e4d (after save success)
     ];
-    save_patch[1..5].copy_from_slice(&(save as u32 - (save_dest as u32 + 5)).to_le_bytes());
+    save_patch[1..5].copy_from_slice(&(save_inj as u32 - (save_dest as u32 + 5)).to_le_bytes());
     patch(save_dest, &save_patch);
 
     // call load() instead of CStream.Create
@@ -250,15 +273,15 @@ unsafe fn injector() {
         0x84, 0xc0, // test al,al
         0x0f, 0x85, 0xa4, 0x00, 0x00, 0x00, // jne 0x705af3 (after load)
     ];
-    load_patch[1..5].copy_from_slice(&(load as u32 - (load_dest as u32 + 5)).to_le_bytes());
+    load_patch[1..5].copy_from_slice(&(load_inj as u32 - (load_dest as u32 + 5)).to_le_bytes());
     patch(load_dest, &load_patch);
 
     // check for .gm82 as well as .gm81 when dragging file onto game maker
-    patch(0x6df7e3 as *mut u8, &(gm81_or_gm82_drag_file as u32 - 0x6df7e7).to_le_bytes());
+    patch(0x6df7e3 as *mut u8, &(gm81_or_gm82_inj as u32 - 0x6df7e7).to_le_bytes());
     // check for .gm82 as well as .gm81 in open file dialog
-    patch(0x6e02ee as *mut u8, &(gm81_or_gm82_open_file as u32 - 0x6e02f2).to_le_bytes());
+    patch(0x6e02ee as *mut u8, &(gm81_or_gm82_inj as u32 - 0x6e02f2).to_le_bytes());
     // check for .gm82 as well as .gm81 in "rename if using an old file extension" code
-    patch(0x6e0575 as *mut u8, &(gm81_or_gm82_drag_file as u32 - 0x6e0579).to_le_bytes());
+    patch(0x6e0575 as *mut u8, &(gm81_or_gm82_inj as u32 - 0x6e0579).to_le_bytes());
     // replace .gm81 with .gm82 in "generate a default filename to save to" code
     patch(0x6e0734 as *mut u8, &[b'2']);
     // save new .gm82 projects to subfolder when using "save as" dialog
