@@ -20,13 +20,13 @@ fn undelimit(s: &str) -> String {
     s.replace("*\\/", "*/").replace("\\n", "\n").replace("\\r", "\r").replace("\\\\", "\\")
 }
 
-trait UStrPtr {
-    fn asg(self, s: &str);
+pub trait UStrPtr {
+    fn asg(self, s: impl AsRef<OsStr>);
     fn asg_undelimit(self, s: &str);
 }
 
 impl UStrPtr for *mut UStr {
-    fn asg(self, s: &str) {
+    fn asg(self, s: impl AsRef<OsStr>) {
         unsafe {
             delphi::UStrAsg(self.as_mut().unwrap(), &UStr::new(s));
         }

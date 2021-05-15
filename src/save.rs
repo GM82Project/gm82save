@@ -773,6 +773,7 @@ unsafe fn write_tree_children<F: Write>(parent: &delphi::TTreeNode, tabs: &mut S
 
 pub unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
     {
+        std::fs::create_dir_all(path.parent().unwrap())?;
         // some stuff to go in the main gmk
         let mut f = open_file(&path)?;
         writeln!(f, "gameid={}", ide::GAME_ID.read())?;

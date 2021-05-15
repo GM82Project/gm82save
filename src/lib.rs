@@ -201,6 +201,18 @@ macro_rules! gm81_or_gm82 {
 gm81_or_gm82!(gm81_or_gm82_open_file, 8);
 gm81_or_gm82!(gm81_or_gm82_drag_file, 1);
 
+unsafe extern "fastcall" fn make_new_folder(_: u32, path_ptr: *const u16) {
+    use load::UStrPtr;
+    let path_delphi = UStr::from_ptr(&path_ptr);
+    let mut path: PathBuf = path_delphi.to_os_string().into();
+    // .gm82 works in the ui but rust doesn't get it so check for that specifically
+    let is_gm82 = path.extension() == Some("gm82".as_ref()) || path.file_name() == Some(".gm82".as_ref());
+    if is_gm82 {
+        path.push(path.file_name().unwrap().to_owned());
+    }
+    ide::PROJECT_PATH.asg(path);
+}
+
 unsafe fn patch(dest: *mut u8, source: &[u8]) {
     let mut old_protect = 0;
     VirtualProtect(dest.cast(), source.len(), PAGE_READWRITE, &mut old_protect);
@@ -249,4 +261,6 @@ unsafe fn injector() {
     patch(0x6e0575 as *mut u8, &(gm81_or_gm82_drag_file as u32 - 0x6e0579).to_le_bytes());
     // replace .gm81 with .gm82 in "generate a default filename to save to" code
     patch(0x6e0734 as *mut u8, &[b'2']);
+    // save new .gm82 projects to subfolder when using "save as" dialog
+    patch(0x6e06b4 as *mut u8, &(make_new_folder as u32 - 0x6e06b8).to_le_bytes());
 }

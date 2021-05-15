@@ -274,6 +274,10 @@ impl UStr {
             unsafe { OsString::from_wide(slice::from_raw_parts(self.0, self.len())) }
         }
     }
+
+    pub unsafe fn from_ptr(s: &*const u16) -> &Self {
+        std::mem::transmute(s)
+    }
 }
 
 impl Drop for UStr {

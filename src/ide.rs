@@ -197,6 +197,8 @@ pub mod game_info {
 const ACTION_LIBRARIES: *const &'static ActionLibrary = 0x79a660 as _;
 const ACTION_LIBRARY_COUNT: IntPtr = 0x77f5dc as _;
 
+pub const PROJECT_PATH: *mut UStr = 0x77f44c as _;
+
 pub fn initialize_project() {
     unsafe {
         let _: u32 = delphi_call!(0x705964);
