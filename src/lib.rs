@@ -239,6 +239,10 @@ unsafe fn patch(dest: *mut u8, source: &[u8]) {
     FlushInstructionCache(GetCurrentProcess(), dest.cast(), source.len());
 }
 
+unsafe fn patch_call(instr: *mut u8, proc: usize) {
+    patch(instr.add(1), &(proc - (instr as usize + 5)).to_le_bytes());
+}
+
 #[ctor]
 unsafe fn injector() {
     std::panic::set_hook(Box::new(|info| {
@@ -272,13 +276,13 @@ unsafe fn injector() {
     patch(load_dest, &load_patch);
 
     // check for .gm82 as well as .gm81 when dragging file onto game maker
-    patch(0x6df7e3 as *mut u8, &(gm81_or_gm82_inj as u32 - 0x6df7e7).to_le_bytes());
+    patch_call(0x6df7e2 as _, gm81_or_gm82_inj as _);
     // check for .gm82 as well as .gm81 in open file dialog
-    patch(0x6e02ee as *mut u8, &(gm81_or_gm82_inj as u32 - 0x6e02f2).to_le_bytes());
+    patch_call(0x6e02ed as _, gm81_or_gm82_inj as _);
     // check for .gm82 as well as .gm81 in "rename if using an old file extension" code
-    patch(0x6e0575 as *mut u8, &(gm81_or_gm82_inj as u32 - 0x6e0579).to_le_bytes());
+    patch_call(0x6e0574 as _, gm81_or_gm82_inj as _);
     // replace .gm81 with .gm82 in "generate a default filename to save to" code
-    patch(0x6e0734 as *mut u8, &[b'2']);
+    patch(0x6e0734 as _, &[b'2']);
     // save new .gm82 projects to subfolder when using "save as" dialog
-    patch(0x6e06b4 as *mut u8, &(make_new_folder as u32 - 0x6e06b8).to_le_bytes());
+    patch_call(0x6e06b3 as _, make_new_folder as _);
 }
