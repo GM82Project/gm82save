@@ -215,8 +215,10 @@ unsafe extern "C" fn gm81_or_gm82_inj() {
 
 unsafe extern "fastcall" fn gm81_or_gm82(s: *const u16) -> i32 {
     let s = UStr::from_ptr(&s);
-    let out = delphi::CompareText(s, 0x6dfbe4 as _);
-    if out != 0 { delphi::CompareText(s, 0x6e072c as _) } else { out }
+    // test .gm81
+    let out = delphi::CompareText(s, 0x6e0534 as _);
+    // test .gm82
+    if out != 0 { delphi::CompareText(s, 0x6dfbe4 as _) } else { out }
 }
 
 unsafe extern "fastcall" fn make_new_folder(_: u32, path_ptr: *const u16) {
@@ -338,8 +340,8 @@ unsafe fn injector() {
     patch_call(0x6e02ed as _, gm81_or_gm82_inj as _);
     // check for .gm82 as well as .gm81 in "rename if using an old file extension" code
     patch_call(0x6e0574 as _, gm81_or_gm82_inj as _);
-    // replace .gm81 with .gm82 in "generate a default filename to save to" code
-    patch(0x6e0734 as _, &[b'2']);
+    // replace now-unused .gm81 with .gm82
+    patch(0x6dfbec as _, &[b'2']);
     // save new .gm82 projects to subfolder when using "save as" dialog
     patch_call(0x6e06b3 as _, make_new_folder as _);
 
