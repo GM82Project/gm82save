@@ -216,11 +216,7 @@ unsafe extern "C" fn gm81_or_gm82_inj() {
 unsafe extern "fastcall" fn gm81_or_gm82(s: *const u16) -> i32 {
     let s = UStr::from_ptr(&s);
     let out = delphi::CompareText(s, 0x6dfbe4 as _);
-    if out != 0 {
-        delphi::CompareText(s, 0x6e072c as _)
-    } else {
-        out
-    }
+    if out != 0 { delphi::CompareText(s, 0x6e072c as _) } else { out }
 }
 
 unsafe extern "fastcall" fn make_new_folder(_: u32, path_ptr: *const u16) {
