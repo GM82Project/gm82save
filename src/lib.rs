@@ -231,6 +231,63 @@ unsafe extern "fastcall" fn make_new_folder(_: u32, path_ptr: *const u16) {
     ide::PROJECT_PATH.asg(path);
 }
 
+#[naked]
+unsafe extern "C" fn save_820_if_exe() {
+    asm! {
+        "mov ecx, 820",
+        "mov edx, 800",
+        "test bl, bl",
+        "cmovnz edx, ecx",
+        "ret",
+        options(noreturn),
+    }
+}
+
+#[naked]
+unsafe extern "C" fn save_bool_if_exe() {
+    asm! {
+        "push esi",
+        "mov esi, 0x52f240",
+        "mov ecx, 0x52f12c",
+        "test bl, bl",
+        "cmovnz ecx, esi",
+        "call ecx",
+        "pop esi",
+        "ret",
+        options(noreturn),
+    }
+}
+
+#[naked]
+unsafe extern "C" fn save_creation_code_flag_inj() {
+    asm! {
+        "mov ecx, 0x52f12c",
+        "call ecx",
+        "test bl, bl",
+        "jnz {}",
+        "ret",
+        sym save_creation_code_flag,
+        options(noreturn),
+    }
+}
+
+#[naked]
+unsafe extern "C" fn save_creation_code_flag() {
+    asm! {
+        "mov eax, esi",
+        "xor edx, edx",
+        "mov ecx, 0x52f12c",
+        "call ecx",
+        "mov eax, esi",
+        "mov edx, [0x77f54c]",
+        "shr edx, 31",
+        "mov ecx, 0x52f240",
+        "call ecx",
+        "ret",
+        options(noreturn),
+    }
+}
+
 unsafe fn patch(dest: *mut u8, source: &[u8]) {
     let mut old_protect = 0;
     VirtualProtect(dest.cast(), source.len(), PAGE_READWRITE, &mut old_protect);
@@ -285,4 +342,13 @@ unsafe fn injector() {
     patch(0x6e0734 as _, &[b'2']);
     // save new .gm82 projects to subfolder when using "save as" dialog
     patch_call(0x6e06b3 as _, make_new_folder as _);
+
+    // save creation code flag (reusing the software vertex processing flag)
+    // write 820 instead of 800 for settings version if saving exe
+    patch(0x70997c as _, &[0xe8]);
+    patch_call(0x70997c as _, save_820_if_exe as _);
+    // call WriteBoolean instead of WriteInteger if saving exe
+    patch_call(0x709a4f as _, save_bool_if_exe as _);
+    // save extra info if saving exe
+    patch_call(0x709c99 as _, save_creation_code_flag_inj as _);
 }
