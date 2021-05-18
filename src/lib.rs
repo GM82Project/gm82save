@@ -234,9 +234,9 @@ unsafe extern "fastcall" fn make_new_folder(_: u32, path_ptr: *const u16) {
 }
 
 #[naked]
-unsafe extern "C" fn save_820_if_exe() {
+unsafe extern "C" fn save_82_if_exe() {
     asm! {
-        "mov ecx, 820",
+        "mov ecx, 825",
         "mov edx, 800",
         "test bl, bl",
         "cmovnz edx, ecx",
@@ -346,9 +346,9 @@ unsafe fn injector() {
     patch_call(0x6e06b3 as _, make_new_folder as _);
 
     // save creation code flag (reusing the software vertex processing flag)
-    // write 820 instead of 800 for settings version if saving exe
+    // write 825 instead of 800 for settings version if saving exe
     patch(0x70997c as _, &[0xe8]);
-    patch_call(0x70997c as _, save_820_if_exe as _);
+    patch_call(0x70997c as _, save_82_if_exe as _);
     // call WriteBoolean instead of WriteInteger if saving exe
     patch_call(0x709a4f as _, save_bool_if_exe as _);
     // save extra info if saving exe
