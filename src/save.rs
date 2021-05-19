@@ -363,7 +363,7 @@ fn save_instances(instances: &[Instance], path: &mut PathBuf) -> Result<()> {
     path.push("instances.txt");
     let mut f = open_file(&path)?;
     path.pop();
-    let mut codes = HashSet::with_capacity(instances.len());
+    let mut codes = HashMap::with_capacity(instances.len());
     for instance in instances {
         // pre-process the code so the hash stays consistent
         let mut code = Vec::with_capacity(instance.creation_code.len());
@@ -377,16 +377,30 @@ fn save_instances(instances: &[Instance], path: &mut PathBuf) -> Result<()> {
                     i => b'A' - 10 + i as u8,
                 };
             }
-            let fname = unsafe { str::from_utf8_unchecked(&hash_hex) };
-            if codes.insert(hash) {
-                path.push(fname);
+            let mut fname = unsafe { str::from_utf8_unchecked(&hash_hex).to_string() };
+            if let Some(fname) = loop {
+                if let Some(old_code) = codes.get(&fname) {
+                    if &code == old_code {
+                        // we already saved this code, no need to repeat
+                        break None
+                    } else {
+                        // new code with hash collision
+                        fname.push('_');
+                    }
+                } else {
+                    // new code, safe hash
+                    codes.insert(fname.to_string(), code.clone());
+                    break Some(&fname)
+                }
+            } {
+                path.push(&fname);
                 path.set_extension("gml");
                 std::fs::write(&path, code)?;
                 path.pop();
             }
             fname
         } else {
-            ""
+            String::new() // ""
         };
         writeln!(
             f,
