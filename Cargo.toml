@@ -19,7 +19,6 @@ crc = "1.8"
 crossbeam-channel = "0.5"
 crossbeam-utils = "0.8"
 ctor = "0.1.20"
-image = { version = "0.23", default-features = false, features = ["png"] }
 itertools = "0.10"
 paste = "1.0"
 phf = { git = "https://github.com/skyfloogle/rust-phf.git", branch = "various-forks", features = ["macros"] }

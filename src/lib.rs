@@ -18,7 +18,7 @@ use std::{ffi::c_void, path::PathBuf};
 
 pub enum Error {
     IoError(std::io::Error),
-    ImageError(image::ImageError),
+    PngDecodeError(PathBuf, png::DecodingError),
     UnicodeError(String),
     AssetNotFound(String),
     SyntaxError(PathBuf),
@@ -37,7 +37,7 @@ impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::IoError(e) => write!(f, "io error: {}", e),
-            Self::ImageError(e) => write!(f, "image error: {}", e),
+            Self::PngDecodeError(p, e) => write!(f, "couldn't decode image {}: {}", p.to_string_lossy(), e),
             Self::UnicodeError(s) => write!(f, "couldn't encode {}", s),
             Self::AssetNotFound(s) => write!(f, "couldn't find asset {}", s),
             Self::SyntaxError(p) => write!(f, "syntax error in file {}", p.to_string_lossy()),
@@ -57,12 +57,6 @@ impl std::fmt::Display for Error {
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Self {
         Error::IoError(err)
-    }
-}
-
-impl From<image::ImageError> for Error {
-    fn from(err: image::ImageError) -> Self {
-        Error::ImageError(err)
     }
 }
 

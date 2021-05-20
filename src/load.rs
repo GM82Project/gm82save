@@ -193,32 +193,74 @@ unsafe fn load_sound(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*con
 }
 
 unsafe fn load_frame(path: &std::path::Path, frame: &mut Frame) -> Result<()> {
-    use image::{codecs::png::PngDecoder, DynamicImage, GenericImageView, ImageBuffer, ImageDecoder};
-    let decoder = PngDecoder::new(open_file(path)?)?;
-    let (w, h) = decoder.dimensions();
-    frame.width = w;
-    frame.height = h;
+    use png::{BitDepth, ColorType, Decoder, Transformations};
+    let err = |e| Error::PngDecodeError(path.to_path_buf(), e);
+    // no open_file because png uses BufReader internally
+    let mut decoder = Decoder::new(File::open(&path)?);
+    decoder.set_transformations(Transformations::EXPAND | Transformations::STRIP_16);
+    let (info, mut reader) = decoder.read_info().map_err(err)?;
+    frame.width = info.width;
+    frame.height = info.height;
     // do this calculation myself in case the png is a weird format
-    let data_size = w as usize * h as usize * 4;
+    let line_size = info.width as usize * 4;
+    let data_size = line_size * info.height as usize;
     let data = slice::from_raw_parts_mut(delphi::GetMem(data_size), data_size);
-    frame.data = match decoder.color_type() {
-        image::ColorType::Rgba8 => {
-            decoder.read_image(data)?;
+    match (info.bit_depth, info.color_type) {
+        (BitDepth::Eight, ColorType::RGBA) => {
+            // this should be the only one that actually gets used
+            // but i'll allow other formats too just to be nice
+            reader.next_frame(data).map_err(err)?;
             // RGBA8 -> BGRA8
             data.par_chunks_exact_mut(4).for_each(|px| px.swap(0, 2));
-            data.as_ptr()
         },
-        _ => {
-            // strange, but i'll allow it
-            let tmp = DynamicImage::from_decoder(decoder)?;
-            let mut out = ImageBuffer::from_raw(w, h, data).unwrap();
-            for (to, from) in out.pixels_mut().zip(tmp.pixels()) {
-                // am just relying on pixels() going in the correct order, should be fine though
-                *to = from.2;
+        (BitDepth::Eight, ColorType::RGB) => {
+            for dst_row in data.chunks_exact_mut(line_size) {
+                let src_row = reader.next_row().map_err(err)?.ok_or_else(|| {
+                    Error::Other(format!("decoding ended too soon for image {}", path.to_string_lossy()))
+                })?;
+                // RGB8 -> BGR8
+                for (dst, src) in dst_row.chunks_exact_mut(4).zip(src_row.chunks_exact(3)) {
+                    dst[0] = src[2];
+                    dst[1] = src[1];
+                    dst[2] = src[0];
+                    dst[3] = 255;
+                }
             }
-            out.into_raw().as_ptr()
         },
-    };
+        (BitDepth::Eight, ColorType::Grayscale) => {
+            for dst_row in data.chunks_exact_mut(line_size) {
+                let src_row = reader.next_row().map_err(err)?.ok_or_else(|| {
+                    Error::Other(format!("decoding ended too soon for image {}", path.to_string_lossy()))
+                })?;
+                for (dst, &src) in dst_row.chunks_exact_mut(4).zip(src_row) {
+                    dst[0..3].fill(src);
+                    dst[3] = 255;
+                }
+            }
+        },
+        (BitDepth::Eight, ColorType::GrayscaleAlpha) => {
+            for dst_row in data.chunks_exact_mut(line_size) {
+                let src_row = reader.next_row().map_err(err)?.ok_or_else(|| {
+                    Error::Other(format!("decoding ended too soon for image {}", path.to_string_lossy()))
+                })?;
+                for (dst, src) in dst_row.chunks_exact_mut(4).zip(src_row.chunks_exact(2)) {
+                    dst[0..3].fill(src[0]);
+                    dst[3] = src[1];
+                }
+            }
+        },
+        (depth, coltype) => {
+            // the above should cover all valid formats
+            // see https://www.w3.org/TR/PNG-Chunks.html
+            return Err(Error::Other(format!(
+                "couldn't understand format {:?}/{:?} for image {}",
+                depth,
+                coltype,
+                path.to_string_lossy()
+            )))
+        },
+    }
+    frame.data = data.as_ptr();
     Ok(())
 }
 
