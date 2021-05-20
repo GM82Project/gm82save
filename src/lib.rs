@@ -14,12 +14,7 @@ mod stub;
 
 use crate::delphi::{advance_progress_form, UStr};
 use ctor::ctor;
-use std::path::PathBuf;
-use winapi::um::{
-    memoryapi::VirtualProtect,
-    processthreadsapi::{FlushInstructionCache, GetCurrentProcess},
-    winnt::PAGE_READWRITE,
-};
+use std::{ffi::c_void, path::PathBuf};
 
 pub enum Error {
     IoError(std::io::Error),
@@ -291,6 +286,24 @@ unsafe extern "C" fn save_creation_code_flag() {
 }
 
 unsafe fn patch(dest: *mut u8, source: &[u8]) {
+    // the only winapi imports in the whole project, no need for crates
+    #[allow(non_camel_case_types)]
+    type PAGE_TYPE = u32;
+    const PAGE_READWRITE: PAGE_TYPE = 0x04;
+    type BOOL = i32;
+    type HANDLE = isize;
+    #[link(name = "kernel32")]
+    extern "system" {
+        fn VirtualProtect(
+            lpaddress: *mut c_void,
+            dwsize: usize,
+            flnewprotect: PAGE_TYPE,
+            lpfloldprotect: *mut PAGE_TYPE,
+        ) -> BOOL;
+        fn GetCurrentProcess() -> HANDLE;
+        fn FlushInstructionCache<'a>(hprocess: HANDLE, lpbaseaddress: *const c_void, dwsize: usize) -> BOOL;
+    }
+
     let mut old_protect = 0;
     VirtualProtect(dest.cast(), source.len(), PAGE_READWRITE, &mut old_protect);
     dest.copy_from(source.as_ptr(), source.len());
