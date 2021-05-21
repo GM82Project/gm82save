@@ -12,7 +12,7 @@ mod load;
 mod save;
 mod stub;
 
-use crate::delphi::{advance_progress_form, UStr};
+use crate::delphi::UStr;
 use std::{ffi::c_void, path::PathBuf};
 
 pub enum Error {
@@ -81,6 +81,21 @@ fn show_message(msg: &str) {
     }
 }
 
+#[cfg(not(feature = "smooth_progress_bar"))]
+struct FakeSender;
+#[cfg(not(feature = "smooth_progress_bar"))]
+impl FakeSender {
+    fn send(&self, _: ()) {}
+}
+#[cfg(not(feature = "smooth_progress_bar"))]
+fn run_while_updating_bar<OP>(_bar_start: u32, _bar_end: u32, _count: u32, op: OP) -> Result<()>
+where
+    OP: Fn(FakeSender) -> Result<()> + Sync + Send,
+{
+    op(FakeSender)
+}
+
+#[cfg(feature = "smooth_progress_bar")]
 fn run_while_updating_bar<OP>(bar_start: u32, bar_end: u32, count: u32, op: OP) -> Result<()>
 where
     OP: Fn(crossbeam_channel::Sender<()>) -> Result<()> + Sync + Send,
@@ -98,7 +113,7 @@ where
                         Err(_) => break 'outer,
                     }
                 }
-                advance_progress_form(progress * (bar_end - bar_start) / count + bar_start);
+                delphi::advance_progress_form(progress * (bar_end - bar_start) / count + bar_start);
                 // if this errors, it'll error next time too so no need to check
                 if let Ok(()) = rx.recv_timeout(std::time::Duration::from_millis(20)) {
                     progress += 1;
