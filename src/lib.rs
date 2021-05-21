@@ -98,7 +98,7 @@ where
 #[cfg(feature = "smooth_progress_bar")]
 fn run_while_updating_bar<OP>(bar_start: u32, bar_end: u32, count: u32, op: OP) -> Result<()>
 where
-    OP: Fn(crossbeam_channel::Sender<()>) -> Result<()> + Sync + Send,
+    OP: Fn(crossbeam_channel::Sender<()>) -> Result<()> + Send + Sync,
 {
     if count > 0 {
         let (tx, rx) = crossbeam_channel::unbounded();
@@ -106,8 +106,8 @@ where
             // this is basically what crossbeam does
             // note that the handle is joined at the end of the function
             // but it should be done executing by the time we get there anyway
-            let f: Box<dyn FnOnce() -> Result<()> + Sync + Send> = Box::new(|| op(tx));
-            let f: Box<dyn FnOnce() -> Result<()> + Sync + Send + 'static> = unsafe { std::mem::transmute(f) };
+            let f: Box<dyn FnOnce() -> Result<()> + Send> = Box::new(|| op(tx));
+            let f: Box<dyn FnOnce() -> Result<()> + Send + 'static> = unsafe { std::mem::transmute(f) };
             std::thread::spawn(f)
         };
         let mut progress = 0;
