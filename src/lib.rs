@@ -13,7 +13,6 @@ mod save;
 mod stub;
 
 use crate::delphi::{advance_progress_form, UStr};
-use ctor::ctor;
 use std::{ffi::c_void, path::PathBuf};
 
 pub enum Error {
@@ -309,7 +308,8 @@ unsafe fn patch_call(instr: *mut u8, proc: usize) {
     patch(instr.add(1), &(proc - (instr as usize + 5)).to_le_bytes());
 }
 
-#[ctor]
+#[cfg_attr(not(test), ctor::ctor)]
+#[cfg_attr(test, allow(dead_code))]
 unsafe fn injector() {
     std::panic::set_hook(Box::new(|info| {
         show_message(&info.to_string());
