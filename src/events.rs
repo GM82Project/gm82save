@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 pub const EV_CREATE: usize = 0;
 pub const EV_DESTROY: usize = 1;
 pub const EV_ALARM: usize = 2;
@@ -11,7 +13,7 @@ pub const EV_KEYPRESS: usize = 9;
 pub const EV_KEYRELEASE: usize = 10;
 pub const EV_TRIGGER: usize = 11;
 
-pub const EVENT_ID_TO_NAME: [&str; 12] = [
+pub const EVENT_NAMES: [&str; 12] = [
     "Create",
     "Destroy",
     "Alarm",
@@ -25,18 +27,3 @@ pub const EVENT_ID_TO_NAME: [&str; 12] = [
     "KeyRelease",
     "Trigger",
 ];
-
-pub const EVENT_NAME_TO_ID: phf::Map<&'static str, usize> = phf::phf_map! {
-    "Create" => EV_CREATE,
-    "Destroy" => EV_DESTROY,
-    "Step" => EV_STEP,
-    "Alarm" => EV_ALARM,
-    "Keyboard" => EV_KEYBOARD,
-    "Mouse" => EV_MOUSE,
-    "Collision" => EV_COLLISION,
-    "Other" => EV_OTHER,
-    "Draw" => EV_DRAW,
-    "KeyPress" => EV_KEYPRESS,
-    "KeyRelease" => EV_KEYRELEASE,
-    "Trigger" => EV_TRIGGER,
-};

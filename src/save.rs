@@ -280,14 +280,14 @@ unsafe fn save_timeline(tl: &Timeline, path: &mut PathBuf) -> Result<()> {
 unsafe fn event_name(ev_type: usize, ev_numb: usize) -> String {
     match ev_type {
         events::EV_COLLISION => {
-            format!("{}_{}", events::EVENT_ID_TO_NAME[ev_type], ide::get_object_names().get_asset(ev_numb as _))
+            format!("{}_{}", events::EVENT_NAMES[ev_type], ide::get_object_names().get_asset(ev_numb as _))
         },
         events::EV_TRIGGER => format!(
             "{}_{}",
-            events::EVENT_ID_TO_NAME[ev_type],
+            events::EVENT_NAMES[ev_type],
             ide::get_triggers().get_asset(ev_numb as _).and_then(|t| t.name.try_decode_opt()).unwrap_or_default()
         ),
-        _ => format!("{}_{}", events::EVENT_ID_TO_NAME[ev_type], ev_numb),
+        _ => format!("{}_{}", events::EVENT_NAMES[ev_type], ev_numb),
     }
 }
 

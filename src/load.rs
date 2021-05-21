@@ -492,7 +492,7 @@ unsafe fn load_object(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*con
         let err = || Error::SyntaxError(path.to_path_buf());
         let (name, actions) = event.split_once("\n").ok_or_else(err)?;
         let (ev_type_s, ev_numb_s) = name.trim().split_once("_").ok_or_else(err)?;
-        let ev_type = *events::EVENT_NAME_TO_ID.get(ev_type_s).ok_or_else(err)?;
+        let ev_type = events::EVENT_NAMES.iter().position(|&s| s == ev_type_s).ok_or_else(err)?;
         let ev_numb = match ev_type {
             events::EV_COLLISION => *object_map.get(ev_numb_s).ok_or_else(err)?,
             events::EV_TRIGGER => *trigger_map.get(ev_numb_s).ok_or_else(err)?,
