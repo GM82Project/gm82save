@@ -133,7 +133,6 @@ version = "0.1.0"
 dependencies = [
  "crc",
  "crossbeam-channel",
- "crossbeam-utils",
  "ctor",
  "itertools",
  "paste",

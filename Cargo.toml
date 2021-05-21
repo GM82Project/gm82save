@@ -10,7 +10,7 @@ crate-type = ["cdylib"]
 
 [features]
 default = ["smooth_progress_bar"]
-smooth_progress_bar = ["crossbeam-channel", "crossbeam-utils"]
+smooth_progress_bar = ["crossbeam-channel"]
 
 [profile.release]
 codegen-units = 1
@@ -21,7 +21,6 @@ panic = "abort"
 [dependencies]
 crc = "1.8"
 crossbeam-channel = {version = "0.5", optional = true}
-crossbeam-utils = {version = "0.8", optional = true}
 ctor = "0.1.20"
 itertools = "0.10"
 paste = "1.0"

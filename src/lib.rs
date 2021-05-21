@@ -101,27 +101,31 @@ where
     OP: Fn(crossbeam_channel::Sender<()>) -> Result<()> + Sync + Send,
 {
     if count > 0 {
-        crossbeam_utils::thread::scope(|scope| {
-            let (tx, rx) = crossbeam_channel::unbounded();
-            let handle = scope.spawn(|_| op(tx));
-            let mut progress = 0;
-            'outer: loop {
-                'inner: loop {
-                    match rx.try_recv() {
-                        Ok(()) => progress += 1,
-                        Err(crossbeam_channel::TryRecvError::Empty) => break 'inner,
-                        Err(_) => break 'outer,
-                    }
-                }
-                delphi::advance_progress_form(progress * (bar_end - bar_start) / count + bar_start);
-                // if this errors, it'll error next time too so no need to check
-                if let Ok(()) = rx.recv_timeout(std::time::Duration::from_millis(20)) {
-                    progress += 1;
+        let (tx, rx) = crossbeam_channel::unbounded();
+        let handle = {
+            // this is basically what crossbeam does
+            // note that the handle is joined at the end of the function
+            // but it should be done executing by the time we get there anyway
+            let f: Box<dyn FnOnce() -> Result<()> + Sync + Send> = Box::new(|| op(tx));
+            let f: Box<dyn FnOnce() -> Result<()> + Sync + Send + 'static> = unsafe { std::mem::transmute(f) };
+            std::thread::spawn(f)
+        };
+        let mut progress = 0;
+        'outer: loop {
+            'inner: loop {
+                match rx.try_recv() {
+                    Ok(()) => progress += 1,
+                    Err(crossbeam_channel::TryRecvError::Empty) => break 'inner,
+                    Err(_) => break 'outer,
                 }
             }
-            handle.join().unwrap()
-        })
-        .unwrap()
+            delphi::advance_progress_form(progress * (bar_end - bar_start) / count + bar_start);
+            // if this errors, it'll error next time too so no need to check
+            if let Ok(()) = rx.recv_timeout(std::time::Duration::from_millis(20)) {
+                progress += 1;
+            }
+        }
+        handle.join().unwrap()
     } else {
         Ok(())
     }
