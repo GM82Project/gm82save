@@ -268,6 +268,20 @@ unsafe extern "C" fn save_bool_if_exe() {
 }
 
 #[naked]
+unsafe extern "C" fn fix_tile_null_pointer() {
+    asm! {
+        "mov edx, 0x64e048",
+        "call edx",
+        "mov edx, 0x68ef07",
+        "mov ecx, 0x68ef6c",
+        "test eax, eax",
+        "cmovz edx, ecx",
+        "jmp edx",
+        options(noreturn),
+    }
+}
+
+#[naked]
 unsafe extern "C" fn save_creation_code_flag_inj() {
     asm! {
         "mov ecx, 0x52f12c",
@@ -377,6 +391,9 @@ unsafe fn injector() {
     patch_call(0x70997c as _, save_82_if_exe as _);
     // call WriteBoolean instead of WriteInteger if saving exe
     patch_call(0x709a4f as _, save_bool_if_exe as _);
+    // fix stupid null pointer error
+    patch(0x68ef02 as _, &[0xe9]);
+    patch_call(0x68ef02 as _, fix_tile_null_pointer as _);
     // save extra info if saving exe
     patch_call(0x709c99 as _, save_creation_code_flag_inj as _);
 }
