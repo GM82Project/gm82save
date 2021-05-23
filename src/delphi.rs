@@ -306,23 +306,6 @@ pub fn close_progress_form() {
     }
 }
 
-pub unsafe fn Now() -> f64 {
-    let out: f64;
-    asm! {
-        "call {call}",
-        "sub esp,8",
-        "fstp qword ptr [esp]",
-        "movsd {out}, [esp]",
-        "add esp,8",
-        call = in(reg) 0x4199b0,
-        out = lateout(xmm_reg) out,
-        lateout("eax") _,
-        lateout("edx") _,
-        lateout("ecx") _,
-    };
-    out
-}
-
 pub unsafe fn Free<T>(a: *const T) {
     let _: u32 = delphi_call!(0x405a7c, a);
 }
