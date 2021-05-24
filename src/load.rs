@@ -38,7 +38,13 @@ impl UStrPtr for *mut UStr {
 }
 
 fn load_gml(code: &str) -> UStr {
-    UStr::new(code.replace('\n', "\r\n"))
+    let mut buf = String::with_capacity(code.len());
+    // don't use string.replace() in case your gml is \r\n for some reason
+    for line in code.lines() {
+        buf += line.trim_end();
+        buf += "\r\n";
+    }
+    UStr::new(buf)
 }
 
 struct Assets {
@@ -438,9 +444,16 @@ unsafe fn load_event(
             })?;
         }
         if action.action_kind == 7 {
-            // first character will always be LF because it doesn't cut the newline when searching for */
+            // first character will always be a newline because it doesn't cut the newline when searching for */
             // so skip it
-            action.param_strings[0] = load_gml(&code.get(1..).unwrap_or(""));
+            let code = if code.starts_with('\n') {
+                &code[1..]
+            } else if code.starts_with("\r\n") {
+                &code[2..]
+            } else {
+                code
+            };
+            action.param_strings[0] = load_gml(code);
         }
     }
     Ok(())
