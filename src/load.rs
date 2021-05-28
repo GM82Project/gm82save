@@ -65,7 +65,11 @@ struct AssetMaps {
 }
 
 fn open_file(path: &std::path::Path) -> Result<BufReader<File>> {
-    Ok(BufReader::new(File::open(path)?))
+    Ok(BufReader::new(File::open(path).map_err(|e| Error::FileIoError(e, path.to_path_buf()))?))
+}
+
+fn read_file<P: AsRef<std::path::Path>>(path: P) -> Result<String> {
+    std::fs::read_to_string(path.as_ref()).map_err(|e| Error::FileIoError(e, path.as_ref().to_path_buf()))
 }
 
 fn decode_line<'a, F: FnMut(&'a str, &'a str) -> Result<()>>(
@@ -148,7 +152,7 @@ unsafe fn load_triggers(maps: &AssetMaps, path: &mut PathBuf) -> Result<()> {
             Ok(())
         })?;
         path.set_extension("gml");
-        trig.condition = UStr::new(std::fs::read_to_string(&path)?);
+        trig.condition = UStr::new(read_file(&path)?);
         path.pop();
         *trig_p = Some(trig);
     }
@@ -160,10 +164,7 @@ fn verify_path(path: &std::path::Path) -> Result<()> {
     if path.exists() {
         Ok(())
     } else {
-        Err(Error::IoError(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            format!("file {} not found", path.to_string_lossy()),
-        )))
+        Err(Error::FileIoError(std::io::Error::new(std::io::ErrorKind::NotFound, "file not found"), path.to_path_buf()))
     }
 }
 
@@ -202,7 +203,7 @@ unsafe fn load_frame(path: &std::path::Path, frame: &mut Frame) -> Result<()> {
     use png::{BitDepth, ColorType, Decoder, Transformations};
     let err = |e| Error::PngDecodeError(path.to_path_buf(), e);
     // no open_file because png uses BufReader internally
-    let mut decoder = Decoder::new(File::open(&path)?);
+    let mut decoder = Decoder::new(File::open(&path).map_err(|e| Error::FileIoError(e, path.to_path_buf()))?);
     decoder.set_transformations(Transformations::EXPAND | Transformations::STRIP_16);
     let (info, mut reader) = decoder.read_info().map_err(err)?;
     frame.width = info.width;
@@ -330,7 +331,7 @@ unsafe fn load_sprite(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*co
 unsafe fn load_script(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*const Script> {
     path.set_extension("gml");
     let s = Script::new();
-    (*s).source = load_gml(&std::fs::read_to_string(path)?);
+    (*s).source = load_gml(&read_file(path)?);
     Ok(s)
 }
 
@@ -497,7 +498,7 @@ unsafe fn load_object(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*con
         Ok(())
     })?;
     path.set_extension("gml");
-    let code = std::fs::read_to_string(&path)?;
+    let code = read_file(&path)?;
     for event in code.trim_start_matches("#define ").split("\n#define ") {
         if event.trim().is_empty() {
             continue
@@ -520,7 +521,7 @@ unsafe fn load_object(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*con
 unsafe fn load_timeline(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const Timeline> {
     let tl = &mut *Timeline::new();
     path.set_extension("gml");
-    let code = std::fs::read_to_string(&path)?;
+    let code = read_file(&path)?;
     let iter = code.trim_start_matches("#define ").split("\n#define ");
     tl.alloc(iter.clone().count());
     let times = slice::from_raw_parts_mut(tl.moment_times, tl.moment_count);
@@ -562,7 +563,7 @@ unsafe fn load_path(file_path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*
     })?;
     file_path.pop();
     file_path.push("points.txt");
-    let points_txt = std::fs::read_to_string(&file_path)?;
+    let points_txt = read_file(&file_path)?;
     let point_lines: Vec<_> = points_txt.par_lines().collect();
     for (point, line) in path.alloc_points(point_lines.len()).iter_mut().zip(point_lines) {
         let mut iter = line.split(',');
@@ -581,7 +582,7 @@ unsafe fn load_path(file_path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*
 
 unsafe fn load_instances(room: &mut Room, path: &mut PathBuf, objs: &HashMap<String, usize>) -> Result<()> {
     path.push("instances.txt");
-    let instances_txt = std::fs::read_to_string(&path)?;
+    let instances_txt = read_file(&path)?;
     let instances: Vec<_> = instances_txt.lines().filter(|s| !s.is_empty()).collect();
     let inst_path = path.to_path_buf(); // save instances.txt path for errors
     path.pop();
@@ -604,7 +605,7 @@ unsafe fn load_instances(room: &mut Room, path: &mut PathBuf, objs: &HashMap<Str
             if !code_hash.is_empty() {
                 let mut path = path.join(code_hash);
                 path.set_extension("gml");
-                instance.creation_code = load_gml(&std::fs::read_to_string(&path)?);
+                instance.creation_code = load_gml(&read_file(&path)?);
             }
             Ok(())
         },
@@ -625,7 +626,7 @@ unsafe fn load_tiles(path: &mut PathBuf, bgs: &HashMap<String, usize>) -> Result
         let depth = line.parse()?;
         path.push(line);
         path.set_extension("txt");
-        let layer_txt = std::fs::read_to_string(&path)?;
+        let layer_txt = read_file(&path)?;
         let layer: Vec<_> = layer_txt.lines().filter(|s| !s.is_empty()).collect();
         tiles.reserve(layer.len());
         let err = || Error::SyntaxError(path.to_path_buf());
@@ -744,7 +745,7 @@ unsafe fn load_room(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const
     })?;
     path.pop();
     path.push("code.gml");
-    room.creation_code = load_gml(&std::fs::read_to_string(&path)?);
+    room.creation_code = load_gml(&read_file(&path)?);
     path.pop();
     load_instances(room, path, &asset_maps.objects.map)?;
     room.put_tiles(load_tiles(path, &asset_maps.backgrounds.map)?);
@@ -754,7 +755,7 @@ unsafe fn load_room(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const
 
 unsafe fn load_constants(path: &mut PathBuf) -> Result<()> {
     path.push("constants.txt");
-    let s = std::fs::read_to_string(&path)?;
+    let s = read_file(&path)?;
     path.pop();
     let lines: Vec<_> = s.par_lines().collect();
     ide::alloc_constants(lines.len());
@@ -771,7 +772,7 @@ unsafe fn load_constants(path: &mut PathBuf) -> Result<()> {
 unsafe fn load_included_files(path: &mut PathBuf) -> Result<()> {
     path.push("datafiles");
     path.push("index.yyd");
-    let index = std::fs::read_to_string(&path)?;
+    let index = read_file(&path)?;
     path.pop();
     let files: Vec<_> = index.par_lines().collect();
     ide::alloc_included_files(files.len());
@@ -795,7 +796,8 @@ unsafe fn load_included_files(path: &mut PathBuf) -> Result<()> {
         path.push("include");
         path.push(fname);
         file.source_path = UStr::new(&path);
-        file.source_length = std::fs::metadata(&path)?.len() as _;
+        file.source_length =
+            std::fs::metadata(&path).map_err(|e| Error::FileIoError(e, path.to_path_buf()))?.len() as _;
         if file.stored_in_gmk {
             verify_path(&path)?;
             file.data_exists = true;
@@ -959,7 +961,7 @@ unsafe fn load_settings(path: &mut PathBuf) -> Result<()> {
 fn load_index(name: &str, path: &mut PathBuf) -> Result<Assets> {
     path.push(name);
     path.push("index.yyd");
-    let text = std::fs::read_to_string(&path)?;
+    let text = read_file(&path)?;
     let index: Vec<_> = text.par_lines().map(String::from).collect();
     let map = index.par_iter().enumerate().filter_map(|(i, s)| (!s.is_empty()).then(|| (s.to_string(), i))).collect();
     path.pop();

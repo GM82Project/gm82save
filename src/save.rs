@@ -48,8 +48,16 @@ impl<'a> GetAsset<String> for &'a [UStr] {
     }
 }
 
+fn create_dirs(path: &std::path::Path) -> Result<()> {
+    std::fs::create_dir_all(path).map_err(|e| Error::DirIoError(e, path.to_path_buf()))
+}
+
 fn open_file(path: &std::path::Path) -> Result<BufWriter<File>> {
-    Ok(BufWriter::new(File::create(path)?))
+    Ok(BufWriter::new(File::create(path).map_err(|e| Error::FileIoError(e, path.to_path_buf()))?))
+}
+
+fn write_file(path: &std::path::Path, content: impl AsRef<[u8]>) -> Result<()> {
+    std::fs::write(path, content).map_err(|e| Error::FileIoError(e, path.to_path_buf()))
 }
 
 fn write_gml<F: Write>(f: &mut F, code: &UStr) -> Result<()> {
@@ -92,7 +100,7 @@ unsafe fn save_stream(data: &delphi::TMemoryStream, path: &std::path::Path) -> R
     s.set_len(len);
     data.read(s.as_mut_ptr(), len as _);
     data.set_pos(old_pos);
-    std::fs::write(path, s)?;
+    write_file(path, s)?;
     Ok(())
 }
 
@@ -116,7 +124,7 @@ unsafe fn save_sound(sound: &Sound, path: &mut PathBuf) -> Result<()> {
 }
 
 unsafe fn save_sprite(sprite: &Sprite, path: &mut PathBuf) -> Result<()> {
-    std::fs::create_dir_all(&path)?;
+    create_dirs(&path)?;
     let frames = slice::from_raw_parts(sprite.frames, sprite.frame_count as _);
     for (i, frame) in frames.iter().enumerate() {
         path.push(format!("{}.png", i));
@@ -162,7 +170,7 @@ unsafe fn save_background(back: &Background, path: &mut PathBuf) -> Result<()> {
 }
 
 unsafe fn save_path(path: &Path, file_path: &mut PathBuf) -> Result<()> {
-    std::fs::create_dir_all(&file_path)?;
+    create_dirs(&file_path)?;
     file_path.push("path.txt");
     let mut f = open_file(&file_path)?;
     writeln!(f, "connection={}", path.connection)?;
@@ -395,7 +403,7 @@ fn save_instances(instances: &[Instance], path: &mut PathBuf) -> Result<()> {
             } {
                 path.push(&fname);
                 path.set_extension("gml");
-                std::fs::write(&path, code)?;
+                write_file(&path, code)?;
                 path.pop();
             }
             fname
@@ -417,7 +425,7 @@ fn save_instances(instances: &[Instance], path: &mut PathBuf) -> Result<()> {
 }
 
 unsafe fn save_room(room: &Room, path: &mut PathBuf) -> Result<()> {
-    std::fs::create_dir_all(&path)?;
+    create_dirs(&path)?;
     path.push("room.txt");
     {
         let mut f = open_file(&path)?;
@@ -511,7 +519,7 @@ unsafe fn save_constants(path: &mut PathBuf) -> Result<()> {
 unsafe fn save_settings(path: &mut PathBuf) -> Result<()> {
     use ide::settings::*;
     path.push("settings");
-    std::fs::create_dir_all(&path)?;
+    create_dirs(&path)?;
     save_constants(path)?;
     // not the usual behaviour, but i don't feel like adding more flags than necessary
     if *HAS_CUSTOM_LOAD_IMAGE && CUSTOM_LOAD_IMAGE.read().is_null() {
@@ -600,7 +608,7 @@ unsafe fn save_settings(path: &mut PathBuf) -> Result<()> {
 
 unsafe fn save_triggers(path: &mut PathBuf) -> Result<()> {
     path.push("triggers");
-    std::fs::create_dir_all(&path)?;
+    create_dirs(&path)?;
     let triggers = ide::get_triggers();
     {
         let mut index = Vec::with_capacity(triggers.len());
@@ -617,7 +625,7 @@ unsafe fn save_triggers(path: &mut PathBuf) -> Result<()> {
             }
         }
         path.push("index.yyd");
-        std::fs::write(&path, index)?;
+        write_file(&path, index)?;
         path.pop();
     }
     for trigger in triggers {
@@ -651,7 +659,7 @@ unsafe fn save_assets<'a, T: Sync>(
     path: &mut PathBuf,
 ) -> Result<()> {
     path.push(name);
-    std::fs::create_dir_all(&path)?;
+    create_dirs(&path)?;
     let mut count = 0;
     {
         let mut name_set = HashSet::with_capacity(names.len());
@@ -667,7 +675,7 @@ unsafe fn save_assets<'a, T: Sync>(
             }
         }
         path.push("index.yyd");
-        std::fs::write(&path, index)?;
+        write_file(&path, index)?;
         path.pop();
     }
     run_while_updating_bar(_bar_start, _bar_end, count, |tx| {
@@ -695,7 +703,7 @@ unsafe fn save_assets<'a, T: Sync>(
 unsafe fn save_included_files(path: &mut PathBuf) -> Result<()> {
     path.push("datafiles");
     path.push("include");
-    std::fs::create_dir_all(&path)?;
+    create_dirs(&path)?;
     path.pop();
     let files = ide::get_included_files();
     {
@@ -709,7 +717,7 @@ unsafe fn save_included_files(path: &mut PathBuf) -> Result<()> {
             }
         }
         path.push("index.yyd");
-        std::fs::write(&path, index)?;
+        write_file(&path, index)?;
         path.pop();
     }
     for file in files {
@@ -787,7 +795,7 @@ unsafe fn write_tree_children<F: Write>(parent: &delphi::TTreeNode, tabs: &mut S
 
 pub unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
     {
-        std::fs::create_dir_all(path.parent().unwrap())?;
+        create_dirs(path.parent().unwrap())?;
         // some stuff to go in the main gmk
         let mut f = open_file(&path)?;
         writeln!(f, "gameid={}", ide::GAME_ID.read())?;
