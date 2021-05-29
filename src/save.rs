@@ -48,6 +48,17 @@ impl<'a> GetAsset<String> for &'a [UStr] {
     }
 }
 
+fn make_unicase(s: String, u: &UStr) -> unicase::UniCase<String> {
+    // implement my own ascii check because it's Faster
+    if s.len() == u.len() {
+        // nothing got expanded, so as far as we're concerned it's ascii
+        // windows isn't case insensitive for some of the wackier characters anyway
+        unicase::UniCase::ascii(s)
+    } else {
+        unicase::UniCase::unicode(s)
+    }
+}
+
 fn create_dirs(path: &std::path::Path) -> Result<()> {
     std::fs::create_dir_all(path).map_err(|e| Error::DirIoError(e, path.to_path_buf()))
 }
@@ -617,7 +628,7 @@ unsafe fn save_triggers(path: &mut PathBuf) -> Result<()> {
             if let Some(trigger) = trigger.as_ref() {
                 let name = trigger.name.try_decode()?;
                 writeln!(index, "{}", name)?;
-                if !name_set.insert(name) {
+                if !name_set.insert(make_unicase(name, &trigger.name)) {
                     return Err(Error::DuplicateTrigger(trigger.name.try_decode()?))
                 }
             } else {
@@ -669,7 +680,7 @@ unsafe fn save_assets<'a, T: Sync>(
             writeln!(&mut index, "{}", name)?;
             if !name.is_empty() {
                 count += 1;
-                if !name_set.insert(name) {
+                if !name_set.insert(make_unicase(name, name_wide)) {
                     return Err(Error::DuplicateAsset(name_wide.try_decode()?))
                 }
             }
