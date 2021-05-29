@@ -744,6 +744,7 @@ unsafe fn save_included_files(path: &mut PathBuf) -> Result<()> {
             writeln!(f, "export_folder={}", file.export_custom_folder.try_decode()?)?;
         }
         f.flush()?;
+        path.pop();
     }
     path.pop();
     Ok(())
