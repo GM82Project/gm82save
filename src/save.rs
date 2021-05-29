@@ -734,11 +734,23 @@ unsafe fn save_included_files(path: &mut PathBuf) -> Result<()> {
     for file in files {
         let file = &**file;
         let mut name = file.file_name.try_decode()?;
-        if file.data_exists && file.stored_in_gmk {
-            if let Some(stream) = file.data.as_ref() {
+        if file.data_exists {
+            if file.stored_in_gmk {
+                if let Some(stream) = file.data.as_ref() {
+                    path.push("include");
+                    path.push(&name);
+                    save_stream(stream, &path)?;
+                    path.pop();
+                    path.pop();
+                }
+            } else {
+                // try to copy it to gmk dir if not already done
                 path.push("include");
                 path.push(&name);
-                save_stream(stream, &path)?;
+                if !path.exists() {
+                    std::fs::copy(file.source_path.to_os_string(), &path)
+                        .map_err(|e| Error::FileIoError(e, path.to_path_buf()))?;
+                }
                 path.pop();
                 path.pop();
             }

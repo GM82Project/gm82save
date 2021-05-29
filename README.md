@@ -10,4 +10,5 @@ This is a hack that allows GameMaker 8.1 to save to a custom .gm82 format, which
 * Minor quirks:
   * When using the Save As dialog to save a new .gm82 project, it will create a new folder and save into that. Behaviour for saving .gm81 projects is unchanged.
   * I recommend **adding antivirus exceptions** to your GameMaker and project directories. I'm not gonna knock you for being cautious, but antivirus can make saving and loading take quite a lot longer.
+  * **Included files** stored outside your project **will be copied into it**, even if "Store in the editable gmk file" is unchecked.
   * **Timestamps** are currently **not preserved**. In practice, all this means is that the "Keep Last Changed" option won't work correctly when importing resources.

@@ -1005,7 +1005,7 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
             "gameid" => ide::GAME_ID.write(v.parse()?),
             "info_author" => ide::settings::INFO_AUTHOR.asg(v),
             "info_version" => ide::settings::INFO_VERSION.asg(v),
-            "info_timestamp" => ide::settings::INFO_TIMESTAMP.write(v.parse()?), // TODO remove
+            "info_timestamp" => ide::settings::INFO_TIMESTAMP.write(v.parse()?), // legacy
             "info_information" => ide::settings::INFO_INFORMATION.asg_undelimit(v),
             "exe_company" => ide::settings::EXE_COMPANY.asg(v),
             "exe_product" => ide::settings::EXE_PRODUCT.asg(v),
