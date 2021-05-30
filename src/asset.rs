@@ -8,7 +8,7 @@ use std::slice;
 
 #[repr(C)]
 pub struct Trigger {
-    exists: u32,
+    vmt: u32,
     pub name: UStr,
     pub condition: UStr,
     pub constant_name: UStr,
@@ -23,12 +23,12 @@ impl Trigger {
 
 #[repr(C)]
 pub struct Sound {
-    exists: u32,
+    vmt: u32,
     pub kind: u32,
     pub extension: UStr,
     pub effects: u32,
     pub source: UStr,
-    pub padding: u32, // ???
+    pub padding: u32, // align f64 to 8 bytes
     pub volume: f64,
     pub pan: f64,
     pub preload: bool,
@@ -45,7 +45,7 @@ unsafe impl Sync for Sound {}
 
 #[repr(C)]
 pub struct Frame {
-    exists: u32,
+    vmt: u32,
     pub width: u32,
     pub height: u32,
     pub data: *const u8,
@@ -63,7 +63,7 @@ impl Frame {
 
 #[repr(C)]
 pub struct Sprite {
-    exists: u32,
+    vmt: u32,
     pub frame_count: u32,
     pub origin_x: i32,
     pub origin_y: i32,
@@ -72,9 +72,9 @@ pub struct Sprite {
     pub per_frame_colliders: bool,
     pub bbox_type: u32,
     pub bbox_left: i32,
-    pub bbox_bottom: i32,
-    pub bbox_right: i32,
     pub bbox_top: i32,
+    pub bbox_right: i32,
+    pub bbox_bottom: i32,
     pub frames: *mut *mut Frame,
 }
 
@@ -92,7 +92,7 @@ unsafe impl Sync for Sprite {}
 
 #[repr(C)]
 pub struct Background {
-    exists: u32,
+    vmt: u32,
     pub frame: *mut Frame,
     pub is_tileset: bool,
     pub tile_width: u32,
@@ -124,13 +124,13 @@ pub struct PathPoint {
 
 #[repr(C)]
 pub struct Path {
-    exists: u32,
+    vmt: u32,
     pub points: *mut PathPoint,
     pub point_count: usize,
     pub connection: u32,
     pub closed: bool,
     pub precision: u32,
-    pub padding: u128, // ???
+    padding: u128,
     pub path_editor_room_background: i32,
     pub snap_x: u32,
     pub snap_y: u32,
@@ -156,7 +156,7 @@ unsafe impl Sync for Path {}
 
 #[repr(C)]
 pub struct Script {
-    exists: u32,
+    vmt: u32,
     pub source: UStr,
 }
 
@@ -168,7 +168,7 @@ impl Script {
 
 #[repr(C)]
 pub struct Font {
-    exists: u32,
+    vmt: u32,
     pub sys_name: UStr,
     pub size: u32,
     pub bold: bool,
@@ -187,7 +187,7 @@ impl Font {
 
 #[repr(C)]
 pub struct Action {
-    exists: u32,
+    vmt: u32,
     pub lib_id: u32,
     pub id: u32,
     pub action_kind: u32,
@@ -213,7 +213,7 @@ impl Action {
 
 #[repr(C)]
 pub struct Event {
-    exists: u32,
+    vmt: u32,
     pub actions: *const *const Action,
     pub action_count: u32,
 }
@@ -230,7 +230,7 @@ impl Event {
 
 #[repr(C)]
 pub struct Timeline {
-    exists: u32,
+    vmt: u32,
     pub moment_events: *mut *mut Event,
     pub moment_times: *mut u32,
     pub moment_count: usize,
@@ -252,7 +252,7 @@ unsafe impl Sync for Timeline {}
 
 #[repr(C)]
 pub struct Object {
-    exists: u32,
+    vmt: u32,
     pub sprite_index: i32,
     pub solid: bool,
     pub visible: bool,
@@ -334,7 +334,7 @@ pub struct Tile {
 
 #[repr(C)]
 pub struct Room {
-    exists: u32,
+    vmt: u32,
     pub caption: UStr,
     pub speed: u32,
     pub width: u32,
@@ -396,7 +396,7 @@ unsafe impl Sync for Room {}
 
 #[repr(C)]
 pub struct IncludedFile {
-    exists: u32,
+    vmt: u32,
     pub file_name: UStr,
     pub source_path: UStr,
     pub data_exists: bool,
@@ -418,14 +418,14 @@ impl IncludedFile {
 
 #[repr(C)]
 pub struct Extension {
-    exists: u32,
+    vmt: u32,
     pub name: UStr,
     // other stuff that doesn't get written to the gmk
 }
 
 #[repr(C)]
 pub struct ActionDefinition {
-    exists: u32,
+    vmt: u32,
     name: UStr,
     pub id: u32,
     image: u32,      // pointer
@@ -454,7 +454,7 @@ pub struct ActionDefinition {
 
 #[repr(C)]
 pub struct ActionLibrary {
-    exists: u32,
+    vmt: u32,
     caption: UStr,
     pub id: u32,
     author: UStr,

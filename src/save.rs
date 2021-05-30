@@ -152,9 +152,9 @@ unsafe fn save_sprite(sprite: &Sprite, path: &mut PathBuf) -> Result<()> {
     writeln!(f, "per_frame_colliders={}", sprite.per_frame_colliders as u8)?;
     writeln!(f, "bbox_type={}", sprite.bbox_type)?;
     writeln!(f, "bbox_left={}", sprite.bbox_left)?;
-    writeln!(f, "bbox_bottom={}", sprite.bbox_bottom)?;
-    writeln!(f, "bbox_right={}", sprite.bbox_right)?;
     writeln!(f, "bbox_top={}", sprite.bbox_top)?;
+    writeln!(f, "bbox_right={}", sprite.bbox_right)?;
+    writeln!(f, "bbox_bottom={}", sprite.bbox_bottom)?;
     f.flush()?;
     path.pop();
     Ok(())
