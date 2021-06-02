@@ -192,13 +192,13 @@ unsafe extern "C" fn load_inj() {
     };
 }
 
-unsafe extern "fastcall" fn load(proj_path: &UStr, obj_ptr: *mut u32, result_ptr: *mut bool) -> bool {
+unsafe extern "fastcall" fn load(proj_path: &UStr, stream_ptr: *mut u32, result_ptr: *mut bool) -> bool {
     let path: PathBuf = proj_path.to_os_string().into();
     // .gm82 works in the ui but rust doesn't get it so check for that specifically
     let is_gm82 = path.extension() == Some("gm82".as_ref()) || path.file_name() == Some(".gm82".as_ref());
     if !is_gm82 {
-        let obj = delphi_call!(0x405a4c, 0x52e8fc, 1);
-        obj_ptr.write(obj);
+        let stream = delphi_call!(0x405a4c, 0x52e8fc, 1);
+        stream_ptr.write(stream);
         return false
     }
 
@@ -315,6 +315,36 @@ unsafe extern "C" fn save_creation_code_flag() {
     }
 }
 
+#[naked]
+unsafe extern "C" fn setup_unicode_parse_inj() {
+    asm! {
+        "mov ecx, edi",
+        "call {}",
+        "mov eax, 5",
+        "ret",
+        sym setup_unicode_parse,
+        options(noreturn),
+    }
+}
+
+#[naked]
+unsafe extern "C" fn teardown_unicode_parse_inj() {
+    asm! {
+    "mov ecx, 810",
+    "call {}",
+    "mov eax, 0x6ca2cc",
+    "jmp eax",
+    sym setup_unicode_parse,
+    options(noreturn),
+    }
+}
+
+unsafe extern "fastcall" fn setup_unicode_parse(version: i32) {
+    let cp = if version < 810 { [0, 0] } else { [0xe9, 0xfd] };
+    patch(0x52f0a2 as _, &cp);
+    patch(0x52f0c5 as _, &cp);
+}
+
 unsafe fn patch(dest: *mut u8, source: &[u8]) {
     // the only winapi imports in the whole project, no need for crates
     #[allow(non_camel_case_types)]
@@ -400,4 +430,9 @@ unsafe fn injector() {
     patch_call(0x68ef02 as _, fix_tile_null_pointer as _);
     // save extra info if saving exe
     patch_call(0x709c99 as _, save_creation_code_flag_inj as _);
+    // read text as ANSI on pre-8.1
+    patch(0x70537b as _, &[0xe8]);
+    patch_call(0x70537b as _, setup_unicode_parse_inj as _);
+    // reset above
+    patch_call(0x705acc as _, teardown_unicode_parse_inj as _);
 }
