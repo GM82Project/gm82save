@@ -340,6 +340,8 @@ unsafe extern "C" fn teardown_unicode_parse_inj() {
 }
 
 unsafe extern "fastcall" fn setup_unicode_parse(version: i32) {
+    // this just patches CStream.ReadString to read with the active code page instead of UTF-8
+    // (and reverts that change after loading so nothing else breaks)
     let cp = if version < 810 { [0, 0] } else { [0xe9, 0xfd] };
     patch(0x52f0a2 as _, &cp);
     patch(0x52f0c5 as _, &cp);
