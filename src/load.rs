@@ -123,7 +123,7 @@ unsafe fn read_resource_tree(
             if rtype == 3 { *names.get(name).ok_or_else(|| Error::AssetNotFound(name.to_string()))? } else { 0 };
 
         let node = &*nodes.AddChild(*stack.last().unwrap(), &UStr::new(name));
-        node.SetData(delphi::TreeNodeData::new(rtype, kind, index as u32));
+        node.SetData(delphi::TreeNodeData::new(rtype, kind, index));
         node.SetImageIndex(1);
         if rtype == 2 {
             stack.push(node);

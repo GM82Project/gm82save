@@ -58,13 +58,13 @@ macro_rules! delphi_call {
 #[repr(C)]
 pub struct TreeNodeData {
     unknown: u32,
-    pub rtype: u32, // 0 for toplevel, 1 for group, 2 for folder i think?
-    pub kind: u32,  // what resource type i.e. sprite, sound, etc
-    pub index: u32, // resource index
+    pub rtype: u32,   // 0 for toplevel, 1 for group, 2 for folder i think?
+    pub kind: u32,    // what resource type i.e. sprite, sound, etc
+    pub index: usize, // resource index
 }
 
 impl TreeNodeData {
-    pub fn new(rtype: u32, kind: u32, index: u32) -> *const TreeNodeData {
+    pub fn new(rtype: u32, kind: u32, index: usize) -> *const TreeNodeData {
         let data = unsafe {
             let data: *mut TreeNodeData = delphi_call!(0x405a4c, 0x71c368, 1);
             &mut *data
