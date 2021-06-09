@@ -724,7 +724,7 @@ unsafe fn save_included_files(path: &mut PathBuf) -> Result<()> {
             let name = file.file_name.try_decode()?;
             writeln!(index, "{}", name)?;
             if !names_set.insert(name) {
-                return Err(Error::DuplicateAsset(file.file_name.try_decode()?))
+                return Err(Error::DuplicateIncludedFile(file.file_name.try_decode()?))
             }
         }
         path.push("index.yyd");
