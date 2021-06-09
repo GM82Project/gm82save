@@ -703,7 +703,7 @@ unsafe fn save_assets<'a, T: Sync>(
     path.push("tree.yyd");
     if let Some(tree) = tree.as_ref() {
         let mut f = open_file(&path)?;
-        write_tree_children(&**tree, &mut String::new(), &mut f)?;
+        write_tree_children(&**tree, names, &mut String::new(), &mut f)?;
         f.flush()?;
     }
     path.pop();
@@ -798,7 +798,12 @@ unsafe fn save_game_information(path: &mut PathBuf) -> Result<()> {
     Ok(())
 }
 
-unsafe fn write_tree_children<F: Write>(parent: &delphi::TTreeNode, tabs: &mut String, f: &mut F) -> Result<()> {
+unsafe fn write_tree_children<F: Write>(
+    parent: &delphi::TTreeNode,
+    names: &[UStr],
+    tabs: &mut String,
+    f: &mut F,
+) -> Result<()> {
     for i in 0..parent.GetCount() {
         let node = &*parent.GetItem(i);
         let name = node.name.try_decode()?;
@@ -807,10 +812,10 @@ unsafe fn write_tree_children<F: Write>(parent: &delphi::TTreeNode, tabs: &mut S
                 writeln!(f, "{}+{}", tabs, name)?;
                 tabs.push('\t');
                 drop(name);
-                write_tree_children(node, tabs, f)?;
+                write_tree_children(node, names, tabs, f)?;
                 tabs.pop();
             },
-            3 => writeln!(f, "{}|{}", tabs, name)?,
+            3 => writeln!(f, "{}|{}", tabs, names[(*node.data).index].try_decode()?)?,
             _ => return Err(Error::Other(format!("failed to save resource tree {}", name))),
         }
     }
