@@ -421,17 +421,19 @@ unsafe fn injector() {
     // save new .gm82 projects to subfolder when using "save as" dialog
     patch_call(0x6e06b3 as _, make_new_folder as _);
 
+    // fix stupid null pointer error
+    patch(0x68ef02 as _, &[0xe9]);
+    patch_call(0x68ef02 as _, fix_tile_null_pointer as _);
+
     // save creation code flag (reusing the software vertex processing flag)
     // write 825 instead of 800 for settings version if saving exe
     patch(0x70997c as _, &[0xe8]);
     patch_call(0x70997c as _, save_82_if_exe as _);
     // call WriteBoolean instead of WriteInteger if saving exe
     patch_call(0x709a4f as _, save_bool_if_exe as _);
-    // fix stupid null pointer error
-    patch(0x68ef02 as _, &[0xe9]);
-    patch_call(0x68ef02 as _, fix_tile_null_pointer as _);
     // save extra info if saving exe
     patch_call(0x709c99 as _, save_creation_code_flag_inj as _);
+
     // read text as ANSI on pre-8.1
     patch(0x70537b as _, &[0xe8]);
     patch_call(0x70537b as _, setup_unicode_parse_inj as _);
