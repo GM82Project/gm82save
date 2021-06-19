@@ -554,7 +554,7 @@ unsafe fn save_settings(path: &mut PathBuf) -> Result<()> {
         writeln!(f, "frequency={}", *FREQUENCY)?;
         writeln!(f, "dont_show_buttons={}", u8::from(*DONT_SHOW_BUTTONS))?;
         writeln!(f, "vsync={}", *VSYNC_AND_FORCE_CPU & 1)?;
-        writeln!(f, "force_cpu_render={}", u8::from(*VSYNC_AND_FORCE_CPU & (1 << 7) != 0))?;
+        writeln!(f, "swap_creation_events={}", u8::from(*VSYNC_AND_FORCE_CPU & (1 << 31) != 0))?;
         writeln!(f, "disable_screensaver={}", u8::from(*DISABLE_SCREENSAVER))?;
         writeln!(f, "f4_fullscreen_toggle={}", u8::from(*F4_FULLSCREEN))?;
         writeln!(f, "f1_help_menu={}", u8::from(*F1_HELP))?;

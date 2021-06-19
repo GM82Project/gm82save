@@ -867,7 +867,8 @@ unsafe fn load_settings(path: &mut PathBuf) -> Result<()> {
             "frequency" => FREQUENCY.write(v.parse()?),
             "dont_show_buttons" => DONT_SHOW_BUTTONS.write(v.parse::<u8>()? != 0),
             "vsync" => *VSYNC_AND_FORCE_CPU |= u32::from(v.parse::<u8>()? != 0),
-            "force_cpu_render" => *VSYNC_AND_FORCE_CPU |= u32::from(v.parse::<u8>()? != 0) << 7,
+            "force_cpu_render" => (), // legacy, and saving didn't even work so
+            "swap_creation_events" => *VSYNC_AND_FORCE_CPU |= u32::from(v.parse::<u8>()? != 0) << 31,
             "disable_screensaver" => DISABLE_SCREENSAVER.write(v.parse::<u8>()? != 0),
             "f4_fullscreen_toggle" => F4_FULLSCREEN.write(v.parse::<u8>()? != 0),
             "f1_help_menu" => F1_HELP.write(v.parse::<u8>()? != 0),
