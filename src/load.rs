@@ -587,8 +587,9 @@ unsafe fn load_instances(room: &mut Room, path: &mut PathBuf, objs: &HashMap<Str
     let inst_path = path.to_path_buf(); // save instances.txt path for errors
     path.pop();
     let err = || Error::SyntaxError(inst_path.to_path_buf());
-    room.alloc_instances(instances.len()).into_par_iter().zip(&instances).try_for_each(
-        |(instance, line)| -> Result<()> {
+    let last_instance_id = *ide::LAST_INSTANCE_ID + 1;
+    room.alloc_instances(instances.len()).into_par_iter().zip(&instances).enumerate().try_for_each(
+        |(i, (instance, line))| -> Result<()> {
             let mut iter = line.split(',');
             instance.object = match iter.next().ok_or_else(err)? {
                 "" => -1,
@@ -598,10 +599,7 @@ unsafe fn load_instances(room: &mut Room, path: &mut PathBuf, objs: &HashMap<Str
             instance.y = iter.next().ok_or_else(err)?.parse()?;
             let code_hash = iter.next().ok_or_else(err)?;
             instance.locked = iter.next().ok_or_else(err)?.parse::<u8>()? != 0;
-            instance.id = {
-                *ide::LAST_INSTANCE_ID += 1;
-                *ide::LAST_INSTANCE_ID as _
-            };
+            instance.id = (last_instance_id + i) as _;
             if !code_hash.is_empty() {
                 let mut path = path.join(code_hash);
                 path.set_extension("gml");
@@ -610,6 +608,7 @@ unsafe fn load_instances(room: &mut Room, path: &mut PathBuf, objs: &HashMap<Str
             Ok(())
         },
     )?;
+    *ide::LAST_INSTANCE_ID += instances.len();
     Ok(())
 }
 
@@ -630,9 +629,11 @@ unsafe fn load_tiles(path: &mut PathBuf, bgs: &HashMap<String, usize>) -> Result
         let layer: Vec<_> = layer_txt.lines().filter(|s| !s.is_empty()).collect();
         tiles.reserve(layer.len());
         let err = || Error::SyntaxError(path.to_path_buf());
+        let last_tile_id = *ide::LAST_TILE_ID + 1;
         let layer_tiles = layer
             .par_iter()
-            .map(|tile| {
+            .enumerate()
+            .map(|(i, tile)| {
                 let mut iter = tile.split(',');
                 let t = Tile {
                     source_bg: match iter.next().ok_or_else(err)? {
@@ -647,10 +648,7 @@ unsafe fn load_tiles(path: &mut PathBuf, bgs: &HashMap<String, usize>) -> Result
                     height: iter.next().ok_or_else(err)?.parse()?,
                     locked: iter.next().ok_or_else(err)?.parse::<u8>()? != 0,
                     depth,
-                    id: {
-                        *ide::LAST_TILE_ID += 1;
-                        *ide::LAST_TILE_ID as _
-                    },
+                    id: (last_tile_id + i) as _,
                 };
                 if iter.next() != None {
                     return Err(err())
@@ -658,6 +656,7 @@ unsafe fn load_tiles(path: &mut PathBuf, bgs: &HashMap<String, usize>) -> Result
                 Ok(t)
             })
             .collect::<Result<Vec<_>>>()?;
+        *ide::LAST_TILE_ID += layer_tiles.len();
         tiles.extend_from_slice(&layer_tiles);
         path.pop();
     }
@@ -985,16 +984,29 @@ unsafe fn load_assets<'a, T: Sync>(
     path.push(name);
     let names = &assets.index;
     alloc(names.len());
-    run_while_updating_bar(bar_start, bar_end, names.len() as u32, |tx| {
-        names.par_iter().zip(get_assets()).zip(get_names()).try_for_each(|((name, asset), name_p)| -> Result<()> {
-            if !name.is_empty() {
-                *name_p = UStr::new(name);
-                *asset = load_asset(&mut path.join(name), asset_maps)?.as_ref();
-            }
-            let _ = tx.send(());
-            Ok(())
-        })
-    })?;
+    if name != "rooms" {
+        run_while_updating_bar(bar_start, bar_end, names.len() as u32, |tx| {
+            names.par_iter().zip(get_assets()).zip(get_names()).try_for_each(|((name, asset), name_p)| -> Result<()> {
+                if !name.is_empty() {
+                    *name_p = UStr::new(name);
+                    *asset = load_asset(&mut path.join(name), asset_maps)?.as_ref();
+                }
+                let _ = tx.send(());
+                Ok(())
+            })
+        })?;
+    } else {
+        run_while_updating_bar(bar_start, bar_end, names.len() as u32, |tx| {
+            names.iter().zip(get_assets()).zip(get_names()).try_for_each(|((name, asset), name_p)| -> Result<()> {
+                if !name.is_empty() {
+                    *name_p = UStr::new(name);
+                    *asset = load_asset(&mut path.join(name), asset_maps)?.as_ref();
+                }
+                let _ = tx.send(());
+                Ok(())
+            })
+        })?;
+    }
     path.pop();
     Ok(())
 }
