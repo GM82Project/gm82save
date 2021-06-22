@@ -152,7 +152,7 @@ unsafe fn load_triggers(maps: &AssetMaps, path: &mut PathBuf) -> Result<()> {
             Ok(())
         })?;
         path.set_extension("gml");
-        trig.condition = UStr::new(read_file(&path)?);
+        trig.condition = load_gml(&read_file(&path)?);
         path.pop();
         *trig_p = Some(trig);
     }
