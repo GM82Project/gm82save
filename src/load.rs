@@ -593,7 +593,7 @@ unsafe fn load_instances(room: &mut Room, path: &mut PathBuf, objs: &HashMap<Str
             let mut iter = line.split(',');
             instance.object = match iter.next().ok_or_else(err)? {
                 "" => -1,
-                obj => *objs.get(obj).ok_or_else(|| Error::AssetNotFound(obj.to_ascii_lowercase()))? as _,
+                obj => *objs.get(obj).ok_or_else(|| Error::AssetNotFound(obj.to_string()))? as _,
             };
             instance.x = iter.next().ok_or_else(err)?.parse()?;
             instance.y = iter.next().ok_or_else(err)?.parse()?;
