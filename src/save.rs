@@ -436,7 +436,7 @@ fn save_instances(instances: &[Instance], path: &mut PathBuf) -> Result<()> {
 }
 
 unsafe fn save_room(room: &Room, path: &mut PathBuf) -> Result<()> {
-    let _: u32 = delphi_call!(0x6576fc, room);
+    let _: u32 = delphi_call!(0x6576fc, room); // clean unused assets
     create_dirs(&path)?;
     path.push("room.txt");
     {

@@ -330,12 +330,12 @@ unsafe extern "C" fn setup_unicode_parse_inj() {
 #[naked]
 unsafe extern "C" fn teardown_unicode_parse_inj() {
     asm! {
-    "mov ecx, 810",
-    "call {}",
-    "mov eax, 0x6ca2cc",
-    "jmp eax",
-    sym setup_unicode_parse,
-    options(noreturn),
+        "mov ecx, 810",
+        "call {}",
+        "mov eax, 0x6ca2cc",
+        "jmp eax",
+        sym setup_unicode_parse,
+        options(noreturn),
     }
 }
 
