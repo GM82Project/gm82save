@@ -135,6 +135,22 @@ where
     }
 }
 
+static mut LAST_SAVE: f64 = 0.0;
+
+fn update_timestamp() {
+    unsafe {
+        asm! {
+        "call {call}",
+        "fstp dword ptr [{output}]",
+        call = in(reg) 0x4199b0,
+        output = sym LAST_SAVE,
+        lateout("eax") _,
+        lateout("edx") _,
+        lateout("ecx") _,
+        }
+    }
+}
+
 #[naked]
 unsafe extern "C" fn save_inj() {
     asm! {
@@ -439,4 +455,18 @@ unsafe fn injector() {
     patch_call(0x70537b as _, setup_unicode_parse_inj as _);
     // reset above
     patch_call(0x705acc as _, teardown_unicode_parse_inj as _);
+
+    // update timestamps when setting name
+    unsafe fn patch_timestamps(dest: *mut u8) {
+        patch(dest, &[0x8b, 0xc3, 0xe8, 0xe0, 0x00, 0x00, 0x00]);
+    }
+    patch(0x62cbe9 as _, &[0x8b, 0xc3, 0xe8, 0x3c, 0x01, 0x00, 0x00]); // objects
+    patch_timestamps(0x6f59e1 as _); // sprites
+    patch_timestamps(0x652381 as _); // sounds
+    patch_timestamps(0x692fe5 as _); // rooms
+    patch_timestamps(0x64def9 as _); // backgrounds
+    patch_timestamps(0x655c01 as _); // scripts
+    patch_timestamps(0x722901 as _); // paths
+    patch_timestamps(0x6fcd19 as _); // fonts
+    patch_timestamps(0x6fa6c9 as _); // timelines
 }

@@ -2,7 +2,7 @@ use crate::{
     asset::*,
     delphi,
     delphi::{advance_progress_form, TTreeNode, UStr},
-    events, ide, run_while_updating_bar, Error, Result, ACTION_TOKEN,
+    events, ide, run_while_updating_bar, update_timestamp, Error, Result, ACTION_TOKEN,
 };
 use itertools::Itertools;
 use rayon::prelude::*;
@@ -925,5 +925,8 @@ pub unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
     save_included_files(&mut path)?;
 
     advance_progress_form(100);
+
+    update_timestamp();
+
     Ok(())
 }

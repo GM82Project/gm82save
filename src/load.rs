@@ -2,7 +2,7 @@ use crate::{
     asset::*,
     delphi,
     delphi::{advance_progress_form, UStr},
-    events, ide, run_while_updating_bar, Error, Result, ACTION_TOKEN,
+    events, ide, run_while_updating_bar, update_timestamp, Error, Result, ACTION_TOKEN,
 };
 use itertools::izip;
 use rayon::prelude::*;
@@ -1245,5 +1245,8 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         (ptr as *mut bool).write(false);
     }
     advance_progress_form(100);
+
+    update_timestamp();
+
     Ok(())
 }

@@ -134,6 +134,26 @@ impl TBitmap {
     pub unsafe fn LoadFromFile(&self, filename: &UStr) {
         let _: u32 = delphi_call!(0x45e64c, self, filename.0);
     }
+
+    pub unsafe fn SetWidth(&mut self, width: u32) {
+        asm! {
+            "mov ecx, [eax]",
+            "call [ecx+0x44]",
+            inlateout("eax") self => _,
+            inlateout("edx") width => _,
+            lateout("ecx") _,
+        }
+    }
+
+    pub unsafe fn SetHeight(&mut self, height: u32) {
+        asm! {
+            "mov ecx, [eax]",
+            "call [ecx+0x38]",
+            inlateout("eax") self => _,
+            inlateout("edx") height => _,
+            lateout("ecx") _,
+        }
+    }
 }
 
 pub struct TIcon {}

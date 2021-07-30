@@ -16,12 +16,14 @@ type TypeInfoPtr = *const u8;
 
 const TRIGGER_COUNT: IntPtr = 0x77f3f8 as _;
 const TRIGGERS: AssetList<Trigger> = 0x77f3f4 as _;
+pub const TRIGGERS_UPDATED: *const bool = 0x790058 as _;
 
 const CONSTANT_COUNT: IntPtr = 0x77f3c4 as _;
 const CONSTANT_NAMES: UStrListPtr = 0x78c14c as _;
 const CONSTANT_VALUES: UStrListPtr = 0x78c150 as _;
 const CONSTANT_NAME_TYPE: TypeInfoPtr = 0x696594 as _;
 const CONSTANT_VALUE_TYPE: TypeInfoPtr = 0x6965c0 as _;
+pub const CONSTANTS_UPDATED: *mut bool = 0x78c154 as _;
 
 const SOUNDS: AssetList<Sound> = 0x77f2b8 as _;
 const SOUND_FORMS: Forms = 0x77f2bc as _;
@@ -30,6 +32,7 @@ const SOUND_TIMESTAMPS: Timestamps = 0x77f2c4 as _;
 const SOUND_COUNT: IntPtr = 0x77f2c8 as _;
 const SOUND_TYPEINFO: TypeInfoPtr = 0x651ce0 as _;
 const SOUND_TYPESIZE: usize = 0x2c;
+pub const SOUNDS_UPDATED: *mut bool = 0x78a1b0 as _;
 
 const SPRITES: AssetList<Sprite> = 0x77f4c4 as _;
 const SPRITE_NAMES: UStrListPtr = 0x77f4cc as _;
@@ -38,6 +41,7 @@ const SPRITE_THUMBS: ThumbIDs = 0x77f4d4 as _;
 const SPRITE_COUNT: IntPtr = 0x77f4d8 as _;
 const SPRITE_TYPEINFO: TypeInfoPtr = 0x6f522c as _;
 const SPRITE_TYPESIZE: usize = 0x2c;
+pub const SPRITES_UPDATED: *mut bool = 0x790170 as _;
 
 const BACKGROUNDS: AssetList<Background> = 0x77f1ac as _;
 const BACKGROUND_FORMS: Forms = 0x77f1b0 as _;
@@ -47,6 +51,7 @@ const BACKGROUND_THUMBS: ThumbIDs = 0x77f1bc as _;
 const BACKGROUND_COUNT: IntPtr = 0x77f1c0 as _;
 const BACKGROUND_TYPEINFO: TypeInfoPtr = 0x64d734 as _;
 const BACKGROUND_TYPESIZE: usize = 0x30;
+pub const BACKGROUNDS_UPDATED: *mut bool = 0x78a168 as _;
 
 const PATHS: AssetList<Path> = 0x77f608 as _;
 const PATH_FORMS: Forms = 0x77f60c as _;
@@ -55,6 +60,7 @@ const PATH_TIMESTAMPS: Timestamps = 0x77f614 as _;
 const PATH_COUNT: IntPtr = 0x77f618 as _;
 const PATH_TYPEINFO: TypeInfoPtr = 0x72207c as _;
 const PATH_TYPESIZE: usize = 0x28;
+pub const PATHS_UPDATED: *mut bool = 0x7a4658 as _;
 
 const SCRIPTS: AssetList<Script> = 0x77f2cc as _;
 const SCRIPT_FORMS: Forms = 0x77f2d0 as _;
@@ -63,6 +69,7 @@ const SCRIPT_TIMESTAMPS: Timestamps = 0x77f2d8 as _;
 const SCRIPT_COUNT: IntPtr = 0x77f2dc as _;
 const SCRIPT_TYPEINFO: TypeInfoPtr = 0x6550a8 as _;
 const SCRIPT_TYPESIZE: usize = 0x2c;
+pub const SCRIPTS_UPDATED: *mut bool = 0x78a1b8 as _;
 
 const FONTS: AssetList<Font> = 0x77f4fc as _;
 const FONT_FORMS: Forms = 0x77f500 as _;
@@ -71,6 +78,7 @@ const FONT_TIMESTAMPS: Timestamps = 0x77f508 as _;
 const FONT_COUNT: IntPtr = 0x77f50c as _;
 const FONT_TYPEINFO: TypeInfoPtr = 0x6fc680 as _;
 const FONT_TYPESIZE: usize = 0x28;
+pub const FONTS_UPDATED: *mut bool = 0x790190 as _;
 
 const TIMELINES: AssetList<Timeline> = 0x77f4e4 as _;
 const TIMELINE_FORMS: Forms = 0x77f4e8 as _;
@@ -79,6 +87,7 @@ const TIMELINE_TIMESTAMPS: Timestamps = 0x77f4f0 as _;
 const TIMELINE_COUNT: IntPtr = 0x77f4f4 as _;
 const TIMELINE_TYPEINFO: TypeInfoPtr = 0x6fa020 as _;
 const TIMELINE_TYPESIZE: usize = 0x2c;
+pub const TIMELINES_UPDATED: *mut bool = 0x790188 as _;
 
 const OBJECTS: AssetList<Object> = 0x77f0d0 as _;
 const OBJECT_FORMS: Forms = 0x77f0d4 as _;
@@ -87,6 +96,7 @@ const OBJECT_TIMESTAMPS: Timestamps = 0x77f0dc as _;
 const OBJECT_COUNT: IntPtr = 0x77f0e0 as _;
 const OBJECT_TYPEINFO: TypeInfoPtr = 0x62c4a8 as _;
 const OBJECT_TYPESIZE: usize = 0x2c;
+pub const OBJECTS_UPDATED: *mut bool = 0x78a0d4 as _;
 
 const ROOMS: AssetList<Room> = 0x77f3a8 as _;
 const ROOM_FORMS: Forms = 0x77f3ac as _;
@@ -95,14 +105,17 @@ const ROOM_TIMESTAMPS: Timestamps = 0x77f3b4 as _;
 const ROOM_COUNT: IntPtr = 0x77f3b8 as _;
 const ROOM_TYPEINFO: TypeInfoPtr = 0x6928f8 as _;
 const ROOM_TYPESIZE: usize = 0x28;
+pub const ROOMS_UPDATED: *mut bool = 0x78a1f8 as _;
 
 const INCLUDED_FILES: GaplessList<IncludedFile> = 0x77f420 as _;
 const INCLUDED_FILE_TIMESTAMPS: Timestamps = 0x77f424 as _;
 const INCLUDED_FILE_COUNT: IntPtr = 0x77f428 as _;
+pub const INCLUDED_FILES_UPDATED: *mut bool = 0x7900a0 as _;
 
 const EXTENSIONS: GaplessList<Extension> = 0x77f5d4 as _;
 const EXTENSION_COUNT: IntPtr = 0x77f5d8 as _;
 const EXTENSIONS_LOADED: *mut *mut bool = 0x790a14 as _;
+pub const EXTENSIONS_UPDATED: *mut bool = 0x790a0c as _;
 
 pub const GAME_ID: IntPtr = 0x7907f4 as IntPtr;
 
@@ -124,6 +137,7 @@ pub const _RT_EXTENSION_PACKAGES: *const *const TTreeNode = 0x79a9e4 as _;
 pub const LAST_INSTANCE_ID: IntPtr = 0x77f2e0 as IntPtr;
 pub const LAST_TILE_ID: IntPtr = 0x77f2e4 as IntPtr;
 
+pub const SETTINGS_UPDATED: *mut bool = 0x790824 as _;
 pub mod settings {
     #![allow(dead_code)]
     use crate::delphi::{TBitmap, TIcon, UStr};
@@ -179,6 +193,7 @@ pub mod settings {
     pub const EXE_DESCRIPTION: *mut UStr = 0x77f5d0 as _;
 }
 
+pub const GAME_INFO_UPDATED: *mut bool = 0x78895c as _;
 pub mod game_info {
     use crate::delphi::{THelpForm, UStr};
     pub const NEW_WINDOW: *mut bool = 0x77b578 as _;
