@@ -1021,6 +1021,11 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     ide::initialize_project();
     read_txt(&path, |k, v| {
         match k {
+            "gm82_version" => {
+                if v.parse::<u8>()? > 1 {
+                    return Err(Error::OldGM82)
+                }
+            },
             "gameid" => ide::GAME_ID.write(v.parse()?),
             "info_author" => ide::settings::INFO_AUTHOR.asg(v),
             "info_version" => ide::settings::INFO_VERSION.asg(v),

@@ -31,6 +31,7 @@ pub enum Error {
     DuplicateAsset(String),
     DuplicateIncludedFile(String),
     DuplicateTrigger(String),
+    OldGM82,
     Other(String),
 }
 
@@ -52,6 +53,7 @@ impl std::fmt::Display for Error {
             Self::DuplicateAsset(n) => write!(f, "multiple assets named {}", n),
             Self::DuplicateIncludedFile(n) => write!(f, "multiple included files named {}", n),
             Self::DuplicateTrigger(n) => write!(f, "multiple triggers named {}", n),
+            Self::OldGM82 => write!(f, "this project was made with a newer version of gm82save, please update"),
             Self::Other(s) => write!(f, "other error: {}", s),
         }
     }
