@@ -302,8 +302,8 @@ pub struct View {
     pub port_h: u32,
     pub following_hborder: u32,
     pub following_vborder: u32,
-    pub following_hspeed: u32,
-    pub following_vspeed: u32,
+    pub following_hspeed: i32,
+    pub following_vspeed: i32,
     pub following_target: i32,
 }
 

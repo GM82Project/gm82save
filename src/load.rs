@@ -710,8 +710,14 @@ unsafe fn load_room(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const
                     "view_hport" => room.views[i].port_h = v.parse()?,
                     "view_fol_hbord" => room.views[i].following_hborder = v.parse()?,
                     "view_fol_vbord" => room.views[i].following_vborder = v.parse()?,
-                    "view_fol_hspeed" => room.views[i].following_hspeed = v.parse()?,
-                    "view_fol_vspeed" => room.views[i].following_vspeed = v.parse()?,
+                    "view_fol_hspeed" => {
+                        room.views[i].following_hspeed =
+                            if let Ok(s) = v.parse() { s } else { v.parse::<u32>()? as i32 };
+                    },
+                    "view_fol_vspeed" => {
+                        room.views[i].following_vspeed =
+                            if let Ok(s) = v.parse() { s } else { v.parse::<u32>()? as i32 };
+                    },
                     "view_fol_target" => {
                         room.views[i].following_target = if v.is_empty() {
                             -1
