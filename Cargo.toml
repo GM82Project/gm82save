@@ -18,6 +18,9 @@ lto = true
 strip = true
 panic = "abort"
 
+[build-dependencies]
+time = "0.3"
+
 [dependencies]
 crc = "1.8"
 crossbeam-channel = {version = "0.5", optional = true}

@@ -153,6 +153,18 @@ fn update_timestamp() {
     }
 }
 
+unsafe extern "fastcall" fn about_inj(about_dialog: *const *const usize) {
+    let info = UStr::new(concat!("gm82save: ", env!("BUILD_DATE")));
+    let edition_label = *about_dialog.add(0xe5);
+    asm! {
+        "call {}",
+        in(reg) 0x4ee6d8, // TControl.SetText
+        inlateout("eax") edition_label => _,
+        inlateout("edx") info.0 => _,
+        lateout("ecx") _,
+    }
+}
+
 #[naked]
 unsafe extern "C" fn save_inj() {
     asm! {
@@ -401,6 +413,14 @@ unsafe fn injector() {
     std::panic::set_hook(Box::new(|info| {
         show_message(&info.to_string());
     }));
+
+    // about dialog
+    #[rustfmt::skip]
+    patch(0x71be58 as _, &[
+        0x8b, 0xc8, // mov ecx, eax
+        0xe9, // jmp [nothing yet]
+    ]);
+    patch_call(0x71be5a as _, about_inj as _);
 
     // call save() instead of CStream.Create and the "save gmk" function
     let save_dest = 0x705cbd as *mut u8;

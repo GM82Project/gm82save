@@ -271,7 +271,7 @@ pub unsafe fn CompareText(a: &UStr, b: *const u16) -> i32 {
 }
 
 #[repr(transparent)]
-pub struct UStr(pub(self) *const u16);
+pub struct UStr(pub *const u16);
 
 impl UStr {
     pub fn new(s: impl AsRef<OsStr>) -> Self {
