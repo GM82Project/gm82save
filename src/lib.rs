@@ -508,6 +508,9 @@ unsafe fn injector() {
     // reset above
     patch_call(0x705acc as _, teardown_unicode_parse_inj as _);
 
+    // disable news (replace function with a ret)
+    patch(0x62c224 as _, &[0xc3]);
+
     // update timestamps when setting name
     unsafe fn patch_timestamps(dest: *mut u8) {
         patch(dest, &[0x8b, 0xc3, 0xe8, 0xe0, 0x00, 0x00, 0x00]);
