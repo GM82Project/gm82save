@@ -2,7 +2,8 @@ use crate::{
     asset::*,
     delphi,
     delphi::{advance_progress_form, TTreeNode, UStr},
-    events, ide, run_while_updating_bar, update_timestamp, Error, Result, ACTION_TOKEN,
+    events, ide, run_while_updating_bar, update_timestamp, Error, InstanceExtra, Result, TileExtra, ACTION_TOKEN,
+    EXTRA_DATA,
 };
 use itertools::Itertools;
 use rayon::prelude::*;
@@ -354,9 +355,11 @@ unsafe fn save_tiles(tiles: &[Tile], path: &mut PathBuf) -> Result<()> {
                 f
             },
         };
+        let TileExtra { xscale, yscale, blend } =
+            EXTRA_DATA.as_ref().and_then(|e| e.1.get(&tile.id).cloned()).unwrap_or_default();
         writeln!(
             f,
-            "{},{},{},{},{},{},{},{}",
+            "{},{},{},{},{},{},{},{},{},{},{}",
             ide::get_background_names().get_asset(tile.source_bg),
             tile.x,
             tile.y,
@@ -364,7 +367,10 @@ unsafe fn save_tiles(tiles: &[Tile], path: &mut PathBuf) -> Result<()> {
             tile.v,
             tile.width,
             tile.height,
-            u8::from(tile.locked)
+            u8::from(tile.locked),
+            xscale,
+            yscale,
+            blend,
         )?;
     }
     layers.values_mut().try_for_each(Write::flush)?;
@@ -421,14 +427,20 @@ fn save_instances(instances: &[Instance], path: &mut PathBuf) -> Result<()> {
         } else {
             String::new() // ""
         };
+        let InstanceExtra { xscale, yscale, blend, angle } =
+            unsafe { EXTRA_DATA.as_ref().and_then(|e| e.0.get(&instance.id).cloned()).unwrap_or_default() };
         writeln!(
             f,
-            "{},{},{},{},{}",
+            "{},{},{},{},{},{},{},{},{}",
             ide::get_object_names().get_asset(instance.object),
             instance.x,
             instance.y,
             fname,
             u8::from(instance.locked),
+            xscale,
+            yscale,
+            blend,
+            angle,
         )?;
     }
     f.flush()?;
@@ -828,7 +840,7 @@ pub unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
         create_dirs(path.parent().unwrap())?;
         // some stuff to go in the main gmk
         let mut f = open_file(&path)?;
-        writeln!(f, "gm82_version=1")?;
+        writeln!(f, "gm82_version=2")?;
         writeln!(f, "gameid={}", ide::GAME_ID.read())?;
         writeln!(f)?;
         writeln!(f, "info_author={}", (&*ide::settings::INFO_AUTHOR).try_decode()?)?;

@@ -2,7 +2,8 @@ use crate::{
     asset::*,
     delphi,
     delphi::{advance_progress_form, UStr},
-    events, ide, run_while_updating_bar, update_timestamp, Error, Result, ACTION_TOKEN,
+    events, ide, run_while_updating_bar, update_timestamp, Error, InstanceExtra, Result, TileExtra, ACTION_TOKEN,
+    EXTRA_DATA,
 };
 use itertools::izip;
 use rayon::prelude::*;
@@ -588,8 +589,9 @@ unsafe fn load_instances(room: &mut Room, path: &mut PathBuf, objs: &HashMap<Str
     path.pop();
     let err = || Error::SyntaxError(inst_path.to_path_buf());
     let last_instance_id = *ide::LAST_INSTANCE_ID + 1;
-    room.alloc_instances(instances.len()).into_par_iter().zip(&instances).enumerate().try_for_each(
-        |(i, (instance, line))| -> Result<()> {
+    let mut extras: Vec<InstanceExtra> = vec![Default::default(); instances.len()];
+    room.alloc_instances(instances.len()).into_par_iter().zip(&instances).enumerate().zip(&mut extras).try_for_each(
+        |((i, (instance, line)), extra)| -> Result<()> {
             let mut iter = line.split(',');
             instance.object = match iter.next().ok_or_else(err)? {
                 "" => -1,
@@ -600,6 +602,18 @@ unsafe fn load_instances(room: &mut Room, path: &mut PathBuf, objs: &HashMap<Str
             let code_hash = iter.next().ok_or_else(err)?;
             instance.locked = iter.next().ok_or_else(err)?.parse::<u8>()? != 0;
             instance.id = (last_instance_id + i) as _;
+            if let Some(s) = iter.next() {
+                extra.xscale = s.parse()?;
+            }
+            if let Some(s) = iter.next() {
+                extra.yscale = s.parse()?;
+            }
+            if let Some(s) = iter.next() {
+                extra.blend = s.parse()?;
+            }
+            if let Some(s) = iter.next() {
+                extra.angle = s.parse()?;
+            }
             if !code_hash.is_empty() {
                 let mut path = path.join(code_hash);
                 path.set_extension("gml");
@@ -608,6 +622,11 @@ unsafe fn load_instances(room: &mut Room, path: &mut PathBuf, objs: &HashMap<Str
             Ok(())
         },
     )?;
+    let extra_data = &mut EXTRA_DATA.as_mut().unwrap().0;
+    extra_data.reserve(extras.len());
+    for (inst, extra) in room.get_instances().iter().zip(extras.drain(..)) {
+        extra_data.insert(inst.id, extra);
+    }
     *ide::LAST_INSTANCE_ID += instances.len();
     Ok(())
 }
@@ -617,6 +636,7 @@ unsafe fn load_tiles(path: &mut PathBuf, bgs: &HashMap<String, usize>) -> Result
     path.push("layers.txt");
     let f = open_file(&path)?;
     path.pop();
+    let extra_data = &mut EXTRA_DATA.as_mut().unwrap().1;
     for line in f.lines() {
         let line = line?;
         if line.is_empty() {
@@ -630,10 +650,12 @@ unsafe fn load_tiles(path: &mut PathBuf, bgs: &HashMap<String, usize>) -> Result
         tiles.reserve(layer.len());
         let err = || Error::SyntaxError(path.to_path_buf());
         let last_tile_id = *ide::LAST_TILE_ID + 1;
+        let mut extras: Vec<TileExtra> = vec![Default::default(); layer.len()];
         let layer_tiles = layer
             .par_iter()
             .enumerate()
-            .map(|(i, tile)| {
+            .zip(&mut extras)
+            .map(|((i, tile), extra)| {
                 let mut iter = tile.split(',');
                 let t = Tile {
                     source_bg: match iter.next().ok_or_else(err)? {
@@ -650,12 +672,25 @@ unsafe fn load_tiles(path: &mut PathBuf, bgs: &HashMap<String, usize>) -> Result
                     depth,
                     id: (last_tile_id + i) as _,
                 };
+                if let Some(s) = iter.next() {
+                    extra.xscale = s.parse()?;
+                }
+                if let Some(s) = iter.next() {
+                    extra.yscale = s.parse()?;
+                }
+                if let Some(s) = iter.next() {
+                    extra.blend = s.parse()?;
+                }
                 if iter.next() != None {
                     return Err(err())
                 }
                 Ok(t)
             })
             .collect::<Result<Vec<_>>>()?;
+        extra_data.reserve(extras.len());
+        for (tile, extra) in layer_tiles.iter().zip(extras.drain(..)) {
+            extra_data.insert(tile.id, extra);
+        }
         *ide::LAST_TILE_ID += layer_tiles.len();
         tiles.extend_from_slice(&layer_tiles);
         path.pop();
@@ -1022,7 +1057,7 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     read_txt(&path, |k, v| {
         match k {
             "gm82_version" => {
-                if v.parse::<u8>()? > 1 {
+                if v.parse::<u8>()? > 2 {
                     return Err(Error::OldGM82)
                 }
             },

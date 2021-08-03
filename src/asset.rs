@@ -328,7 +328,7 @@ pub struct Tile {
     pub width: u32,
     pub height: u32,
     pub depth: i32,
-    pub id: i32,
+    pub id: u32,
     pub locked: bool,
 }
 
@@ -381,10 +381,18 @@ impl Room {
         slice::from_raw_parts_mut(self.instances, count)
     }
 
+    pub unsafe fn get_instances(&self) -> &[Instance] {
+        slice::from_raw_parts(self.instances, self.instance_count)
+    }
+
     pub unsafe fn put_tiles(&mut self, tiles: Vec<Tile>) {
         self.tile_count = tiles.len();
         DynArraySetLength(&mut self.tiles, 0x656448 as _, 1, tiles.len());
         tiles.as_ptr().copy_to_nonoverlapping(self.tiles, tiles.len());
+    }
+
+    pub unsafe fn get_tiles(&self) -> &[Tile] {
+        slice::from_raw_parts(self.tiles, self.tile_count)
     }
 
     pub unsafe fn calc_extents(&mut self) {

@@ -13,7 +13,7 @@ mod save;
 mod stub;
 
 use crate::delphi::UStr;
-use std::{ffi::c_void, path::PathBuf};
+use std::{collections::HashMap, ffi::c_void, path::PathBuf};
 
 pub enum Error {
     IoError(std::io::Error),
@@ -153,6 +153,35 @@ fn update_timestamp() {
     }
 }
 
+#[derive(Clone)]
+struct InstanceExtra {
+    pub xscale: f64,
+    pub yscale: f64,
+    pub blend: u32,
+    pub angle: f64,
+}
+
+impl Default for InstanceExtra {
+    fn default() -> Self {
+        Self { xscale: 1.0, yscale: 1.0, blend: u32::MAX, angle: 0.0 }
+    }
+}
+
+#[derive(Clone)]
+struct TileExtra {
+    pub xscale: f64,
+    pub yscale: f64,
+    pub blend: u32,
+}
+
+impl Default for TileExtra {
+    fn default() -> Self {
+        Self { xscale: 1.0, yscale: 1.0, blend: u32::MAX }
+    }
+}
+
+static mut EXTRA_DATA: Option<(HashMap<u32, InstanceExtra>, HashMap<u32, TileExtra>)> = None;
+
 unsafe extern "fastcall" fn about_inj(about_dialog: *const *const usize) {
     let info = UStr::new(concat!("gm82save: ", env!("BUILD_DATE")));
     let edition_label = *about_dialog.add(0xe5);
@@ -223,6 +252,7 @@ unsafe extern "C" fn load_inj() {
 }
 
 unsafe extern "fastcall" fn load(proj_path: &UStr, stream_ptr: *mut u32, result_ptr: *mut bool) -> bool {
+    EXTRA_DATA = Some(Default::default());
     let path: PathBuf = proj_path.to_os_string().into();
     // .gm82 works in the ui but rust doesn't get it so check for that specifically
     let is_gm82 = path.extension() == Some("gm82".as_ref()) || path.file_name() == Some(".gm82".as_ref());
