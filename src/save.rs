@@ -3,7 +3,7 @@ use crate::{
     delphi,
     delphi::{advance_progress_form, TTreeNode, UStr},
     events, ide, run_while_updating_bar, update_timestamp, Error, InstanceExtra, Result, TileExtra, ACTION_TOKEN,
-    EXTRA_DATA,
+    EXTRA_DATA, SAVING_FOR_ROOM_EDITOR,
 };
 use itertools::Itertools;
 use rayon::prelude::*;
@@ -835,6 +835,41 @@ unsafe fn write_tree_children<F: Write>(
     Ok(())
 }
 
+unsafe fn save_icon_cache(path: &mut PathBuf) -> Result<()> {
+    const BMP_HEADER: &[u8] = include_bytes!("../assets/thumb_header.dat");
+    const BMP_SIZE: usize = 16 * 16 * 4 + BMP_HEADER.len();
+    unsafe fn save_frame(frame: &Frame, name: &UStr, path: &std::path::Path) -> Result<()> {
+        let mut out = Vec::with_capacity(BMP_SIZE);
+        out.extend_from_slice(BMP_HEADER);
+        out.set_len(BMP_SIZE);
+        frame.thumb(&mut out[BMP_HEADER.len()..]);
+        let mut path = path.join(name.to_os_string());
+        path.set_extension("bmp");
+        write_file(&path, out)
+    }
+    path.push("cache");
+    path.push("sprites");
+    create_dirs(path)?;
+    ide::get_sprites().par_iter().zip(ide::get_sprite_names()).try_for_each(|(sprite, name)| -> Result<()> {
+        if let Some(sprite) = sprite.filter(|s| s.frame_count > 0) {
+            save_frame(&*sprite.frames.read(), name, path)?;
+        }
+        Ok(())
+    })?;
+    path.pop();
+    path.push("backgrounds");
+    create_dirs(path)?;
+    ide::get_backgrounds().par_iter().zip(ide::get_background_names()).try_for_each(|(bg, name)| -> Result<()> {
+        if let Some(bg) = bg {
+            save_frame(&*bg.frame, name, path)?;
+        }
+        Ok(())
+    })?;
+    path.pop();
+    path.pop();
+    Ok(())
+}
+
 pub unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
     {
         create_dirs(path.parent().unwrap())?;
@@ -936,6 +971,10 @@ pub unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
     save_assets(90, 95, "rooms", ide::get_rooms(), ide::get_room_names(), ide::RT_ROOMS, save_room, &mut path)?;
     advance_progress_form(95);
     save_included_files(&mut path)?;
+
+    if SAVING_FOR_ROOM_EDITOR {
+        save_icon_cache(&mut path)?;
+    }
 
     advance_progress_form(100);
 

@@ -59,6 +59,50 @@ impl Frame {
     pub unsafe fn load_from_file(&mut self, file: &UStr) {
         let _: u32 = delphi_call!(0x7026A4, self, file);
     }
+
+    pub unsafe fn thumb(&self, out: &mut [u8]) {
+        // note: this assumes output format == input format
+        // these are stored as BGRA8 so make sure to double check what the output should be
+        use itertools::Itertools;
+        let data = slice::from_raw_parts(self.data, (self.width * self.height * 4) as usize);
+        let (width, height) = if self.width > self.height {
+            (16, (self.height * 16 / self.width) as usize)
+        } else {
+            ((self.width * 16 / self.height) as usize, 16)
+        };
+        let (hoffset, voffset) = (8 - width / 2, 8 - height / 2);
+        for (y, row) in out.chunks_exact_mut(16 * 4).enumerate() {
+            if y < voffset || y >= voffset + height {
+                row.fill(0);
+                continue
+            }
+            let y = y - voffset;
+            let y = 15 - y; // vertical flip for BMP
+            for (x, px) in row.chunks_exact_mut(4).enumerate() {
+                if x < hoffset || x >= hoffset + width {
+                    px.fill(0);
+                    continue
+                }
+                let x = x - hoffset;
+                let ox = (x as f64) / 16.0 * f64::from(self.width);
+                let ox2 = ox + 0.5 / 16.0 * f64::from(self.width);
+                let oy = (y as f64) / 16.0 * f64::from(self.height);
+                let oy2 = oy + 0.5 / 16.0 * f64::from(self.height);
+                // sum all pixels
+                let sum_px = [ox, ox2]
+                    .iter()
+                    .map(|x| x.floor() as usize)
+                    .cartesian_product([oy, oy2].iter().map(|x| x.floor() as usize))
+                    .fold([0.0f64; 4], |mut px, (ox, oy)| {
+                        let offset = (oy * self.width as usize + ox) * 4;
+                        px.iter_mut().zip(&data[offset..offset + 4]).for_each(|(o, i)| *o += f64::from(*i));
+                        px
+                    });
+                // average and place into output
+                px.iter_mut().zip(sum_px).for_each(|(o, i)| *o = (i / 4.0).floor() as u8);
+            }
+        }
+    }
 }
 
 #[repr(C)]

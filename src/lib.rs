@@ -504,6 +504,8 @@ unsafe extern "C" fn room_form_inj() {
     }
 }
 
+static mut SAVING_FOR_ROOM_EDITOR: bool = false;
+
 unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
     if *(0x79a982 as *const bool) {
         return delphi_call!(0x6884c8, room_id)
