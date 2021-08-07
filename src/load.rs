@@ -52,7 +52,7 @@ struct Assets {
     index: Vec<String>,
     map: HashMap<String, usize>,
 }
-struct AssetMaps {
+pub struct AssetMaps {
     triggers: Assets,
     sprites: Assets,
     sounds: Assets,
@@ -698,7 +698,7 @@ unsafe fn load_tiles(path: &mut PathBuf, bgs: &HashMap<String, usize>) -> Result
     Ok(tiles)
 }
 
-unsafe fn load_room(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const Room> {
+pub unsafe fn load_room(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const Room> {
     let room = &mut *Room::new();
     path.push("room.txt");
     read_txt(&path, |k, v| {
@@ -1052,6 +1052,21 @@ unsafe fn load_assets<'a, T: Sync>(
     Ok(())
 }
 
+pub fn load_asset_maps(path: &mut PathBuf) -> Result<AssetMaps> {
+    Ok(AssetMaps {
+        triggers: load_index("triggers", path)?,
+        sprites: load_index("sprites", path)?,
+        sounds: load_index("sounds", path)?,
+        backgrounds: load_index("backgrounds", path)?,
+        paths: load_index("paths", path)?,
+        scripts: load_index("scripts", path)?,
+        objects: load_index("objects", path)?,
+        rooms: load_index("rooms", path)?,
+        fonts: load_index("fonts", path)?,
+        timelines: load_index("timelines", path)?,
+    })
+}
+
 pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     ide::initialize_project();
     read_txt(&path, |k, v| {
@@ -1089,18 +1104,7 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     advance_progress_form(5);
     load_settings(&mut path)?;
     advance_progress_form(10);
-    let asset_maps = AssetMaps {
-        triggers: load_index("triggers", &mut path)?,
-        sprites: load_index("sprites", &mut path)?,
-        sounds: load_index("sounds", &mut path)?,
-        backgrounds: load_index("backgrounds", &mut path)?,
-        paths: load_index("paths", &mut path)?,
-        scripts: load_index("scripts", &mut path)?,
-        objects: load_index("objects", &mut path)?,
-        rooms: load_index("rooms", &mut path)?,
-        fonts: load_index("fonts", &mut path)?,
-        timelines: load_index("timelines", &mut path)?,
-    };
+    let asset_maps = load_asset_maps(&mut path)?;
     advance_progress_form(15);
     load_triggers(&asset_maps, &mut path)?;
     advance_progress_form(20);

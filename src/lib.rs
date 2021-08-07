@@ -494,6 +494,66 @@ unsafe extern "fastcall" fn setup_unicode_parse(version: i32) {
     patch(0x52f0c5 as _, &cp);
 }
 
+#[naked]
+unsafe extern "C" fn room_form_inj() {
+    asm! {
+        "mov ecx, eax",
+        "jmp {}",
+        sym room_form,
+        options(noreturn),
+    }
+}
+
+unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
+    if *(0x79a982 as *const bool) {
+        return delphi_call!(0x6884c8, room_id)
+    }
+    let editor_path = match std::env::current_exe() {
+        Ok(mut path) => {
+            path.set_file_name("room_editor.exe");
+            path
+        },
+        Err(_) => return delphi_call!(0x6884c8, room_id),
+    };
+    if editor_path.exists() {
+        let mut room_path = PathBuf::from((&*ide::PROJECT_PATH).to_os_string());
+        if room_path.extension() == Some("gm82".as_ref()) {
+            SAVING_FOR_ROOM_EDITOR = true;
+            let _: u32 = delphi_call!(0x6e0540, *(0x790100 as *const u32)); // save
+            SAVING_FOR_ROOM_EDITOR = false;
+            if room_path.exists() {
+                room_path.pop();
+                if let Ok(asset_maps) = load::load_asset_maps(&mut room_path) {
+                    room_path.push("rooms");
+                    room_path.push(ide::get_room_names()[room_id].to_os_string());
+                    let _: u32 = delphi_call!(0x51acd0, *(0x790100 as *const u32)); // hide main form
+                    let _ = std::process::Command::new(editor_path).arg(&room_path).spawn().and_then(|mut c| c.wait());
+                    let _: u32 = delphi_call!(0x51acd8, *(0x790100 as *const u32)); // show main form
+                    {
+                        let room = ide::get_rooms()[room_id].unwrap();
+                        // remove this room's ids from the global thing
+                        if let Some((extra_inst, extra_tile)) = EXTRA_DATA.as_mut() {
+                            for inst in room.get_instances() {
+                                extra_inst.remove(&inst.id);
+                            }
+                            for tile in room.get_tiles() {
+                                extra_tile.remove(&tile.id);
+                            }
+                        }
+                        let _: u32 = delphi_call!(0x657820, room); // clear room
+                    }
+                    ide::get_rooms_mut()[room_id] = load::load_room(&mut room_path, &asset_maps)
+                        .ok()
+                        .expect("loading the updated room failed")
+                        .as_ref();
+                    return 0
+                }
+            }
+        }
+    }
+    delphi_call!(0x6884c8, room_id) // the default
+}
+
 unsafe fn patch(dest: *mut u8, source: &[u8]) {
     // the only winapi imports in the whole project, no need for crates
     #[allow(non_camel_case_types)]
@@ -606,6 +666,8 @@ unsafe fn injector() {
     // reset above
     patch_call(0x705acc as _, teardown_unicode_parse_inj as _);
 
+    // funky room editor shit
+    patch_call(0x69319c as _, room_form_inj as _);
     // disable news (replace function with a ret)
     patch(0x62c224 as _, &[0xc3]);
 
