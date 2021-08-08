@@ -76,30 +76,47 @@ impl Frame {
                 row.fill(0);
                 continue
             }
-            let y = y - voffset;
             let y = 15 - y; // vertical flip for BMP
+            let y = y - voffset;
             for (x, px) in row.chunks_exact_mut(4).enumerate() {
                 if x < hoffset || x >= hoffset + width {
                     px.fill(0);
                     continue
                 }
                 let x = x - hoffset;
-                let ox = (x as f64) / 16.0 * f64::from(self.width);
-                let ox2 = ox + 0.5 / 16.0 * f64::from(self.width);
-                let oy = (y as f64) / 16.0 * f64::from(self.height);
-                let oy2 = oy + 0.5 / 16.0 * f64::from(self.height);
+                // get sample points
+                let ox = (x as f64) / (width as f64) * f64::from(self.width);
+                let ox2 = ox + 0.5 / (width as f64) * f64::from(self.width);
+                let oy = (y as f64) / (height as f64) * f64::from(self.height);
+                let oy2 = oy + 0.5 / (height as f64) * f64::from(self.height);
                 // sum all pixels
+                let mut px_count = 0.0;
                 let sum_px = [ox, ox2]
                     .iter()
                     .map(|x| x.floor() as usize)
                     .cartesian_product([oy, oy2].iter().map(|x| x.floor() as usize))
                     .fold([0.0f64; 4], |mut px, (ox, oy)| {
                         let offset = (oy * self.width as usize + ox) * 4;
-                        px.iter_mut().zip(&data[offset..offset + 4]).for_each(|(o, i)| *o += f64::from(*i));
+                        let in_px = &data[offset..offset + 4];
+                        if in_px[3] != 0 {
+                            px_count += 1.0;
+                            px.iter_mut().zip(in_px).for_each(|(o, i)| *o += f64::from(*i));
+                        }
                         px
                     });
-                // average and place into output
-                px.iter_mut().zip(sum_px).for_each(|(o, i)| *o = (i / 4.0).floor() as u8);
+                if px_count != 0.0 {
+                    // average and place into output
+                    px[..3].iter_mut().zip(sum_px).for_each(|(o, i)| *o = (i / px_count).floor() as u8);
+                    // blend semi-transparent to white
+                    let alpha = sum_px[3] / px_count / 255.0;
+                    if alpha != 1.0 {
+                        px[..3].iter_mut().for_each(|c| *c += (f64::from(255 - *c) * (1.0 - alpha)) as u8);
+                    }
+                    px[3] = 255;
+                } else {
+                    // fully transparent
+                    px.fill(0);
+                }
             }
         }
     }

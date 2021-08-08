@@ -839,6 +839,9 @@ unsafe fn save_icon_cache(path: &mut PathBuf) -> Result<()> {
     const BMP_HEADER: &[u8] = include_bytes!("../assets/thumb_header.dat");
     const BMP_SIZE: usize = 16 * 16 * 4 + BMP_HEADER.len();
     unsafe fn save_frame(frame: &Frame, name: &UStr, path: &std::path::Path) -> Result<()> {
+        if frame.width == 0 || frame.height == 0 {
+            return Ok(())
+        }
         let mut out = Vec::with_capacity(BMP_SIZE);
         out.extend_from_slice(BMP_HEADER);
         out.set_len(BMP_SIZE);
