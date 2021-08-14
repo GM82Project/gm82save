@@ -522,7 +522,7 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
     }
     let editor_path = match std::env::current_exe() {
         Ok(mut path) => {
-            path.set_file_name("room_editor.exe");
+            path.set_file_name("gm82room.exe");
             path
         },
         Err(_) => return delphi_call!(0x6884c8, room_id),
