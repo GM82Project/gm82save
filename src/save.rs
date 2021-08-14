@@ -878,7 +878,7 @@ pub unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
         create_dirs(path.parent().unwrap())?;
         // some stuff to go in the main gmk
         let mut f = open_file(&path)?;
-        writeln!(f, "gm82_version=2")?;
+        writeln!(f, "gm82_version=3")?;
         writeln!(f, "gameid={}", ide::GAME_ID.read())?;
         writeln!(f)?;
         writeln!(f, "info_author={}", (&*ide::settings::INFO_AUTHOR).try_decode()?)?;

@@ -897,7 +897,7 @@ unsafe fn load_settings(path: &mut PathBuf) -> Result<()> {
             "interpolate_pixels" => INTERPOLATE_PIXELS.write(v.parse::<u8>()? != 0),
             "dont_draw_border" => DONT_DRAW_BORDER.write(v.parse::<u8>()? != 0),
             "display_cursor" => DISPLAY_CURSOR.write(v.parse::<u8>()? != 0),
-            "scaling" => SCALING.write(v.parse()?),
+            "scaling" => SCALING.write(if let Ok(s) = v.parse() { s } else { v.parse::<u32>()? as i32 }),
             "allow_resize" => ALLOW_RESIZE.write(v.parse::<u8>()? != 0),
             "window_on_top" => WINDOW_ON_TOP.write(v.parse::<u8>()? != 0),
             "clear_color" => CLEAR_COLOUR.write(v.parse()?),
@@ -1072,7 +1072,7 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     read_txt(&path, |k, v| {
         match k {
             "gm82_version" => {
-                if v.parse::<u8>()? > 2 {
+                if v.parse::<u8>()? > 3 {
                     return Err(Error::OldGM82)
                 }
             },

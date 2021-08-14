@@ -146,7 +146,7 @@ pub mod settings {
     pub const INTERPOLATE_PIXELS: *mut bool = 0x77f518 as _;
     pub const DONT_DRAW_BORDER: *mut bool = 0x77f51c as _;
     pub const DISPLAY_CURSOR: *mut bool = 0x77f520 as _;
-    pub const SCALING: *mut u32 = 0x77f524 as _;
+    pub const SCALING: *mut i32 = 0x77f524 as _;
     pub const ALLOW_RESIZE: *mut bool = 0x77f528 as _;
     pub const WINDOW_ON_TOP: *mut bool = 0x77f52c as _;
     pub const CLEAR_COLOUR: *mut u32 = 0x77f530 as _;
