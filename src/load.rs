@@ -346,7 +346,7 @@ unsafe fn load_font(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*cons
             "bold" => f.bold = v.parse::<u8>()? != 0,
             "italic" => f.italic = v.parse::<u8>()? != 0,
             "charset" => f.charset = v.parse()?,
-            "aa_level" => f.aa_level = v.parse()?,
+            "aa_level" => f.aa_level = v.parse()?, // DOES NOT CORRESPOND TO .GMK OR .EXE
             "range_start" => f.range_start = v.parse()?,
             "range_end" => f.range_end = v.parse()?,
             _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),

@@ -237,6 +237,7 @@ pub struct Font {
     pub range_start: u32,
     pub range_end: u32,
     pub charset: u32,
+    /// This is 1 less than what you'll see saved in .gmk or .exe or .gm81 or whatever
     pub aa_level: u32,
 }
 

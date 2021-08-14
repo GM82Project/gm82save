@@ -218,7 +218,7 @@ unsafe fn save_font(font: &Font, path: &mut PathBuf) -> Result<()> {
     writeln!(f, "bold={}", font.bold as u8)?;
     writeln!(f, "italic={}", font.italic as u8)?;
     writeln!(f, "charset={}", font.charset)?;
-    writeln!(f, "aa_level={}", font.aa_level)?;
+    writeln!(f, "aa_level={}", font.aa_level)?; // DOES NOT CORRESPOND TO .GMK OR .EXE
     writeln!(f, "range_start={}", font.range_start)?;
     writeln!(f, "range_end={}", font.range_end)?;
     f.flush()?;
