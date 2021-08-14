@@ -406,6 +406,7 @@ unsafe extern "C" fn save_instance_extra_inj() {
         "mov ecx, ebx", // file
         "mov eax, dword ptr [edi + 0x2f4]", // instance list
         "mov edx, dword ptr [eax + ebp*0x8 + 0xc]", // instance id
+        "push byte ptr [esp]", // are we exe?
         "call {}",
         "inc esi",
         "mov eax, 0x658600", // jnz of loop
@@ -422,6 +423,7 @@ unsafe extern "C" fn save_tile_extra_inj() {
     "mov ecx, ebx", // file
     "mov eax, dword ptr [edi + 0x2fc]", // tile list
     "mov edx, dword ptr [eax + ebp*0x8 + 0x20]", // tile id
+    "push byte ptr [esp]", // are we exe?
     "call {}",
     "inc esi",
     "mov eax, 0x6586dd", // jnz of loop
@@ -445,20 +447,24 @@ unsafe fn save_real(file: usize, real: &f64) {
     }
 }
 
-unsafe extern "fastcall" fn save_instance_extra(file: usize, id: u32) {
-    if let Some(data) = EXTRA_DATA.as_ref().map(|(insts, _)| insts.get(&id).unwrap_or(&InstanceExtra::DEFAULT)) {
-        save_real(file, &data.xscale);
-        save_real(file, &data.yscale);
-        let _: u32 = delphi_call!(0x52f12c, file, data.blend);
-        save_real(file, &data.angle);
+unsafe extern "fastcall" fn save_instance_extra(file: usize, id: u32, exe: bool) {
+    if exe {
+        if let Some(data) = EXTRA_DATA.as_ref().map(|(insts, _)| insts.get(&id).unwrap_or(&InstanceExtra::DEFAULT)) {
+            save_real(file, &data.xscale);
+            save_real(file, &data.yscale);
+            let _: u32 = delphi_call!(0x52f12c, file, data.blend);
+            save_real(file, &data.angle);
+        }
     }
 }
 
-unsafe extern "fastcall" fn save_tile_extra(file: usize, id: u32) {
-    if let Some(data) = EXTRA_DATA.as_ref().map(|(_, tiles)| tiles.get(&id).unwrap_or(&TileExtra::DEFAULT)) {
-        save_real(file, &data.xscale);
-        save_real(file, &data.yscale);
-        let _: u32 = delphi_call!(0x52f12c, file, data.blend);
+unsafe extern "fastcall" fn save_tile_extra(file: usize, id: u32, exe: bool) {
+    if exe {
+        if let Some(data) = EXTRA_DATA.as_ref().map(|(_, tiles)| tiles.get(&id).unwrap_or(&TileExtra::DEFAULT)) {
+            save_real(file, &data.xscale);
+            save_real(file, &data.yscale);
+            let _: u32 = delphi_call!(0x52f12c, file, data.blend);
+        }
     }
 }
 
