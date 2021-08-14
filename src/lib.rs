@@ -406,7 +406,9 @@ unsafe extern "C" fn save_instance_extra_inj() {
         "mov ecx, ebx", // file
         "mov eax, dword ptr [edi + 0x2f4]", // instance list
         "mov edx, dword ptr [eax + ebp*0x8 + 0xc]", // instance id
-        "push byte ptr [esp]", // are we exe?
+        "xor eax, eax",
+        "mov al, byte ptr [esp]", // are we exe?
+        "push eax",
         "call {}",
         "inc esi",
         "mov eax, 0x658600", // jnz of loop
@@ -423,7 +425,9 @@ unsafe extern "C" fn save_tile_extra_inj() {
     "mov ecx, ebx", // file
     "mov eax, dword ptr [edi + 0x2fc]", // tile list
     "mov edx, dword ptr [eax + ebp*0x8 + 0x20]", // tile id
-    "push byte ptr [esp]", // are we exe?
+    "xor eax, eax",
+    "mov al, byte ptr [esp]", // are we exe?
+    "push eax",
     "call {}",
     "inc esi",
     "mov eax, 0x6586dd", // jnz of loop
