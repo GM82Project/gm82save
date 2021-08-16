@@ -600,7 +600,14 @@ unsafe fn patch_call(instr: *mut u8, proc: usize) {
 #[cfg_attr(test, allow(dead_code))]
 unsafe fn injector() {
     std::panic::set_hook(Box::new(|info| {
-        show_message(&info.to_string());
+        #[link(name="user32")]
+        extern "system" {
+            fn MessageBoxW(hWnd: usize, lpText: *const u16, lpCaption: *const u16, uType: u32) -> i32;
+        }
+        let msg = info.to_string().encode_utf16().collect::<Vec<_>>();
+        MessageBoxW(0, msg.as_ptr(), std::ptr::null(), 0);
+
+        std::process::exit(-1);
     }));
 
     // about dialog
