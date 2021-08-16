@@ -72,11 +72,11 @@ impl Frame {
         };
         let (hoffset, voffset) = (8 - width / 2, 8 - height / 2);
         for (y, row) in out.chunks_exact_mut(16 * 4).enumerate() {
+            let y = 15 - y; // vertical flip for BMP
             if y < voffset || y >= voffset + height {
                 row.fill(0);
                 continue
             }
-            let y = 15 - y; // vertical flip for BMP
             let y = y - voffset;
             for (x, px) in row.chunks_exact_mut(4).enumerate() {
                 if x < hoffset || x >= hoffset + width {
