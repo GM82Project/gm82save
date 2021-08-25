@@ -313,6 +313,20 @@ unsafe extern "fastcall" fn make_new_folder(_: u32, path_ptr: *const u16) {
 }
 
 #[naked]
+unsafe extern "C" fn fix_tile_null_pointer() {
+    asm! {
+    "mov edx, 0x64e048",
+    "call edx",
+    "mov edx, 0x68ef07",
+    "mov ecx, 0x68ef6c",
+    "test eax, eax",
+    "cmovz edx, ecx",
+    "jmp edx",
+    options(noreturn),
+    }
+}
+
+#[naked]
 unsafe extern "C" fn save_82_if_exe() {
     // only saves settings version 825 when saving an exe with the creation code flag set
     asm! {
@@ -338,20 +352,6 @@ unsafe extern "C" fn save_bool_if_exe() {
         "call ecx",
         "pop esi",
         "ret",
-        options(noreturn),
-    }
-}
-
-#[naked]
-unsafe extern "C" fn fix_tile_null_pointer() {
-    asm! {
-        "mov edx, 0x64e048",
-        "call edx",
-        "mov edx, 0x68ef07",
-        "mov ecx, 0x68ef6c",
-        "test eax, eax",
-        "cmovz edx, ecx",
-        "jmp edx",
         options(noreturn),
     }
 }
