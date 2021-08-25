@@ -314,11 +314,14 @@ unsafe extern "fastcall" fn make_new_folder(_: u32, path_ptr: *const u16) {
 
 #[naked]
 unsafe extern "C" fn save_82_if_exe() {
+    // only saves settings version 825 when saving an exe with the creation code flag set
     asm! {
-        "mov ecx, 825",
-        "mov edx, 800",
-        "test bl, bl",
-        "cmovnz edx, ecx",
+        "mov edx, 825",
+        "mov ecx, 800",
+        "test bl, bl", // if exe
+        "cmovz edx, ecx",
+        "bt word ptr [0x77f54e], 15", // if force cpu
+        "cmovnc edx, ecx",
         "ret",
         options(noreturn),
     }
@@ -328,9 +331,9 @@ unsafe extern "C" fn save_82_if_exe() {
 unsafe extern "C" fn save_bool_if_exe() {
     asm! {
         "push esi",
-        "mov esi, 0x52f240",
-        "mov ecx, 0x52f12c",
-        "test bl, bl",
+        "mov esi, 0x52f240", // WriteBoolean
+        "mov ecx, 0x52f12c", // WriteInteger
+        "test bl, bl", // if exe
         "cmovnz ecx, esi",
         "call ecx",
         "pop esi",
@@ -354,31 +357,25 @@ unsafe extern "C" fn fix_tile_null_pointer() {
 }
 
 #[naked]
-unsafe extern "C" fn save_creation_code_flag_inj() {
-    asm! {
-        "mov ecx, 0x52f12c",
-        "call ecx",
-        "test bl, bl",
-        "jnz {}",
-        "ret",
-        sym save_creation_code_flag,
-        options(noreturn),
-    }
-}
-
-#[naked]
 unsafe extern "C" fn save_creation_code_flag() {
     asm! {
-        "mov eax, esi",
-        "xor edx, edx",
-        "mov ecx, 0x52f12c",
+        "mov ecx, 0x52f12c", // WriteInteger (for uninitialized args)
         "call ecx",
-        "mov eax, esi",
-        "mov edx, [0x77f54c]",
-        "shr edx, 31",
-        "mov ecx, 0x52f240",
+        "test bl, bl", // if exe
+        "jz 1f",
+        "bt word ptr [0x77f54e], 15", // if force cpu
+        "jnc 1f",
+
+        "mov eax, esi", // gmk stream
+        "xor edx, edx", // 0 (webgl)
+        "mov ecx, 0x52f12c", // WriteInteger
         "call ecx",
-        "ret",
+        "mov eax, esi", // gmk stream
+        "mov dl, 1", // true (creation code)
+        "mov ecx, 0x52f240", // WriteBoolean
+        "call ecx",
+
+        "1: ret",
         options(noreturn),
     }
 }
@@ -666,7 +663,7 @@ unsafe fn injector() {
     // call WriteBoolean instead of WriteInteger if saving exe
     patch_call(0x709a4f as _, save_bool_if_exe as _);
     // save extra info if saving exe
-    patch_call(0x709c99 as _, save_creation_code_flag_inj as _);
+    patch_call(0x709c99 as _, save_creation_code_flag as _);
 
     // save extra data on instances and tiles
     // write 811 instead of 541 for room version if saving exe
