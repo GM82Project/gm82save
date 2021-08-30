@@ -181,8 +181,8 @@ impl TMemoryStream {
 
     pub unsafe fn set_pos(&self, pos: u32) {
         asm! {
-            "push {pos_lo}",
             "push 0",
+            "push {pos_lo}",
             "call {call}",
             call = in(reg) 0x43f254,
             pos_lo = in(reg) pos,
