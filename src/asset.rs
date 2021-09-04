@@ -108,7 +108,7 @@ impl Frame {
                     // average and place into output
                     px[..3].iter_mut().zip(sum_px).for_each(|(o, i)| *o = (i / px_count).floor() as u8);
                     // blend semi-transparent to white
-                    let alpha = sum_px[3] / px_count / 255.0;
+                    let alpha = sum_px[3] / 4.0 / 255.0;
                     if alpha != 1.0 {
                         px[..3].iter_mut().for_each(|c| *c += (f64::from(255 - *c) * (1.0 - alpha)) as u8);
                     }
