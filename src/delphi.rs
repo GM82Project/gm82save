@@ -1,10 +1,6 @@
 #![allow(non_snake_case, dead_code)]
 
-use std::{
-    ffi::{OsStr, OsString},
-    os::windows::ffi::{OsStrExt, OsStringExt},
-    slice,
-};
+use std::{ffi::{OsStr, OsString}, os::windows::ffi::{OsStrExt, OsStringExt}, slice, ptr};
 
 #[macro_export]
 macro_rules! delphi_call {
@@ -297,6 +293,12 @@ impl UStr {
 
     pub unsafe fn from_ptr(s: &*const u16) -> &Self {
         std::mem::transmute(s)
+    }
+}
+
+impl Default for UStr {
+    fn default() -> Self {
+        UStr(ptr::null())
     }
 }
 
