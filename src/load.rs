@@ -318,9 +318,7 @@ unsafe fn load_sprite(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*co
         Ok(())
     })?;
     path.pop();
-    delphi::DynArraySetLength(&mut sp.frames, 0x5b2754 as *const u8, 1, sp.frame_count as _);
-    let frames = slice::from_raw_parts_mut(sp.frames, sp.frame_count as _);
-    for (i, f) in frames.iter_mut().enumerate() {
+    for (i, f) in sp.alloc_frames(sp.frame_count as usize).iter_mut().enumerate() {
         path.push(format!("{}.png", i));
         *f = Frame::new();
         load_frame(&path, &mut **f)?;
@@ -524,9 +522,7 @@ unsafe fn load_timeline(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*c
     path.set_extension("gml");
     let code = read_file(&path)?;
     let iter = code.trim_start_matches("#define ").split("\n#define ");
-    tl.alloc(iter.clone().count());
-    let times = slice::from_raw_parts_mut(tl.moment_times, tl.moment_count);
-    let events = slice::from_raw_parts_mut(tl.moment_events, tl.moment_count);
+    let (events, times) = tl.alloc(iter.clone().count());
     for (code, time_p, event_p) in izip!(iter, times, events) {
         if code.trim().is_empty() {
             continue

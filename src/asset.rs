@@ -1,8 +1,9 @@
 #![allow(dead_code)]
 
 use crate::{
-    delphi::{DynArraySetLength, TBitmap, TMemoryStream, UStr},
+    delphi::{TBitmap, TMemoryStream, UStr},
     delphi_call,
+    list::DelphiList,
 };
 use std::slice;
 
@@ -136,7 +137,7 @@ pub struct Sprite {
     pub bbox_top: i32,
     pub bbox_right: i32,
     pub bbox_bottom: i32,
-    pub frames: *mut *mut Frame,
+    frames: DelphiList<*mut Frame, 0x5b2754>,
 }
 
 impl Sprite {
@@ -147,9 +148,17 @@ impl Sprite {
     pub unsafe fn get_icon(&self) -> *const TBitmap {
         delphi_call!(0x5b401c, self)
     }
-}
 
-unsafe impl Sync for Sprite {}
+    pub fn alloc_frames(&mut self, count: usize) -> &mut [*mut Frame] {
+        self.frames.alloc(count);
+        self.frame_count = count as u32;
+        unsafe { self.frames.get_unchecked_mut(..self.frame_count as usize) }
+    }
+
+    pub fn get_frames(&self) -> &[*mut Frame] {
+        unsafe { self.frames.get_unchecked(..self.frame_count as usize) }
+    }
+}
 
 #[repr(C)]
 pub struct Background {
@@ -186,7 +195,7 @@ pub struct PathPoint {
 #[repr(C)]
 pub struct Path {
     vmt: u32,
-    pub points: *mut PathPoint,
+    points: DelphiList<PathPoint, 0x534870>,
     pub point_count: usize,
     pub connection: u32,
     pub closed: bool,
@@ -202,18 +211,20 @@ impl Path {
         delphi_call!(0x5357b0, 0x534924, 1)
     }
 
-    pub unsafe fn alloc_points(&mut self, count: usize) -> &mut [PathPoint] {
-        self.point_count = count;
-        DynArraySetLength(&mut self.points, 0x534870 as _, 1, count);
-        slice::from_raw_parts_mut(self.points, count)
-    }
-
     pub unsafe fn commit(&mut self) {
         let _: u32 = delphi_call!(0x53578c, self);
     }
-}
 
-unsafe impl Sync for Path {}
+    pub unsafe fn alloc_points(&mut self, count: usize) -> &mut [PathPoint] {
+        self.point_count = count;
+        self.points.alloc(count);
+        self.points.get_unchecked_mut(..count)
+    }
+
+    pub fn get_points(&self) -> &[PathPoint] {
+        unsafe { self.points.get_unchecked(..self.point_count) }
+    }
+}
 
 #[repr(C)]
 pub struct Script {
@@ -276,7 +287,7 @@ impl Action {
 #[repr(C)]
 pub struct Event {
     vmt: u32,
-    pub actions: *const *const Action,
+    actions: DelphiList<*const Action, 0x5a4be4>,
     pub action_count: u32,
 }
 
@@ -288,13 +299,17 @@ impl Event {
     pub unsafe fn add_action(&mut self, libid: u32, actid: u32) -> *mut Action {
         delphi_call!(0x5a51d4, self, libid, actid)
     }
+
+    pub fn get_actions(&self) -> &[*const Action] {
+        unsafe { self.actions.get_unchecked(..self.action_count as usize) }
+    }
 }
 
 #[repr(C)]
 pub struct Timeline {
     vmt: u32,
-    pub moment_events: *mut *mut Event,
-    pub moment_times: *mut u32,
+    pub moment_events: DelphiList<*mut Event, 0x5ad8c8>,
+    pub moment_times: DelphiList<u32, 0x5ad900>,
     pub moment_count: usize,
 }
 
@@ -303,14 +318,21 @@ impl Timeline {
         delphi_call!(0x5adf3c, 0x5ad98c, 1)
     }
 
-    pub unsafe fn alloc(&mut self, count: usize) {
+    pub unsafe fn alloc(&mut self, count: usize) -> (&mut [*mut Event], &mut [u32]) {
         self.moment_count = count;
-        DynArraySetLength(&mut self.moment_times, 0x5ad900 as _, 1, count);
-        DynArraySetLength(&mut self.moment_events, 0x5ad8c8 as _, 1, count);
+        self.moment_events.alloc(count);
+        self.moment_times.alloc(count);
+        (self.moment_events.get_unchecked_mut(..count), self.moment_times.get_unchecked_mut(..count))
+    }
+
+    pub fn get_events(&self) -> &[*mut Event] {
+        unsafe { self.moment_events.get_unchecked(..self.moment_count) }
+    }
+
+    pub fn get_times(&self) -> &[u32] {
+        unsafe { self.moment_times.get_unchecked(..self.moment_count) }
     }
 }
-
-unsafe impl Sync for Timeline {}
 
 #[repr(C)]
 pub struct Object {
@@ -322,7 +344,7 @@ pub struct Object {
     pub persistent: bool,
     pub parent_index: i32,
     pub mask_index: i32,
-    pub events: [*mut *mut Event; 12],
+    pub events: [DelphiList<*mut Event, 0x5ad8c8>; 12],
 }
 
 impl Object {
@@ -334,8 +356,6 @@ impl Object {
         delphi_call!(0x704d74, self, ev_type, ev_numb)
     }
 }
-
-unsafe impl Sync for Object {}
 
 #[repr(C)]
 pub struct RoomBackground {
@@ -413,9 +433,9 @@ pub struct Room {
     pub views: [View; 8],
     pub creation_code: UStr,
     pub instance_count: usize,
-    pub instances: *mut Instance,
+    instances: DelphiList<Instance, 0x656418>,
     pub tile_count: usize,
-    pub tiles: *mut Tile,
+    tiles: DelphiList<Tile, 0x656448>,
     pub remember_room_editor_info: bool,
     pub editor_width: u32,
     pub editor_height: u32,
@@ -437,32 +457,31 @@ impl Room {
         delphi_call!(0x6577b8, 0x6564cc, 1)
     }
 
-    pub unsafe fn alloc_instances(&mut self, count: usize) -> &mut [Instance] {
-        self.instance_count = count;
-        DynArraySetLength(&mut self.instances, 0x656418 as _, 1, count);
-        slice::from_raw_parts_mut(self.instances, count)
-    }
-
-    pub unsafe fn get_instances(&self) -> &[Instance] {
-        slice::from_raw_parts(self.instances, self.instance_count)
-    }
-
-    pub unsafe fn put_tiles(&mut self, tiles: Vec<Tile>) {
-        self.tile_count = tiles.len();
-        DynArraySetLength(&mut self.tiles, 0x656448 as _, 1, tiles.len());
-        tiles.as_ptr().copy_to_nonoverlapping(self.tiles, tiles.len());
-    }
-
-    pub unsafe fn get_tiles(&self) -> &[Tile] {
-        slice::from_raw_parts(self.tiles, self.tile_count)
-    }
-
     pub unsafe fn calc_extents(&mut self) {
         let _: u32 = delphi_call!(0x657b48, self);
     }
-}
 
-unsafe impl Sync for Room {}
+    pub unsafe fn alloc_instances(&mut self, count: usize) -> &mut [Instance] {
+        self.instance_count = count;
+        self.instances.alloc(count);
+        &mut self.instances[..count]
+    }
+
+    pub fn get_instances(&self) -> &[Instance] {
+        unsafe { self.instances.get_unchecked(..self.instance_count) }
+    }
+
+    pub unsafe fn put_tiles(&mut self, tiles: Vec<Tile>) {
+        let count = tiles.len();
+        self.tile_count = count;
+        self.tiles.alloc(count);
+        self.tiles[..count].copy_from_slice(&tiles);
+    }
+
+    pub fn get_tiles(&self) -> &[Tile] {
+        unsafe { self.tiles.get_unchecked(..self.tile_count) }
+    }
+}
 
 #[repr(C)]
 pub struct IncludedFile {

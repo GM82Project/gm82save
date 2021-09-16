@@ -137,8 +137,7 @@ unsafe fn save_sound(sound: &Sound, path: &mut PathBuf) -> Result<()> {
 
 unsafe fn save_sprite(sprite: &Sprite, path: &mut PathBuf) -> Result<()> {
     create_dirs(&path)?;
-    let frames = slice::from_raw_parts(sprite.frames, sprite.frame_count as _);
-    for (i, frame) in frames.iter().enumerate() {
+    for (i, frame) in sprite.get_frames().iter().enumerate() {
         path.push(format!("{}.png", i));
         save_frame(&**frame, path)?;
         path.pop();
@@ -195,8 +194,7 @@ unsafe fn save_path(path: &Path, file_path: &mut PathBuf) -> Result<()> {
     file_path.pop();
     file_path.push("points.txt");
     let mut f = open_file(&file_path)?;
-    let points = slice::from_raw_parts(path.points, path.point_count as _);
-    for p in points {
+    for p in path.get_points() {
         writeln!(f, "{},{},{}", p.x, p.y, p.speed)?;
     }
     f.flush()?;
@@ -227,8 +225,7 @@ unsafe fn save_font(font: &Font, path: &mut PathBuf) -> Result<()> {
 
 unsafe fn save_event<F: Write>(ev: &Event, name: &str, file: &mut F) -> Result<()> {
     writeln!(file, "#define {}", name)?;
-    let actions = slice::from_raw_parts(ev.actions, ev.action_count as usize);
-    for action in actions {
+    for action in ev.get_actions() {
         let action = &**action;
         writeln!(file, "{}", ACTION_TOKEN)?;
         writeln!(file, "lib_id={}", action.lib_id)?;
@@ -286,10 +283,7 @@ unsafe fn save_event<F: Write>(ev: &Event, name: &str, file: &mut F) -> Result<(
 unsafe fn save_timeline(tl: &Timeline, path: &mut PathBuf) -> Result<()> {
     path.set_extension("gml");
     let mut f = open_file(path)?;
-    let count = tl.moment_count as usize;
-    let events = slice::from_raw_parts(tl.moment_events, count);
-    let times = slice::from_raw_parts(tl.moment_times, count);
-    for (time, event) in times.iter().zip(events) {
+    for (time, event) in tl.get_times().iter().zip(tl.get_events()) {
         let event = &**event;
         save_event(event, &time.to_string(), &mut f)?;
     }
@@ -327,10 +321,8 @@ unsafe fn save_object(obj: &Object, path: &mut PathBuf) -> Result<()> {
     path.set_extension("gml");
     {
         let mut f = open_file(&path)?;
-        for (ev_type, event_group) in obj.events.iter().enumerate().filter(|(_, p)| !p.is_null()) {
-            let count = event_group.sub(1).cast::<u32>().read() as usize;
-            let events = slice::from_raw_parts(*event_group, count);
-            for (ev_numb, ev) in events.iter().enumerate() {
+        for (ev_type, event_group) in obj.events.iter().enumerate() {
+            for (ev_numb, ev) in event_group.iter().enumerate() {
                 let ev = &**ev; // all events in the array are non-null
                 if ev.action_count != 0 {
                     let name = event_name(ev_type, ev_numb);
@@ -519,11 +511,9 @@ unsafe fn save_room(room: &Room, path: &mut PathBuf) -> Result<()> {
         path.pop();
     }
 
-    let tiles = slice::from_raw_parts(room.tiles, room.tile_count as usize);
-    save_tiles(tiles, path)?;
+    save_tiles(room.get_tiles(), path)?;
 
-    let instances = slice::from_raw_parts(room.instances, room.instance_count as usize);
-    save_instances(instances, path)?;
+    save_instances(room.get_instances(), path)?;
     Ok(())
 }
 
@@ -854,8 +844,8 @@ unsafe fn save_icon_cache(path: &mut PathBuf) -> Result<()> {
     path.push("sprites");
     create_dirs(path)?;
     ide::get_sprites().par_iter().zip(ide::get_sprite_names()).try_for_each(|(sprite, name)| -> Result<()> {
-        if let Some(sprite) = sprite.filter(|s| s.frame_count > 0) {
-            save_frame(&*sprite.frames.read(), name, path)?;
+        if let Some(&frame) = sprite.and_then(|s| s.get_frames().get(0)) {
+            save_frame(&*frame, name, path)?;
         }
         Ok(())
     })?;
