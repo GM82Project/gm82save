@@ -1,6 +1,10 @@
 #![allow(non_snake_case, dead_code)]
 
-use std::{ffi::{OsStr, OsString}, os::windows::ffi::{OsStrExt, OsStringExt}, slice, ptr};
+use std::{
+    ffi::{OsStr, OsString},
+    os::windows::ffi::{OsStrExt, OsStringExt},
+    ptr, slice,
+};
 
 #[macro_export]
 macro_rules! delphi_call {

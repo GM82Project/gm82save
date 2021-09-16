@@ -602,7 +602,7 @@ unsafe fn patch_call(instr: *mut u8, proc: usize) {
 #[cfg_attr(test, allow(dead_code))]
 unsafe fn injector() {
     std::panic::set_hook(Box::new(|info| {
-        #[link(name="user32")]
+        #[link(name = "user32")]
         extern "system" {
             fn MessageBoxW(hWnd: usize, lpText: *const u16, lpCaption: *const u16, uType: u32) -> i32;
         }
