@@ -8,6 +8,7 @@ mod asset;
 mod delphi;
 mod events;
 mod ide;
+mod list;
 mod load;
 mod save;
 mod stub;
