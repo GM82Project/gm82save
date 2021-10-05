@@ -534,7 +534,7 @@ unsafe extern "C" fn room_size() {
     asm! {
         "mov eax, [0x79a820]", // get preference
         // safety check
-        "cmp eax, 4",
+        "cmp eax, {count}",
         "jb 1f",
         "mov eax, 0", // default
         "1:",
@@ -542,23 +542,52 @@ unsafe extern "C" fn room_size() {
         "mov edx, 6",
         "mul edx",
         // width
-        "movzx edx, word ptr [2f + eax]",
+        "movzx edx, word ptr [{sizes} + eax]",
         "mov dword ptr [ebx+0xc], edx",
         // height
-        "movzx edx, word ptr [2f + eax + 2]",
+        "movzx edx, word ptr [{sizes} + eax + 2]",
         "mov dword ptr [ebx+0x10], edx",
         // speed
-        "movzx edx, word ptr [2f + eax + 4]",
+        "movzx edx, word ptr [{sizes} + eax + 4]",
         "mov dword ptr [ebx+0x8], edx",
+        // views
+        "mov ecx, 7 * 0x38",
+        "2:", // loop point
+        "movzx edx, word ptr [{sizes} + eax]", // width
+        "mov dword ptr [ebx + 0x12c + ecx + 0xc], edx",  // view_w
+        "mov dword ptr [ebx + 0x12c + ecx + 0x1c], edx", // port_w
+        "movzx edx, word ptr [{sizes} + eax + 2]", // height
+        "mov dword ptr [ebx + 0x12c + ecx + 0x10], edx", // view_h
+        "mov dword ptr [ebx + 0x12c + ecx + 0x20], edx", // port_h
+        "sub ecx, 0x38",
+        "jge 2b",
         "ret",
-        "2:",
-        ".word 800, 608, 50",  // aiwana size
-        ".word 640, 480, 30",  // gm8 default
-        ".word 320, 240, 60",  // pixel games
-        ".word 1024, 768, 60", // studio default but 60fps
+        count = const ROOM_SIZE_COUNT,
+        sizes = sym ROOM_SIZES,
         options(noreturn),
     }
 }
+
+#[allow(dead_code)]
+struct RoomSize {
+    width: u16,
+    height: u16,
+    speed: u16,
+}
+const ROOM_SIZE_COUNT: usize = 11;
+static ROOM_SIZES: [RoomSize; ROOM_SIZE_COUNT] = [
+    RoomSize { width: 800, height: 608, speed: 50 }, // aiwana size
+    RoomSize { width: 800, height: 608, speed: 60 },
+    RoomSize { width: 800, height: 600, speed: 50 },
+    RoomSize { width: 800, height: 600, speed: 60 },
+    RoomSize { width: 320, height: 240, speed: 60 }, // pixel games
+    RoomSize { width: 640, height: 480, speed: 30 }, // gm8 default
+    RoomSize { width: 640, height: 480, speed: 60 },
+    RoomSize { width: 1024, height: 768, speed: 60 }, // studio default but 60fps
+    RoomSize { width: 1280, height: 720, speed: 60 },
+    RoomSize { width: 1366, height: 768, speed: 60 }, // studio 2 default
+    RoomSize { width: 1920, height: 1080, speed: 60 },
+];
 
 static mut SAVING_FOR_ROOM_EDITOR: bool = false;
 
@@ -744,6 +773,10 @@ unsafe fn injector() {
     // default room editor settings
     patch(0x657852 as _, &[0xe8, 0, 0, 0, 0, 0x90, 0x90]);
     patch_call(0x657852 as _, room_size as _);
+
+    // nop out room view size stuff
+    patch(0x657904 as _, &[0x90; 14]);
+    patch(0x65791c as _, &[0x90; 14]);
 
     // funky room editor shit
     patch_call(0x69319c as _, room_form_inj as _);
