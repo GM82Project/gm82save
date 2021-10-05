@@ -529,6 +529,37 @@ unsafe extern "C" fn room_form_inj() {
     }
 }
 
+#[naked]
+unsafe extern "C" fn room_size() {
+    asm! {
+        "mov eax, [0x79a820]", // get preference
+        // safety check
+        "cmp eax, 4",
+        "jb 1f",
+        "mov eax, 0", // default
+        "1:",
+        // multiply by 6 for offset
+        "mov edx, 6",
+        "mul edx",
+        // width
+        "movzx edx, word ptr [2f + eax]",
+        "mov dword ptr [ebx+0xc], edx",
+        // height
+        "movzx edx, word ptr [2f + eax + 2]",
+        "mov dword ptr [ebx+0x10], edx",
+        // speed
+        "movzx edx, word ptr [2f + eax + 4]",
+        "mov dword ptr [ebx+0x8], edx",
+        "ret",
+        "2:",
+        ".word 800, 608, 50",  // aiwana size
+        ".word 640, 480, 30",  // gm8 default
+        ".word 320, 240, 60",  // pixel games
+        ".word 1024, 768, 60", // studio default but 60fps
+        options(noreturn),
+    }
+}
+
 static mut SAVING_FOR_ROOM_EDITOR: bool = false;
 
 unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
@@ -706,6 +737,13 @@ unsafe fn injector() {
 
     // .gm82 file associations
     patch_call(0x6ddacd as _, gm82_file_association_inj as _);
+
+    // don't hide "GMTV" (now default room editor settings)
+    patch(0x71a21d as _, &[0xeb]);
+
+    // default room editor settings
+    patch(0x657852 as _, &[0xe8, 0, 0, 0, 0, 0x90, 0x90]);
+    patch_call(0x657852 as _, room_size as _);
 
     // funky room editor shit
     patch_call(0x69319c as _, room_form_inj as _);
