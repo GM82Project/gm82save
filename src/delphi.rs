@@ -52,6 +52,19 @@ macro_rules! delphi_call {
         };
         out
     }};
+    ($call: literal, $a: expr, $b: expr, $c: expr, $d: expr) => {{
+        let out;
+        asm! {
+            "push {arg4}",
+            "call {call}",
+            call = in(reg) $call,
+            arg4 = in(reg) $d,
+            inlateout("eax") $a => out,
+            inlateout("edx") $b => _,
+            inlateout("ecx") $c => _,
+        };
+        out
+    }};
 }
 
 // this is really game maker specific but i left it here for simplicity
@@ -261,6 +274,10 @@ pub unsafe fn UStrFromPWCharLen(dest: &mut UStr, source: *const u16, length: usi
     let _: u32 = delphi_call!(0x407ff4, dest, source, length);
 }
 
+pub unsafe fn UStrSetLength(dest: &mut UStr, length: usize) {
+    let _: u32 = delphi_call!(0x0408244, dest, length);
+}
+
 pub unsafe fn UStrClr(str: &mut UStr) {
     let _: u32 = delphi_call!(0x407ea8, str);
 }
@@ -271,14 +288,22 @@ pub unsafe fn CompareText(a: &UStr, b: *const u16) -> i32 {
 }
 
 #[repr(transparent)]
-pub struct UStr(pub *const u16);
+pub struct UStr(pub *mut u16);
 
 impl UStr {
     pub fn new(s: impl AsRef<OsStr>) -> Self {
-        let mut out = UStr(std::ptr::null());
-        let s = s.as_ref().encode_wide().collect::<Vec<_>>();
+        let mut out = UStr(std::ptr::null_mut());
+        let s = s.as_ref();
+        // if it takes more than one WTF-16 u16, it will DEFINITELY take more than one WTF-8 u8
+        let guess_len = s.len();
         unsafe {
-            UStrFromPWCharLen(&mut out, s.as_ptr(), s.len());
+            UStrSetLength(&mut out, guess_len);
+            let mut real_len = 0;
+            for (dst, src) in slice::from_raw_parts_mut(out.0, guess_len).iter_mut().zip(s.encode_wide()) {
+                *dst = src;
+                real_len += 1;
+            }
+            UStrSetLength(&mut out, real_len);
         }
         out
     }
@@ -302,7 +327,7 @@ impl UStr {
 
 impl Default for UStr {
     fn default() -> Self {
-        UStr(ptr::null())
+        UStr(ptr::null_mut())
     }
 }
 
