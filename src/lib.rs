@@ -503,6 +503,23 @@ unsafe extern "fastcall" fn setup_unicode_parse(version: i32) {
 }
 
 #[naked]
+unsafe extern "C" fn gm82_file_association_inj() {
+    asm! {
+        "mov ecx, eax",
+        "jmp {}",
+        sym gm82_file_association,
+        options(noreturn),
+    }
+}
+
+unsafe extern "fastcall" fn gm82_file_association(reg: u32) {
+    let ext = UStr::new(r"\.gm82");
+    let _: u32 = delphi_call!(0x6dd850, reg, ext.0, 0, UStr::new("gm82file").0);
+    let _: u32 = delphi_call!(0x452568, reg, 0x80000001u32);
+    let _: u32 = delphi_call!(0x6dd850, reg, ext.0, UStr::new(r"\Software\Classes").0, UStr::new("gm82file").0);
+}
+
+#[naked]
 unsafe extern "C" fn room_form_inj() {
     asm! {
         "mov ecx, eax",
@@ -686,6 +703,9 @@ unsafe fn injector() {
     patch_call(0x70537b as _, setup_unicode_parse_inj as _);
     // reset above
     patch_call(0x705acc as _, teardown_unicode_parse_inj as _);
+
+    // .gm82 file associations
+    patch_call(0x6ddacd as _, gm82_file_association_inj as _);
 
     // funky room editor shit
     patch_call(0x69319c as _, room_form_inj as _);
