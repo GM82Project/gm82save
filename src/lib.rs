@@ -532,62 +532,59 @@ unsafe extern "C" fn room_form_inj() {
 #[naked]
 unsafe extern "C" fn room_size() {
     asm! {
-        "mov eax, [0x79a820]", // get preference
-        // safety check
-        "cmp eax, {count}",
-        "jb 1f",
-        "mov eax, 0", // default
-        "1:",
-        // multiply by 6 for offset
-        "mov edx, 6",
-        "mul edx",
-        // width
-        "movzx edx, word ptr [{sizes} + eax]",
-        "mov dword ptr [ebx+0xc], edx",
-        // height
-        "movzx edx, word ptr [{sizes} + eax + 2]",
-        "mov dword ptr [ebx+0x10], edx",
-        // speed
-        "movzx edx, word ptr [{sizes} + eax + 4]",
-        "mov dword ptr [ebx+0x8], edx",
+        "mov eax, {width}",
+        "mov dword ptr [ebx+0xc], eax",
+        "mov eax, {height}",
+        "mov dword ptr [ebx+0x10], eax",
+        "mov eax, {speed}",
+        "mov dword ptr [ebx+0x8], eax",
         // views
         "mov ecx, 7 * 0x38",
         "2:", // loop point
-        "movzx edx, word ptr [{sizes} + eax]", // width
-        "mov dword ptr [ebx + 0x12c + ecx + 0xc], edx",  // view_w
-        "mov dword ptr [ebx + 0x12c + ecx + 0x1c], edx", // port_w
-        "movzx edx, word ptr [{sizes} + eax + 2]", // height
-        "mov dword ptr [ebx + 0x12c + ecx + 0x10], edx", // view_h
-        "mov dword ptr [ebx + 0x12c + ecx + 0x20], edx", // port_h
+        "mov eax, dword ptr {width}", // width
+        "mov dword ptr [ebx + 0x12c + ecx + 0xc], eax",  // view_w
+        "mov dword ptr [ebx + 0x12c + ecx + 0x1c], eax", // port_w
+        "mov eax, dword ptr {height}", // height
+        "mov dword ptr [ebx + 0x12c + ecx + 0x10], eax", // view_h
+        "mov dword ptr [ebx + 0x12c + ecx + 0x20], eax", // port_h
         "sub ecx, 0x38",
         "jge 2b",
         "ret",
-        count = const ROOM_SIZE_COUNT,
-        sizes = sym ROOM_SIZES,
+        width = sym DEFAULT_ROOM_WIDTH,
+        height = sym DEFAULT_ROOM_HEIGHT,
+        speed = sym DEFAULT_ROOM_SPEED,
         options(noreturn),
     }
 }
 
-#[allow(dead_code)]
-struct RoomSize {
-    width: u16,
-    height: u16,
-    speed: u16,
+#[naked]
+unsafe extern "C" fn fix_broken_room_size() {
+    asm! {
+        // we already have speed in eax so do that one first
+        "cmp eax, 0",
+        "cmovz eax, {speed}",
+        "mov {speed}, eax",
+        // check width
+        "mov eax, 800",
+        "cmp dword ptr {width}, 0",
+        "cmovnz eax, {width}",
+        "mov {width}, eax",
+        // check height
+        "mov eax, 608",
+        "cmp dword ptr {height}, 0",
+        "cmovnz eax, {height}",
+        "mov {height}, eax",
+        "ret",
+        width = sym DEFAULT_ROOM_WIDTH,
+        height = sym DEFAULT_ROOM_HEIGHT,
+        speed = sym DEFAULT_ROOM_SPEED,
+        options(noreturn),
+    }
 }
-const ROOM_SIZE_COUNT: usize = 11;
-static ROOM_SIZES: [RoomSize; ROOM_SIZE_COUNT] = [
-    RoomSize { width: 800, height: 608, speed: 50 }, // aiwana size
-    RoomSize { width: 800, height: 608, speed: 60 },
-    RoomSize { width: 800, height: 600, speed: 50 },
-    RoomSize { width: 800, height: 600, speed: 60 },
-    RoomSize { width: 320, height: 240, speed: 60 }, // pixel games
-    RoomSize { width: 640, height: 480, speed: 30 }, // gm8 default
-    RoomSize { width: 640, height: 480, speed: 60 },
-    RoomSize { width: 1024, height: 768, speed: 60 }, // studio default but 60fps
-    RoomSize { width: 1280, height: 720, speed: 60 },
-    RoomSize { width: 1366, height: 768, speed: 60 }, // studio 2 default
-    RoomSize { width: 1920, height: 1080, speed: 60 },
-];
+
+static mut DEFAULT_ROOM_WIDTH: u32 = 800;
+static mut DEFAULT_ROOM_HEIGHT: u32 = 608;
+static mut DEFAULT_ROOM_SPEED: u32 = 50;
 
 static mut SAVING_FOR_ROOM_EDITOR: bool = false;
 
@@ -767,9 +764,6 @@ unsafe fn injector() {
     // .gm82 file associations
     patch_call(0x6ddacd as _, gm82_file_association_inj as _);
 
-    // don't hide "GMTV" (now default room editor settings)
-    patch(0x71a21d as _, &[0xeb]);
-
     // default room editor settings
     patch(0x657852 as _, &[0xe8, 0, 0, 0, 0, 0x90, 0x90]);
     patch_call(0x657852 as _, room_size as _);
@@ -782,6 +776,59 @@ unsafe fn injector() {
     patch_call(0x69319c as _, room_form_inj as _);
     // disable news (replace function with a ret)
     patch(0x62c224 as _, &[0xc3]);
+
+    // configs for default room editor settings
+    // force progress bar (replace check with nops)
+    patch(0x6ca266 as _, &[0x90, 0x90]);
+    // replace ShowProgress with DefRoomW
+    patch(0x717cbc as _, b"\x08\0\0\0D\0e\0f\0R\0o\0o\0m\0W\0\0\0");
+    patch(0x719350 as _, b"\x08\0\0\0D\0e\0f\0R\0o\0o\0m\0W\0\0\0");
+    // replace NoWebsite with DefRoomH
+    patch(0x7189e8 as _, b"\x08\0\0\0D\0e\0f\0R\0o\0o\0m\0H\0\0\0");
+    patch(0x719e0c as _, b"\x08\0\0\0D\0e\0f\0R\0o\0o\0m\0H\0\0\0");
+    // replace NewsBrowser with DefRoomS
+    patch(0x718a24 as _, b"\x08\0\0\0D\0e\0f\0R\0o\0o\0m\0S\0\0\0");
+    patch(0x719e48 as _, b"\x08\0\0\0D\0e\0f\0R\0o\0o\0m\0S\0\0\0");
+    // read ShowProgress from reg as int
+    patch(0x7170f7 as _, &[0x33, 0xd2]);
+    patch(0x7170fe as _, &[0xe8, 0xcd, 0xfc, 0xff, 0xff, 0xa3]);
+    patch(0x717104 as _, &(&DEFAULT_ROOM_WIDTH as *const u32 as usize as u32).to_le_bytes());
+    // read NoWebsite from reg as int
+    patch(0x71799d as _, &[0xe8, 0x2e, 0xf4, 0xff, 0xff, 0xa3]);
+    patch(0x7179a3 as _, &(&DEFAULT_ROOM_HEIGHT as *const u32 as usize as u32).to_le_bytes());
+    // read NewsBrowser from reg as int
+    patch(0x7179bf as _, &[0xe8, 0x0c, 0xf4, 0xff, 0xff, 0xe8]);
+    patch_call(0x7179c4 as _, fix_broken_room_size as _);
+    // write ShowProgress to reg as int
+    patch(0x718bac as _, &[0x8b, 0x15,  0x2c, 0xa8, 0x79, 0x00,  0x90]);
+    patch(0x718bb9 as _, &[0x43, 0xe0]);
+    patch(0x718bae as _, &(&DEFAULT_ROOM_WIDTH as *const u32 as usize as u32).to_le_bytes());
+    // write NoWebsite to reg as int
+    patch(0x71908e as _, &[0x8b, 0x15,  0x81, 0xa9, 0x79, 0x00,  0x90]);
+    patch(0x71909b as _, &[0x61, 0xdb]);
+    patch(0x719090 as _, &(&DEFAULT_ROOM_HEIGHT as *const u32 as usize as u32).to_le_bytes());
+    // write NewsBrowser to reg as int
+    patch(0x7190b0 as _, &[0x8b, 0x15,  0x83, 0xa9, 0x79, 0x00,  0x90]);
+    patch(0x7190bd as _, &[0x3f, 0xdb]);
+    patch(0x7190b2 as _, &(&DEFAULT_ROOM_SPEED as *const u32 as usize as u32).to_le_bytes());
+    // write ShowProgress to form as ValueEdit
+    patch(0x71a272 as _, &[0x8b, 0x15,  0x2c, 0xa8, 0x79, 0x00,  0xe8, 0xe3, 0x64, 0xe1, 0xff, 0x90, 0x90, 0x90, 0x90]);
+    patch(0x71a274 as _, &(&DEFAULT_ROOM_WIDTH as *const u32 as usize as u32).to_le_bytes());
+    // write NoWebsite to form as ValueEdit
+    patch(0x71a4ec as _, &[0x8b, 0x15,  0x81, 0xa9, 0x79, 0x00,  0xe8, 0x69, 0x62, 0xe1, 0xff, 0x90, 0x90, 0x90, 0x90]);
+    patch(0x71a4ee as _, &(&DEFAULT_ROOM_HEIGHT as *const u32 as usize as u32).to_le_bytes());
+    // write NewsBrowser to form as ValueEdit
+    patch(0x71a51d as _, &[0x8b, 0x15,  0x83, 0xa9, 0x79, 0x00,  0xe8, 0x38, 0x62, 0xe1, 0xff, 0x90, 0x90, 0x90, 0x90]);
+    patch(0x71a51f as _, &(&DEFAULT_ROOM_SPEED as *const u32 as usize as u32).to_le_bytes());
+    // read ShowProgress from form as ValueEdit
+    patch(0x71a777 as _, &[0x8b, 0x80, 0xa0, 0x02, 0x00, 0x00, 0xa3,  0x2c, 0xa8, 0x79, 0x00,  0x90, 0x90]);
+    patch(0x71a77e as _, &(&DEFAULT_ROOM_WIDTH as *const u32 as usize as u32).to_le_bytes());
+    // read NoWebsite from form as ValueEdit
+    patch(0x71a93f as _, &[0x8b, 0x80, 0xa0, 0x02, 0x00, 0x00, 0xa3,  0x81, 0xa9, 0x79, 0x00,  0x90, 0x90]);
+    patch(0x71a946 as _, &(&DEFAULT_ROOM_HEIGHT as *const u32 as usize as u32).to_le_bytes());
+    // read NewsBrowser from form as ValueEdit
+    patch(0x71a96b as _, &[0x8b, 0x80, 0xa0, 0x02, 0x00, 0x00, 0xa3,  0x83, 0xa9, 0x79, 0x00,  0x90, 0x90]);
+    patch(0x71a972 as _, &(&DEFAULT_ROOM_SPEED as *const u32 as usize as u32).to_le_bytes());
 
     // update timestamps when setting name
     unsafe fn patch_timestamps(dest: *mut u8) {
