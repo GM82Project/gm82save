@@ -2,8 +2,8 @@ use crate::{
     asset::*,
     delphi,
     delphi::{advance_progress_form, TTreeNode, UStr},
-    events, ide, run_while_updating_bar, update_timestamp, Error, InstanceExtra, Result, TileExtra, ACTION_TOKEN,
-    EXTRA_DATA, SAVING_FOR_ROOM_EDITOR,
+    events, ide, run_while_updating_bar, show_message, update_timestamp, Error, InstanceExtra, Result, TileExtra,
+    ACTION_TOKEN, EXTRA_DATA, SAVING_FOR_ROOM_EDITOR, SAW_APPLIES_TO_WARNING,
 };
 use itertools::Itertools;
 use rayon::prelude::*;
@@ -237,7 +237,18 @@ unsafe fn save_event<F: Write>(ev: &Event, name: &str, file: &mut F) -> Result<(
             match action.applies_to {
                 -2 => writeln!(file, "applies_to=other")?,
                 -1 => writeln!(file, "applies_to=self")?,
-                i => writeln!(file, "applies_to={}", ide::get_object_names().get_asset(i))?,
+                i => {
+                    if i >= 0 && ide::get_objects().get_asset(i).is_none() && !SAW_APPLIES_TO_WARNING {
+                        show_message(
+                            "WARNING: Project contains actions that apply to an object that has been deleted. \
+                            These will do absolutely nothing when executed. \
+                            You may want to find them and make sure nothing is broken. \
+                            You can find them by searching the project for \"apply_to\\n\" with Notepad++.",
+                        );
+                        SAW_APPLIES_TO_WARNING = true;
+                    }
+                    writeln!(file, "applies_to={}", ide::get_object_names().get_asset(i))?
+                },
             }
         }
         match action.action_kind {

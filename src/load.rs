@@ -399,6 +399,7 @@ unsafe fn load_event(
                         action.applies_to = match v {
                             "other" => -2,
                             "self" => -1,
+                            "" => -4,
                             name => *asset_maps
                                 .objects
                                 .map

@@ -262,6 +262,7 @@ unsafe extern "C" fn load_inj() {
 
 unsafe extern "fastcall" fn load(proj_path: &UStr, stream_ptr: *mut u32, result_ptr: *mut bool) -> bool {
     EXTRA_DATA = Some(Default::default());
+    SAW_APPLIES_TO_WARNING = false;
     let path: PathBuf = proj_path.to_os_string().into();
     // .gm82 works in the ui but rust doesn't get it so check for that specifically
     let is_gm82 = path.extension() == Some("gm82".as_ref()) || path.file_name() == Some(".gm82".as_ref());
@@ -585,6 +586,8 @@ unsafe extern "C" fn fix_broken_room_size() {
 static mut DEFAULT_ROOM_WIDTH: u32 = 800;
 static mut DEFAULT_ROOM_HEIGHT: u32 = 608;
 static mut DEFAULT_ROOM_SPEED: u32 = 50;
+
+static mut SAW_APPLIES_TO_WARNING: bool = false;
 
 static mut SAVING_FOR_ROOM_EDITOR: bool = false;
 
