@@ -140,6 +140,9 @@ unsafe fn load_triggers(maps: &AssetMaps, path: &mut PathBuf) -> Result<()> {
     let names = &maps.triggers.index;
     ide::alloc_triggers(names.len());
     for (name, trig_p) in names.iter().zip(ide::get_triggers_mut()) {
+        if name.is_empty() {
+            continue
+        }
         let trig = &mut *Trigger::new();
         trig.name = UStr::new(name);
         path.push(name);
