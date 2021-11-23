@@ -317,14 +317,14 @@ unsafe extern "fastcall" fn make_new_folder(_: u32, path_ptr: *const u16) {
 #[naked]
 unsafe extern "C" fn fix_tile_null_pointer() {
     asm! {
-    "mov edx, 0x64e048",
-    "call edx",
-    "mov edx, 0x68ef07",
-    "mov ecx, 0x68ef6c",
-    "test eax, eax",
-    "cmovz edx, ecx",
-    "jmp edx",
-    options(noreturn),
+        "mov edx, 0x64e048",
+        "call edx",
+        "mov edx, 0x68ef07",
+        "mov ecx, 0x68ef6c",
+        "test eax, eax",
+        "cmovz edx, ecx",
+        "jmp edx",
+        options(noreturn),
     }
 }
 
@@ -421,19 +421,19 @@ unsafe extern "C" fn save_instance_extra_inj() {
 #[naked]
 unsafe extern "C" fn save_tile_extra_inj() {
     asm! {
-    "mov ecx, ebx", // file
-    "mov eax, dword ptr [edi + 0x2fc]", // tile list
-    "mov edx, dword ptr [eax + ebp*0x8 + 0x20]", // tile id
-    "xor eax, eax",
-    "mov al, byte ptr [esp]", // are we exe?
-    "push eax",
-    "call {}",
-    "inc esi",
-    "mov eax, 0x6586dd", // jnz of loop
-    "dec dword ptr [esp + 0x4]",
-    "jmp eax",
-    sym save_tile_extra,
-    options(noreturn),
+        "mov ecx, ebx", // file
+        "mov eax, dword ptr [edi + 0x2fc]", // tile list
+        "mov edx, dword ptr [eax + ebp*0x8 + 0x20]", // tile id
+        "xor eax, eax",
+        "mov al, byte ptr [esp]", // are we exe?
+        "push eax",
+        "call {}",
+        "inc esi",
+        "mov eax, 0x6586dd", // jnz of loop
+        "dec dword ptr [esp + 0x4]",
+        "jmp eax",
+        sym save_tile_extra,
+        options(noreturn),
     }
 }
 
