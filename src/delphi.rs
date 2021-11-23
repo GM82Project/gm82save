@@ -181,7 +181,14 @@ impl TIcon {
     }
 }
 
-pub struct TMemoryStream {}
+pub struct TMemoryStream {
+    // fields are dangerous to use
+    vmt: u32,
+    memory: *const u8,
+    size: usize,
+    position: usize,
+    capacity: usize,
+}
 
 impl TMemoryStream {
     pub unsafe fn new() -> *mut Self {
@@ -217,6 +224,10 @@ impl TMemoryStream {
         out
     }
 
+    pub unsafe fn get_slice(&self) -> &[u8] {
+        std::slice::from_raw_parts(self.memory, self.size)
+    }
+
     pub unsafe fn read(&self, buf: *mut u8, count: u32) {
         let _: u32 = delphi_call!(0x43f488, self, buf, count);
     }
@@ -224,6 +235,20 @@ impl TMemoryStream {
     pub unsafe fn load(&self, fname: &UStr) {
         let s: *const u16 = fname.0;
         let _: u32 = delphi_call!(0x43ff44, self, s);
+    }
+}
+
+// only usable for real TMemoryStreams
+impl std::io::Write for TMemoryStream {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        unsafe {
+            let result: usize = delphi_call!(0x44006c, self, buf.as_ptr(), buf.len());
+            Ok(result)
+        }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
     }
 }
 

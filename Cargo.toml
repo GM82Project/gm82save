@@ -25,6 +25,7 @@ time = "0.3"
 crc = "1.8"
 crossbeam-channel = {version = "0.5", optional = true}
 ctor = "0.1.20"
+flate2 = {version = "1.0", features = ["zlib-ng-compat"], default-features = false}
 itertools = "0.10"
 paste = "1.0"
 png = "0.16"

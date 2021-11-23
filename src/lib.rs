@@ -14,7 +14,7 @@ mod save;
 mod stub;
 
 use crate::delphi::UStr;
-use std::{collections::HashMap, ffi::c_void, path::PathBuf};
+use std::{collections::HashMap, ffi::c_void, io::Write, path::PathBuf};
 
 pub enum Error {
     IoError(std::io::Error),
@@ -324,6 +324,87 @@ unsafe extern "C" fn fix_tile_null_pointer() {
         "test eax, eax",
         "cmovz edx, ecx",
         "jmp edx",
+        options(noreturn),
+    }
+}
+
+#[naked]
+unsafe extern "C" fn inflate_inj() {
+    asm! {
+        "mov ecx, eax",
+        "jmp {}",
+        sym inflate,
+        options(noreturn),
+    }
+}
+
+unsafe extern "fastcall" fn inflate(src: &delphi::TMemoryStream) -> &mut delphi::TMemoryStream {
+    let dst = &mut *delphi::TMemoryStream::new();
+    let mut size: usize = 0;
+    src.read(&mut size as *mut usize as *mut u8, 4);
+    let mut data = Vec::with_capacity(size);
+    data.set_len(size);
+    src.read(data.as_mut_ptr(), size as u32);
+    let mut decoder = flate2::write::ZlibDecoder::new(dst);
+    decoder.write_all(&data).unwrap();
+    let dst = decoder.finish().unwrap();
+    dst.set_pos(0);
+    return dst
+}
+
+#[naked]
+unsafe extern "C" fn deflate_inj() {
+    asm! {
+        "mov ecx, eax",
+        "jmp {}",
+        sym deflate,
+        options(noreturn),
+    }
+}
+
+unsafe extern "fastcall" fn deflate(dst: &mut delphi::TMemoryStream, src: &delphi::TMemoryStream) {
+    let mut encoder = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::new(DEFLATE_LEVEL));
+    encoder.write_all(src.get_slice()).unwrap();
+    let data = encoder.finish().unwrap();
+    let _ = dst.write(&data.len().to_le_bytes());
+    let _ = dst.write(&data);
+    src.set_pos(data.len() as _);
+}
+
+static mut DEFLATE_LEVEL: u32 = 6; // default
+
+#[naked]
+unsafe extern "C" fn build_small() {
+    asm! {
+        "mov ecx, 9",
+        "mov {}, ecx",
+        "mov ecx, 0x4cf2f4",
+        "jmp ecx",
+        sym DEFLATE_LEVEL,
+        options(noreturn),
+    }
+}
+
+#[naked]
+unsafe extern "C" fn build_fast() {
+    asm! {
+        "mov ecx, 1",
+        "mov {}, ecx",
+        "mov ecx, 0x41735c",
+        "jmp ecx",
+        sym DEFLATE_LEVEL,
+        options(noreturn),
+    }
+}
+
+#[naked]
+unsafe extern "C" fn reset_compression() {
+    asm! {
+        "mov ecx, 6",
+        "mov {}, ecx",
+        "mov ecx, 0x51cc64",
+        "jmp ecx",
+        sym DEFLATE_LEVEL,
         options(noreturn),
     }
 }
@@ -737,6 +818,18 @@ unsafe fn injector() {
     // fix stupid null pointer error
     patch(0x68ef02 as _, &[0xe9]);
     patch_call(0x68ef02 as _, fix_tile_null_pointer as _);
+
+    // use zlib-ng for compression
+    patch(0x52f34c as _, &[0xe9]);
+    patch_call(0x52f34c as _, deflate_inj as _);
+    patch(0x52f2e4 as _, &[0xe9]);
+    patch_call(0x52f2e4 as _, inflate_inj as _);
+    // build fast when making test build
+    patch_call(0x6ce8a2 as _, build_fast as _);
+    patch_call(0x6ce8cb as _, reset_compression as _);
+    // build small when making release
+    patch_call(0x6ce775 as _, build_small as _);
+    patch_call(0x6ce78f as _, reset_compression as _);
 
     // save creation code flag (reusing the software vertex processing flag)
     // write 825 instead of 800 for settings version if saving exe
