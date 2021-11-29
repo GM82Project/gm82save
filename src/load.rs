@@ -1069,6 +1069,7 @@ pub fn load_asset_maps(path: &mut PathBuf) -> Result<AssetMaps> {
 
 pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     ide::initialize_project();
+    EXTRA_DATA = Some(Default::default());
     read_txt(&path, |k, v| {
         match k {
             "gm82_version" => {
