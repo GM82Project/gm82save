@@ -1,6 +1,7 @@
 #![allow(non_snake_case, dead_code)]
 
 use std::{
+    arch::asm,
     ffi::{OsStr, OsString},
     os::windows::ffi::{OsStrExt, OsStringExt},
     ptr, slice,
@@ -10,7 +11,7 @@ use std::{
 macro_rules! delphi_call {
     ($call: literal) => {{
         let out;
-        asm! {
+        std::arch::asm! {
             "call {call}",
             call = in(reg) $call,
             lateout("eax") out,
@@ -21,7 +22,7 @@ macro_rules! delphi_call {
     }};
     ($call: literal, $a: expr) => {{
         let out;
-        asm! {
+        std::arch::asm! {
             "call {call}",
             call = in(reg) $call,
             inlateout("eax") $a => out,
@@ -32,7 +33,7 @@ macro_rules! delphi_call {
     }};
     ($call: literal, $a: expr, $b: expr) => {{
         let out;
-        asm! {
+        std::arch::asm! {
             "call {call}",
             call = in(reg) $call,
             inlateout("eax") $a => out,
@@ -43,7 +44,7 @@ macro_rules! delphi_call {
     }};
     ($call: literal, $a: expr, $b: expr, $c: expr) => {{
         let out;
-        asm! {
+        std::arch::asm! {
             "call {call}",
             call = in(reg) $call,
             inlateout("eax") $a => out,
@@ -54,7 +55,7 @@ macro_rules! delphi_call {
     }};
     ($call: literal, $a: expr, $b: expr, $c: expr, $d: expr) => {{
         let out;
-        asm! {
+        std::arch::asm! {
             "push {arg4}",
             "call {call}",
             call = in(reg) $call,

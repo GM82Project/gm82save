@@ -1,4 +1,4 @@
-#![feature(asm, asm_sym, naked_functions)]
+#![feature(asm_sym, naked_functions)]
 
 #[cfg(not(all(windows, target_arch = "x86")))]
 compile_error!("this tool only works on windows 32-bit");
@@ -14,7 +14,7 @@ mod save;
 mod stub;
 
 use crate::delphi::UStr;
-use std::{collections::HashMap, ffi::c_void, io::Write, path::PathBuf};
+use std::{arch::asm, collections::HashMap, ffi::c_void, io::Write, path::PathBuf};
 
 pub enum Error {
     IoError(std::io::Error),
