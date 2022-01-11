@@ -768,7 +768,7 @@ unsafe fn injector() {
         extern "system" {
             fn MessageBoxW(hWnd: usize, lpText: *const u16, lpCaption: *const u16, uType: u32) -> i32;
         }
-        let msg = info.to_string().encode_utf16().collect::<Vec<_>>();
+        let msg = info.to_string().encode_utf16().chain(std::iter::once(0)).collect::<Vec<_>>();
         MessageBoxW(0, msg.as_ptr(), std::ptr::null(), 0);
 
         std::process::exit(-1);
