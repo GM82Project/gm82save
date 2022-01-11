@@ -16,6 +16,7 @@ mod stub;
 use crate::delphi::UStr;
 use std::{arch::asm, collections::HashMap, ffi::c_void, io::Write, path::PathBuf};
 
+#[derive(Debug)]
 pub enum Error {
     IoError(std::io::Error),
     FileIoError(std::io::Error, PathBuf),
@@ -718,10 +719,8 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
                     if EXTRA_DATA.is_none() {
                         EXTRA_DATA = Some(Default::default());
                     }
-                    ide::get_rooms_mut()[room_id] = load::load_room(&mut room_path, &asset_maps)
-                        .ok()
-                        .expect("loading the updated room failed")
-                        .as_ref();
+                    ide::get_rooms_mut()[room_id] =
+                        load::load_room(&mut room_path, &asset_maps).expect("loading the updated room failed").as_ref();
                     return 0
                 }
             }
