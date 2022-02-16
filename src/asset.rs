@@ -394,7 +394,7 @@ pub struct Instance {
     pub x: i32,
     pub y: i32,
     pub object: i32,
-    pub id: u32,
+    pub id: usize,
     pub creation_code: UStr,
     pub locked: bool,
 }
@@ -410,7 +410,7 @@ pub struct Tile {
     pub width: i32,
     pub height: i32,
     pub depth: i32,
-    pub id: u32,
+    pub id: usize,
     pub locked: bool,
 }
 

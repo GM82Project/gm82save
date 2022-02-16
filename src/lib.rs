@@ -195,7 +195,7 @@ unsafe extern "fastcall" fn reset_extra_data_inj() {
     let _: u32 = delphi_call!(0x6bc964); // reset triggers (what this overwrote)
 }
 
-static mut EXTRA_DATA: Option<(HashMap<u32, InstanceExtra>, HashMap<u32, TileExtra>)> = None;
+static mut EXTRA_DATA: Option<(HashMap<usize, InstanceExtra>, HashMap<usize, TileExtra>)> = None;
 
 unsafe extern "fastcall" fn about_inj(about_dialog: *const *const usize) {
     let info = UStr::new(concat!("gm82save: ", env!("BUILD_DATE")));
@@ -536,7 +536,7 @@ unsafe fn save_real(file: usize, real: &f64) {
     }
 }
 
-unsafe extern "fastcall" fn save_instance_extra(file: usize, id: u32, exe: bool) {
+unsafe extern "fastcall" fn save_instance_extra(file: usize, id: usize, exe: bool) {
     if exe {
         if let Some(data) = EXTRA_DATA.as_ref().map(|(insts, _)| insts.get(&id).unwrap_or(&InstanceExtra::DEFAULT)) {
             save_real(file, &data.xscale);
@@ -547,7 +547,7 @@ unsafe extern "fastcall" fn save_instance_extra(file: usize, id: u32, exe: bool)
     }
 }
 
-unsafe extern "fastcall" fn save_tile_extra(file: usize, id: u32, exe: bool) {
+unsafe extern "fastcall" fn save_tile_extra(file: usize, id: usize, exe: bool) {
     if exe {
         if let Some(data) = EXTRA_DATA.as_ref().map(|(_, tiles)| tiles.get(&id).unwrap_or(&TileExtra::DEFAULT)) {
             save_real(file, &data.xscale);

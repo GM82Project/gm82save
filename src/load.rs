@@ -601,7 +601,7 @@ unsafe fn load_instances(room: &mut Room, path: &mut PathBuf, objs: &HashMap<Str
             instance.y = iter.next().ok_or_else(err)?.parse()?;
             let code_hash = iter.next().ok_or_else(err)?;
             instance.locked = iter.next().ok_or_else(err)?.parse::<u8>()? != 0;
-            instance.id = (last_instance_id + i) as _;
+            instance.id = last_instance_id + i;
             if let Some(s) = iter.next() {
                 extra.xscale = s.parse()?;
             }
@@ -670,7 +670,7 @@ unsafe fn load_tiles(path: &mut PathBuf, bgs: &HashMap<String, usize>) -> Result
                     height: iter.next().ok_or_else(err)?.parse()?,
                     locked: iter.next().ok_or_else(err)?.parse::<u8>()? != 0,
                     depth,
-                    id: (last_tile_id + i) as _,
+                    id: last_tile_id + i,
                 };
                 if let Some(s) = iter.next() {
                     extra.xscale = s.parse()?;
