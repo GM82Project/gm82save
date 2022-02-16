@@ -471,6 +471,10 @@ impl Room {
         unsafe { self.instances.get_unchecked(..self.instance_count) }
     }
 
+    pub fn get_instances_mut(&mut self) -> &mut [Instance] {
+        unsafe { self.instances.get_unchecked_mut(..self.instance_count) }
+    }
+
     pub unsafe fn put_tiles(&mut self, tiles: Vec<Tile>) {
         let count = tiles.len();
         self.tile_count = count;
@@ -480,6 +484,10 @@ impl Room {
 
     pub fn get_tiles(&self) -> &[Tile] {
         unsafe { self.tiles.get_unchecked(..self.tile_count) }
+    }
+
+    pub fn get_tiles_mut(&mut self) -> &mut [Tile] {
+        unsafe { self.tiles.get_unchecked_mut(..self.tile_count) }
     }
 }
 

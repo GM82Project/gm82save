@@ -14,7 +14,14 @@ mod save;
 mod stub;
 
 use crate::delphi::UStr;
-use std::{arch::asm, collections::HashMap, ffi::c_void, io::Write, path::PathBuf};
+use std::{
+    arch::asm,
+    collections::{HashMap, HashSet},
+    ffi::c_void,
+    io::Write,
+    path::PathBuf,
+    ptr,
+};
 
 #[derive(Debug)]
 pub enum Error {
@@ -557,6 +564,31 @@ unsafe extern "fastcall" fn save_tile_extra(file: usize, id: usize, exe: bool) {
     }
 }
 
+unsafe extern "stdcall" fn freshen_room_ids(room: &mut asset::Room) {
+    if let Some((instance_map, tile_map)) = EXTRA_DATA.as_mut() {
+        let last_instance_id = *ide::LAST_INSTANCE_ID + 1;
+        let instances = room.get_instances_mut();
+        *ide::LAST_INSTANCE_ID += instances.len();
+        for (i, instance) in instances.into_iter().enumerate() {
+            let old_id = instance.id;
+            instance.id = last_instance_id + i;
+            if let Some(data) = instance_map.get(&old_id).cloned() {
+                instance_map.insert(instance.id, data);
+            }
+        }
+        let last_tile_id = *ide::LAST_TILE_ID + 1;
+        let tiles = room.get_tiles_mut();
+        *ide::LAST_TILE_ID += tiles.len();
+        for (i, tile) in tiles.into_iter().enumerate() {
+            let old_id = tile.id;
+            tile.id = last_tile_id + i;
+            if let Some(data) = tile_map.get(&old_id).cloned() {
+                tile_map.insert(tile.id, data);
+            }
+        }
+    }
+}
+
 #[naked]
 unsafe extern "C" fn setup_unicode_parse_inj() {
     asm! {
@@ -691,6 +723,39 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
     if editor_path.exists() {
         let mut room_path = PathBuf::from((&*ide::PROJECT_PATH).to_os_string());
         if room_path.extension() == Some("gm82".as_ref()) {
+            // if we haven't loaded as gm82 before, sanitize instance and tile ids, as there may be duplicates
+            if EXTRA_DATA.is_none() {
+                EXTRA_DATA = Some(Default::default());
+                let mut instance_ids = HashSet::new();
+                let mut tile_ids = HashSet::new();
+                // making rooms mutable would lead to weirdness so i guess i'm not
+                for room in ide::get_rooms_mut()
+                    .iter_mut()
+                    .map(|r| std::mem::transmute::<Option<&asset::Room>, Option<&mut asset::Room>>(*r))
+                    .flatten()
+                {
+                    // check if all ids are unique, and if not, update *all* the ids for consistency
+                    let instances_ok = room.get_instances().iter().all(|inst| instance_ids.insert(inst.id));
+                    let tiles_ok = room.get_tiles().iter().all(|tile| tile_ids.insert(tile.id));
+                    if !instances_ok || !tiles_ok {
+                        freshen_room_ids(room);
+                    }
+                }
+                // force-save all open rooms just in case
+                for form in ide::get_room_forms().iter().map(|&f| f as *mut *const u8) {
+                    if !form.is_null() {
+                        let room = *form.add(0x61c / 4);
+                        let saveroom = *form.add(0x620 / 4);
+                        let _: u32 = delphi_call!(0x657994, saveroom, room); // copy room to saveroom
+                        let undoroom_ptr = form.add(0x62c / 4);
+                        if !(*undoroom_ptr).is_null() {
+                            let _: u32 = delphi_call!(0x405a7c, *undoroom_ptr); // free undo room
+                            *undoroom_ptr = ptr::null();
+                        }
+                        form.cast::<bool>().add(0x628).write(false); // clear ischanged flag
+                    }
+                }
+            }
             SAVING_FOR_ROOM_EDITOR = true;
             let _: u32 = delphi_call!(0x6e0540, *(0x790100 as *const u32)); // save
             SAVING_FOR_ROOM_EDITOR = false;
@@ -714,10 +779,6 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
                             }
                         }
                         let _: u32 = delphi_call!(0x657820, room); // clear room
-                    }
-                    // initialize extra data if it doesn't exist yet
-                    if EXTRA_DATA.is_none() {
-                        EXTRA_DATA = Some(Default::default());
                     }
                     ide::get_rooms_mut()[room_id] =
                         load::load_room(&mut room_path, &asset_maps).expect("loading the updated room failed").as_ref();
@@ -872,6 +933,18 @@ unsafe fn injector() {
     // nop out room view size stuff
     patch(0x657904 as _, &[0x90; 14]);
     patch(0x65791c as _, &[0x90; 14]);
+
+    // replace ids in new room when duplicating
+    #[rustfmt::skip]
+    patch(0x692e72 as _, &[
+        0x8b, 0x14, 0x98, // mov edx, [eax+ebx*4]
+        0x8b, 0x04, 0xb0, // mov eax, [eax+esi*4]
+        0x50, // push eax
+        0xe8, 0x16, 0x4b, 0xfc, 0xff, // call CRoom.Assign
+        0xe8, 0x00, 0x00, 0x00, 0x00, // call freshen_room_ids
+        0x90, 0x90, 0x90, 0x90, 0x90, // nop padding
+    ]);
+    patch_call(0x692e7e as _, freshen_room_ids as _);
 
     // funky room editor shit
     patch_call(0x69319c as _, room_form_inj as _);
