@@ -91,7 +91,7 @@ unsafe fn save_frame(frame: &Frame, path: &std::path::Path) -> Result<()> {
     // set up encoder
     let mut f = open_file(path)?;
     let mut encoder = png::Encoder::new(&mut f, frame.width, frame.height);
-    encoder.set_color(png::ColorType::RGBA);
+    encoder.set_color(png::ColorType::Rgba);
     encoder.set_filter(png::FilterType::NoFilter);
     let mut writer = encoder.write_header().map_err(err)?;
     // BGRA8 -> RGBA8

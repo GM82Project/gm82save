@@ -209,7 +209,8 @@ unsafe fn load_frame(path: &std::path::Path, frame: &mut Frame) -> Result<()> {
     // no open_file because png uses BufReader internally
     let mut decoder = Decoder::new(File::open(&path).map_err(|e| Error::FileIoError(e, path.to_path_buf()))?);
     decoder.set_transformations(Transformations::EXPAND | Transformations::STRIP_16);
-    let (info, mut reader) = decoder.read_info().map_err(err)?;
+    let mut reader = decoder.read_info().map_err(err)?;
+    let info = reader.info();
     frame.width = info.width;
     frame.height = info.height;
     // do this calculation myself in case the png is a weird format
@@ -217,20 +218,20 @@ unsafe fn load_frame(path: &std::path::Path, frame: &mut Frame) -> Result<()> {
     let data_size = line_size * info.height as usize;
     let data = slice::from_raw_parts_mut(delphi::GetMem(data_size), data_size);
     match (info.bit_depth, info.color_type) {
-        (BitDepth::Eight, ColorType::RGBA) => {
+        (BitDepth::Eight, ColorType::Rgba) => {
             // this should be the only one that actually gets used
             // but i'll allow other formats too just to be nice
             reader.next_frame(data).map_err(err)?;
             // RGBA8 -> BGRA8
             data.par_chunks_exact_mut(4).for_each(|px| px.swap(0, 2));
         },
-        (BitDepth::Eight, ColorType::RGB) => {
+        (BitDepth::Eight, ColorType::Rgb) => {
             for dst_row in data.chunks_exact_mut(line_size) {
                 let src_row = reader.next_row().map_err(err)?.ok_or_else(|| {
                     Error::Other(format!("decoding ended too soon for image {}", path.to_string_lossy()))
                 })?;
                 // RGB8 -> BGR8
-                for (dst, src) in dst_row.chunks_exact_mut(4).zip(src_row.chunks_exact(3)) {
+                for (dst, src) in dst_row.chunks_exact_mut(4).zip(src_row.data().chunks_exact(3)) {
                     dst[0] = src[2];
                     dst[1] = src[1];
                     dst[2] = src[0];
@@ -243,7 +244,7 @@ unsafe fn load_frame(path: &std::path::Path, frame: &mut Frame) -> Result<()> {
                 let src_row = reader.next_row().map_err(err)?.ok_or_else(|| {
                     Error::Other(format!("decoding ended too soon for image {}", path.to_string_lossy()))
                 })?;
-                for (dst, &src) in dst_row.chunks_exact_mut(4).zip(src_row) {
+                for (dst, &src) in dst_row.chunks_exact_mut(4).zip(src_row.data()) {
                     dst[0..3].fill(src);
                     dst[3] = 255;
                 }
@@ -254,7 +255,7 @@ unsafe fn load_frame(path: &std::path::Path, frame: &mut Frame) -> Result<()> {
                 let src_row = reader.next_row().map_err(err)?.ok_or_else(|| {
                     Error::Other(format!("decoding ended too soon for image {}", path.to_string_lossy()))
                 })?;
-                for (dst, src) in dst_row.chunks_exact_mut(4).zip(src_row.chunks_exact(2)) {
+                for (dst, src) in dst_row.chunks_exact_mut(4).zip(src_row.data().chunks_exact(2)) {
                     dst[0..3].fill(src[0]);
                     dst[3] = src[1];
                 }

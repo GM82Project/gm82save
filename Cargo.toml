@@ -26,6 +26,6 @@ ctor = "0.1.20"
 flate2 = {version = "1.0", features = ["zlib-ng-compat"], default-features = false}
 itertools = "0.10"
 paste = "1.0"
-png = "0.16"
+png = "0.17"
 rayon = "1.5"
 unicase = "2.6"
