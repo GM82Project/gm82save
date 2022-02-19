@@ -638,6 +638,15 @@ unsafe extern "fastcall" fn gm82_file_association(reg: u32) {
     let _: u32 = delphi_call!(0x6dd850, reg, ext.0, UStr::new(r"\Software\Classes").0, UStr::new("gm82file").0);
 }
 
+unsafe extern "fastcall" fn check_gm_processes(name: usize, value: u32) {
+    use sysinfo::{ProcessExt, SystemExt};
+    let system = sysinfo::System::new_with_specifics(sysinfo::RefreshKind::new().with_processes(sysinfo::ProcessRefreshKind::new()));
+    let path = std::env::current_exe().unwrap();
+    if system.processes().iter().filter(|(_, p)| p.exe() == path).count() <= 1 {
+        let _: u32 = delphi_call!(0x716b78, name, value);
+    }
+}
+
 #[naked]
 unsafe extern "C" fn room_form_inj() {
     asm! {
@@ -1003,6 +1012,10 @@ unsafe fn injector() {
     // read NewsBrowser from form as ValueEdit
     patch(0x71a96b as _, &[0x8b, 0x80, 0xa0, 0x02, 0x00, 0x00, 0xa3, 0x83, 0xa9, 0x79, 0x00, 0x90, 0x90]);
     patch(0x71a972 as _, &(&DEFAULT_ROOM_SPEED as *const u32 as usize as u32).to_le_bytes());
+
+    // check for other processes before setting MakerRunning to false
+    patch(0x71af15 as _, &[0xb9]);
+    patch_call(0x71af15 as _, check_gm_processes as _);
 
     // update timestamps when setting name
     unsafe fn patch_timestamps(dest: *mut u8) {
