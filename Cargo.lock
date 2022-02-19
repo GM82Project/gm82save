@@ -47,8 +47,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 [[package]]
 name = "cmake"
 version = "0.1.48"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8ad8cef104ac57b68b89df3208164d228503abbdce70f6880ffa3d970e7443a"
+source = "git+https://github.com/skyfloogle/cmake-rs?branch=i686-msvc2022-fix#67949e7d59bd0b9b680d2567b686bb87b8f67c4a"
 dependencies = [
  "cc",
 ]

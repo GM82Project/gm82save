@@ -29,3 +29,6 @@ paste = "1.0"
 png = "0.17"
 rayon = "1.5"
 unicase = "2.6"
+
+[patch.crates-io]
+cmake = { git = "https://github.com/skyfloogle/cmake-rs", branch = "i686-msvc2022-fix" }
