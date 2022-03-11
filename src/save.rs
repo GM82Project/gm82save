@@ -49,6 +49,18 @@ impl<'a> GetAsset<String> for &'a [UStr] {
     }
 }
 
+fn filename_invalid(s: &str) -> Option<u8> {
+    if s == "." || s == ".." || s.as_bytes().last() == Some('.') {
+        return Some(b'.')
+    }
+    for c in b"<>:\"/\\|?*" {
+        if s.as_bytes().contains(c) {
+            return Some(*c)
+        }
+    }
+    return None
+}
+
 fn make_unicase(s: String, u: &UStr) -> unicase::UniCase<String> {
     // implement my own ascii check because it's Faster
     if s.len() == u.len() {
@@ -642,6 +654,9 @@ unsafe fn save_triggers(path: &mut PathBuf) -> Result<()> {
             if let Some(trigger) = trigger.as_ref() {
                 let name = trigger.name.try_decode()?;
                 writeln!(index, "{}", name)?;
+                if let Some(c) = filename_invalid(&name) {
+                    return Err(Error::BadTriggerName(name, char::from(c)))
+                }
                 if !name_set.insert(make_unicase(name, &trigger.name)) {
                     return Err(Error::DuplicateTrigger(trigger.name.try_decode()?))
                 }
@@ -694,6 +709,9 @@ unsafe fn save_assets<'a, T: Sync>(
             writeln!(&mut index, "{}", name)?;
             if !name.is_empty() {
                 count += 1;
+                if let Some(c) = filename_invalid(&name) {
+                    return Err(Error::BadAssetName(name, char::from(c)))
+                }
                 if !name_set.insert(make_unicase(name, name_wide)) {
                     return Err(Error::DuplicateAsset(name_wide.try_decode()?))
                 }
@@ -737,6 +755,10 @@ unsafe fn save_included_files(path: &mut PathBuf) -> Result<()> {
         for file in files {
             let name = file.file_name.try_decode()?;
             writeln!(index, "{}", name)?;
+
+            if let Some(c) = filename_invalid(&name) {
+                return Err(Error::BadIncludedFileName(name, char::from(c)))
+            }
             if !names_set.insert(name) {
                 return Err(Error::DuplicateIncludedFile(file.file_name.try_decode()?))
             }

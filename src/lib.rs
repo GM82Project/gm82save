@@ -40,6 +40,9 @@ pub enum Error {
     DuplicateAsset(String),
     DuplicateIncludedFile(String),
     DuplicateTrigger(String),
+    BadAssetName(String, char),
+    BadIncludedFileName(String, char),
+    BadTriggerName(String, char),
     OldGM82,
     Other(String),
 }
@@ -62,6 +65,9 @@ impl std::fmt::Display for Error {
             Self::DuplicateAsset(n) => write!(f, "multiple assets named {}", n),
             Self::DuplicateIncludedFile(n) => write!(f, "multiple included files named {}", n),
             Self::DuplicateTrigger(n) => write!(f, "multiple triggers named {}", n),
+            Self::BadAssetName(n, c) => write!(f, "asset name {n} may not contain character {c}"),
+            Self::BadIncludedFileName(n, c) => write!(f, "included file name {n} may not contain character {c}"),
+            Self::BadTriggerName(n, c) => write!(f, "trigger file name {n} may not contain character {c}"),
             Self::OldGM82 => write!(f, "this project was made with a newer version of gm82save, please update"),
             Self::Other(s) => write!(f, "other error: {}", s),
         }
@@ -640,7 +646,9 @@ unsafe extern "fastcall" fn gm82_file_association(reg: u32) {
 
 unsafe extern "fastcall" fn check_gm_processes(name: usize, value: u32) {
     use sysinfo::{ProcessExt, SystemExt};
-    let system = sysinfo::System::new_with_specifics(sysinfo::RefreshKind::new().with_processes(sysinfo::ProcessRefreshKind::new()));
+    let system = sysinfo::System::new_with_specifics(
+        sysinfo::RefreshKind::new().with_processes(sysinfo::ProcessRefreshKind::new()),
+    );
     let path = std::env::current_exe().unwrap();
     if system.processes().iter().filter(|(_, p)| p.exe() == path).count() <= 1 {
         let _: u32 = delphi_call!(0x716b78, name, value);
