@@ -50,7 +50,7 @@ impl<'a> GetAsset<String> for &'a [UStr] {
 }
 
 fn filename_invalid(s: &str) -> Option<u8> {
-    if s == "." || s == ".." || s.as_bytes().last() == Some('.') {
+    if s == "." || s == ".." || s.as_bytes().last().copied() == Some(b'.') {
         return Some(b'.')
     }
     for c in b"<>:\"/\\|?*" {
