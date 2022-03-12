@@ -308,7 +308,9 @@ unsafe fn save_timeline(tl: &Timeline, path: &mut PathBuf) -> Result<()> {
     let mut f = open_file(path)?;
     for (time, event) in tl.get_times().iter().zip(tl.get_events()) {
         let event = &**event;
-        save_event(event, &time.to_string(), &mut f)?;
+        if event.action_count != 0 {
+            save_event(event, &time.to_string(), &mut f)?;
+        }
     }
     f.flush()?;
     Ok(())
