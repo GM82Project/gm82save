@@ -532,8 +532,11 @@ unsafe fn load_timeline(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*c
         if code.trim().is_empty() {
             continue
         }
-        let err = || Error::SyntaxError(path.to_path_buf());
-        let (name, actions) = code.split_once("\n").ok_or_else(err)?;
+        let (name, actions) = match code.split_once("\n") {
+            Some(tuple) => tuple,
+            None if code.as_bytes().iter().all(u8::is_ascii_digit) => (code, ""), // #define 1\n#define 2
+            None => return Err(Error::SyntaxError(path.to_path_buf())),
+        };
         *time_p = name.trim().parse()?;
         let event = Event::new();
         load_event(&path, &mut *event, actions, asset_maps)?;
