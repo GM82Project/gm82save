@@ -138,6 +138,7 @@ unsafe fn save_sound(sound: &Sound, path: &mut PathBuf) -> Result<()> {
     let mut f = open_file(&path)?;
     writeln!(f, "extension={}", extension)?;
     writeln!(f, "exists={}", u8::from(!sound.data.is_null()))?;
+    writeln!(f, "source={}", sound.source.try_decode()?)?;
     writeln!(f, "kind={}", sound.kind)?;
     writeln!(f, "effects={}", sound.effects)?;
     writeln!(f, "volume={}", sound.volume)?;

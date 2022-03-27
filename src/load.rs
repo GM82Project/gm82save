@@ -183,6 +183,7 @@ unsafe fn load_sound(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*con
                 extension = v.to_string();
                 snd.extension = UStr::new(v)
             },
+            "source" => snd.source = UStr::new(v),
             "exists" => exists = v.parse::<u8>()? != 0,
             "kind" => snd.kind = v.parse()?,
             "effects" => snd.effects = v.parse()?,
