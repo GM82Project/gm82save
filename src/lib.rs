@@ -656,6 +656,26 @@ unsafe extern "fastcall" fn check_gm_processes(name: usize, value: u32) {
 }
 
 #[naked]
+unsafe extern "C" fn free_image_editor_bitmap() {
+    asm! {
+        // call free on TheBitmap
+        "mov edx, 0x405a7c",
+        "call edx",
+        // get TransBitmap
+        "mov eax, dword ptr [esi]",
+        "mov eax, dword ptr [eax + 0x708]",
+        // check if it exists
+        "test eax, eax",
+        "jz 1f",
+        // free it
+        "mov edx, 0x405a7c",
+        "call edx",
+        "1: ret",
+        options(noreturn),
+    }
+}
+
+#[naked]
 unsafe extern "C" fn room_form_inj() {
     asm! {
         "mov ecx, eax",
@@ -899,6 +919,9 @@ unsafe fn injector() {
     // fix stupid null pointer error
     patch(0x68ef02 as _, &[0xe9]);
     patch_call(0x68ef02 as _, fix_tile_null_pointer as _);
+
+    // fix memory leak in image editor
+    patch_call(0x643bd0 as _, free_image_editor_bitmap as _);
 
     // use zlib-ng for compression
     patch(0x52f34c as _, &[0xe9]);
