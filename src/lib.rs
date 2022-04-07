@@ -13,7 +13,7 @@ mod load;
 mod save;
 mod stub;
 
-use crate::delphi::UStr;
+use crate::delphi::{TTreeNode, UStr};
 use std::{
     arch::asm,
     collections::{HashMap, HashSet},
@@ -795,6 +795,26 @@ static mut DEFAULT_ROOM_WIDTH: u32 = 800;
 static mut DEFAULT_ROOM_HEIGHT: u32 = 608;
 static mut DEFAULT_ROOM_SPEED: u32 = 50;
 
+#[naked]
+unsafe extern "fastcall" fn dont_make_room_form_inj() {
+    asm! {
+        "mov ecx, eax",
+        "jmp {}",
+        sym dont_make_room_form,
+        options(noreturn)
+    }
+}
+
+unsafe extern "fastcall" fn dont_make_room_form(node: &TTreeNode) {
+    // always open if gm82room is disabled, not opening a room, or not using gm82 format
+    if *(0x79a982 as *const bool)
+        || (*node.data).kind != 4
+        || (*ide::PROJECT_PATH).as_slice().last().copied() != Some(b'2' as u16)
+    {
+        let _: u32 = delphi_call!(0x71d608, node);
+    }
+}
+
 static mut SAW_APPLIES_TO_WARNING: bool = false;
 
 static mut SAVING_FOR_ROOM_EDITOR: bool = false;
@@ -1046,6 +1066,10 @@ unsafe fn injector() {
     patch_call(0x69319c as _, room_form_inj as _);
     // disable news (replace function with a ret)
     patch(0x62c224 as _, &[0xc3]);
+    // don't open gm82room when creating/duplicating a new room
+    patch_call(0x6e2f86 as _, dont_make_room_form_inj as _);
+    patch_call(0x6e2f5c as _, dont_make_room_form_inj as _);
+    patch_call(0x6e169e as _, dont_make_room_form_inj as _);
 
     // configs for default room editor settings
     // force progress bar (replace check with nops)

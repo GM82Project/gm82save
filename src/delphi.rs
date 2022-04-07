@@ -338,12 +338,12 @@ impl UStr {
         if self.0.is_null() { 0 } else { unsafe { self.0.cast::<usize>().sub(1).read() } }
     }
 
+    pub fn as_slice(&self) -> &[u16] {
+        if self.0.is_null() { &[] } else { unsafe { slice::from_raw_parts(self.0, self.len()) } }
+    }
+
     pub fn to_os_string(&self) -> OsString {
-        if self.0.is_null() {
-            OsString::new()
-        } else {
-            unsafe { OsString::from_wide(slice::from_raw_parts(self.0, self.len())) }
-        }
+        OsString::from_wide(self.as_slice())
     }
 
     pub unsafe fn from_ptr(s: &*const u16) -> &Self {
