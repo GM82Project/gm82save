@@ -676,6 +676,59 @@ unsafe extern "C" fn free_image_editor_bitmap() {
 }
 
 #[naked]
+unsafe extern "C" fn path_form_mouse_wheel_inj() {
+    asm! {
+        // call TPathForm.Create
+        "mov ebx, 0x514e78",
+        "call ebx",
+        // set OnMouseWheel
+        "mov dword ptr [eax + 0x144], eax",
+        "lea edx, {}",
+        "mov dword ptr [eax + 0x140], edx",
+        "ret",
+        sym path_form_mouse_wheel,
+        options(noreturn),
+    }
+}
+
+#[naked]
+unsafe extern "C" fn path_form_mouse_wheel() {
+    asm! {
+        // check handled flag
+        "mov edx, [esp + 0x4]",
+        "cmp byte ptr [edx], 0",
+        "jnz 4f",
+        // set handled flag
+        "mov byte ptr [edx], 1",
+        "push eax",
+        // check if shift is being held
+        "mov edx, dword ptr [esp + 0x10]",
+        "test cx, 1",
+        "jnz 2f",
+        // no shift, so scroll vertically
+        "sub dword ptr [eax + 0x464], edx",
+        "jmp 3f",
+        // yes shift, so scroll horizontally
+        "2: sub dword ptr [eax + 0x460], edx",
+        "3:",
+        // update room background
+        "mov ecx, 0x7203ec",
+        "call ecx",
+        // draw path image
+        "mov eax, dword ptr [esp]",
+        "mov ecx, 0x720560",
+        "call ecx",
+        // update status bar
+        "pop eax",
+        "mov ecx, 0x720a68",
+        "call ecx",
+        "4:",
+        "ret 0xc",
+        options(noreturn),
+    }
+}
+
+#[naked]
 unsafe extern "C" fn room_form_inj() {
     asm! {
         "mov ecx, eax",
@@ -922,6 +975,9 @@ unsafe fn injector() {
 
     // fix memory leak in image editor
     patch_call(0x643bd0 as _, free_image_editor_bitmap as _);
+
+    // add scrolling to path form
+    patch_call(0x71fdcb as _, path_form_mouse_wheel_inj as _);
 
     // use zlib-ng for compression
     patch(0x52f34c as _, &[0xe9]);
