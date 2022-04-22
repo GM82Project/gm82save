@@ -729,6 +729,34 @@ unsafe extern "C" fn path_form_mouse_wheel() {
 }
 
 #[naked]
+unsafe extern "C" fn code_editor_middle_click() {
+    asm! {
+        // abort if not middle click
+        "mov ecx, 0x6b734e",
+        "push ecx",
+        "cmp byte ptr [ebp - 1], 2",
+        //"test byte ptr [ebp + 0x10],0x1",
+        "jnz 2f",
+        // save cursor position
+        "push dword ptr [ebx + 0x2ec]",
+        "push dword ptr [ebx + 0x2f0]",
+        // move cursor
+        "mov dword ptr [ebx + 0x2ec], edi",
+        "mov dword ptr [ebx + 0x2f0], esi",
+
+        // show resource on cursor position
+        "mov ecx, 0x6b2000",
+        "mov eax, ebx",
+        "call ecx",
+        // reset cursor
+        "pop dword ptr [ebx + 0x2f0]",
+        "pop dword ptr [ebx + 0x2ec]",
+        "2: ret",
+        options(noreturn),
+    }
+}
+
+#[naked]
 unsafe extern "C" fn room_form_inj() {
     asm! {
         "mov ecx, eax",
@@ -1041,6 +1069,12 @@ unsafe fn injector() {
 
     // .gm82 file associations
     patch_call(0x6ddacd as _, gm82_file_association_inj as _);
+
+    // middle click in code editor shows resource
+    // remove first check
+    patch(0x6b7182 as _, &[0x90, 0x90, 0x90, 0x90, 0x90, 0x90]);
+    // inject second check
+    patch_call(0x6b721b as _, code_editor_middle_click as _);
 
     // default room editor settings
     patch(0x657852 as _, &[0xe8, 0, 0, 0, 0, 0x90, 0x90]);
