@@ -406,50 +406,34 @@ fn save_instances(instances: &[Instance], path: &mut PathBuf) -> Result<()> {
     path.push("instances.txt");
     let mut f = open_file(&path)?;
     path.pop();
-    let mut codes = HashMap::with_capacity(instances.len());
+    let extra_data = unsafe { &mut EXTRA_DATA.get_or_insert_with(Default::default).0 };
+
     for instance in instances {
-        // pre-process the code so the hash stays consistent
         let mut code = Vec::with_capacity(instance.creation_code.len());
         write_gml(&mut code, &instance.creation_code)?;
-        let mut hash_hex = [0; 8];
-        let fname = if !code.is_empty() {
-            let hash = crc::crc32::checksum_ieee(&code);
-            for i in 0..8 {
-                hash_hex[7 - i] = match (hash >> (i * 4)) & 0xf {
-                    i if i < 10 => b'0' + i as u8,
-                    i => b'A' - 10 + i as u8,
-                };
-            }
-            let mut fname = unsafe { str::from_utf8_unchecked(&hash_hex).to_string() };
-            if let Some(fname) = loop {
-                if let Some(old_code) = codes.get(&fname) {
-                    if &code == old_code {
-                        // we already saved this code, no need to repeat
-                        break None
-                    } else {
-                        // new code with hash collision
-                        fname.push('_');
-                    }
-                } else {
-                    // new code, safe hash
-                    codes.insert(fname.to_string(), code.clone());
-                    break Some(&fname)
+        let fname = {
+            // get id
+            let mut hash = extra_data.entry(instance.id).or_default().name;
+            if hash == 0 {
+                // generate random unique id
+                while hash == 0 || extra_data.values().any(|x| x.name == hash) {
+                    hash = delphi::Random();
                 }
-            } {
-                path.push(&fname);
-                path.set_extension("gml");
-                write_file(&path, code)?;
-                path.pop();
+                extra_data.get_mut(&instance.id).unwrap().name = hash;
             }
-            fname
-        } else {
-            String::new() // ""
+            format!("{:08X}", hash)
         };
-        let InstanceExtra { xscale, yscale, blend, angle } =
+        if !code.is_empty() {
+            path.push(&fname);
+            path.set_extension("gml");
+            write_file(&path, &code)?;
+            path.pop();
+        }
+        let InstanceExtra { xscale, yscale, blend, angle, .. } =
             unsafe { EXTRA_DATA.as_ref().and_then(|e| e.0.get(&instance.id).cloned()).unwrap_or_default() };
         writeln!(
             f,
-            "{},{},{},{},{},{},{},{},{}",
+            "{},{},{},{},{},{},{},{},{},{}",
             ide::get_object_names().get_asset(instance.object),
             instance.x,
             instance.y,
@@ -459,6 +443,7 @@ fn save_instances(instances: &[Instance], path: &mut PathBuf) -> Result<()> {
             yscale,
             blend,
             angle,
+            u8::from(!code.is_empty()),
         )?;
     }
     f.flush()?;
@@ -904,7 +889,7 @@ pub unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
         create_dirs(path.parent().unwrap())?;
         // some stuff to go in the main gmk
         let mut f = open_file(&path)?;
-        writeln!(f, "gm82_version=3")?;
+        writeln!(f, "gm82_version=4")?;
         writeln!(f, "gameid={}", ide::GAME_ID.read())?;
         writeln!(f)?;
         writeln!(f, "info_author={}", (&*ide::settings::INFO_AUTHOR).try_decode()?)?;

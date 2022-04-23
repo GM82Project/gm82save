@@ -6,9 +6,10 @@ use crate::{
     EXTRA_DATA,
 };
 use itertools::izip;
+use parking_lot::Mutex;
 use rayon::prelude::*;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     ffi::OsStr,
     fs::File,
     hint::unreachable_unchecked,
@@ -594,6 +595,7 @@ unsafe fn load_instances(room: &mut Room, path: &mut PathBuf, objs: &HashMap<Str
     path.pop();
     let err = || Error::SyntaxError(inst_path.to_path_buf());
     let last_instance_id = *ide::LAST_INSTANCE_ID + 1;
+    let ids = Mutex::new(HashSet::with_capacity(instances.len()));
     let mut extras: Vec<InstanceExtra> = vec![Default::default(); instances.len()];
     room.alloc_instances(instances.len()).into_par_iter().zip(&instances).enumerate().zip(&mut extras).try_for_each(
         |((i, (instance, line)), extra)| -> Result<()> {
@@ -605,6 +607,24 @@ unsafe fn load_instances(room: &mut Room, path: &mut PathBuf, objs: &HashMap<Str
             instance.x = iter.next().ok_or_else(err)?.parse()?;
             instance.y = iter.next().ok_or_else(err)?.parse()?;
             let code_hash = iter.next().ok_or_else(err)?;
+            extra.name = if !code_hash.is_empty() {
+                // check if hash is taken
+                let mut id = u32::from_str_radix(code_hash, 16)?;
+                // while it's taken, generate random id
+                while ids.lock().contains(&id) {
+                    id = delphi::Random();
+                }
+                id
+            } else {
+                // no id, generate random id until we get an unused one
+                loop {
+                    let id = delphi::Random();
+                    if !ids.lock().contains(&id) {
+                        break id
+                    }
+                }
+            };
+            ids.lock().insert(extra.name);
             instance.locked = iter.next().ok_or_else(err)?.parse::<u8>()? != 0;
             instance.id = last_instance_id + i;
             if let Some(s) = iter.next() {
@@ -619,7 +639,9 @@ unsafe fn load_instances(room: &mut Room, path: &mut PathBuf, objs: &HashMap<Str
             if let Some(s) = iter.next() {
                 extra.angle = s.parse()?;
             }
-            if !code_hash.is_empty() {
+            // use the id from the file, not the generated one if relevant
+            let has_code = if let Some(s) = iter.next() { s.parse::<u8>()? != 0 } else { !code_hash.is_empty() };
+            if has_code {
                 let mut path = path.join(code_hash);
                 path.set_extension("gml");
                 instance.creation_code = load_gml(&read_file(&path)?);
@@ -1078,7 +1100,7 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     read_txt(&path, |k, v| {
         match k {
             "gm82_version" => {
-                if v.parse::<u8>()? > 3 {
+                if v.parse::<u8>()? > 4 {
                     return Err(Error::OldGM82)
                 }
             },

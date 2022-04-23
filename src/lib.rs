@@ -15,6 +15,8 @@ mod save;
 mod stub;
 
 use crate::delphi::{TTreeNode, UStr};
+use lazy_static::lazy_static;
+use regex::Regex;
 use std::{
     arch::asm,
     collections::{HashMap, HashSet},
@@ -171,6 +173,7 @@ fn update_timestamp() {
 
 #[derive(Clone)]
 struct InstanceExtra {
+    pub name: u32,
     pub xscale: f64,
     pub yscale: f64,
     pub blend: u32,
@@ -178,7 +181,7 @@ struct InstanceExtra {
 }
 
 impl InstanceExtra {
-    pub const DEFAULT: Self = Self { xscale: 1.0, yscale: 1.0, blend: u32::MAX, angle: 0.0 };
+    pub const DEFAULT: Self = Self { name: 0, xscale: 1.0, yscale: 1.0, blend: u32::MAX, angle: 0.0 };
 }
 
 impl Default for InstanceExtra {
@@ -428,7 +431,17 @@ unsafe extern "C" fn reset_compression() {
     }
 }
 
-unsafe extern "stdcall" fn freshen_room_ids(room: &mut asset::Room) {
+unsafe extern "stdcall" fn duplicate_room(room: &mut asset::Room, old_id: usize, new_id: usize) {
+    let room_names: &[UStr] = ide::get_room_names();
+    fix_instances_when_renaming_room(
+        room,
+        room_names[old_id].to_os_string().to_str().unwrap(),
+        room_names[new_id].to_os_string().to_str().unwrap(),
+    );
+    freshen_room_ids(room);
+}
+
+unsafe fn freshen_room_ids(room: &mut asset::Room) {
     if let Some((instance_map, tile_map)) = EXTRA_DATA.as_mut() {
         let last_instance_id = *ide::LAST_INSTANCE_ID + 1;
         let instances = room.get_instances_mut();
@@ -681,6 +694,64 @@ static mut DEFAULT_ROOM_HEIGHT: u32 = 608;
 static mut DEFAULT_ROOM_SPEED: u32 = 50;
 
 #[naked]
+unsafe extern "fastcall" fn rename_room_inj() {
+    asm! {
+        "mov ecx, ebx",
+        "mov edx, [ebp - 4]",
+        "call {}",
+        "test eax, eax", // for the jump afterwards
+        "ret",
+        sym rename_room,
+        options(noreturn),
+    }
+}
+
+unsafe extern "fastcall" fn rename_room(room_id: usize, new_name: *const u16) -> *const UStr {
+    let rooms: &[Option<&asset::Room>] = ide::get_rooms();
+    let room_names: &[UStr] = ide::get_room_names();
+    if let Some(room) = rooms[room_id] {
+        let new_name = UStr::from_ptr(&new_name);
+        let new_name_slice = new_name.as_slice();
+        if new_name_slice.is_empty() {
+            show_message("Can't give room an empty name.");
+            return ptr::null()
+        }
+        if new_name_slice.contains(&(b'=' as u16)) {
+            show_message("Can't use illegal character '=' in asset name.");
+            return ptr::null()
+        }
+        let old_name = room_names[room_id].to_os_string().into_string().unwrap();
+        let new_name = new_name.to_os_string().into_string().unwrap();
+        fix_instances_when_renaming_room(&mut *(room as *const asset::Room as *mut asset::Room), &old_name, &new_name);
+    }
+    &room_names[room_id]
+}
+
+lazy_static! {
+    static ref ROOM_RENAME_REGEX: Regex = Regex::new(r"=[ \t\r\n]*([^=]*?)_[0-9A-F]{8}").unwrap();
+}
+
+fn fix_instances_when_renaming_room(room: &mut asset::Room, old_name: &str, new_name: &str) {
+    let re: &Regex = &ROOM_RENAME_REGEX;
+    for inst in room.get_instances_mut() {
+        let code = inst.creation_code.to_os_string().into_string().unwrap();
+        let mut it = re.captures_iter(&code).filter_map(|c| c.get(1)).filter(|m| m.as_str() == old_name).peekable();
+        if it.peek().is_none() {
+            continue
+        }
+        let mut new_code = String::with_capacity(code.len());
+        let mut last_match = 0;
+        for m in it {
+            new_code.push_str(&code[last_match..m.start()]);
+            new_code.push_str(&new_name);
+            last_match = m.end();
+        }
+        new_code.push_str(&code[last_match..]);
+        inst.creation_code = UStr::new(new_code);
+    }
+}
+
+#[naked]
 unsafe extern "fastcall" fn dont_make_room_form_inj() {
     asm! {
         "mov ecx, eax",
@@ -924,17 +995,28 @@ unsafe fn injector() {
     patch(0x657904 as _, &[0x90; 14]);
     patch(0x65791c as _, &[0x90; 14]);
 
+    // fix instance references in creation code when renaming room
+    #[rustfmt::skip]
+    patch(0x692fbb as _, &[
+        0xe8, 0, 0, 0, 0, // call rename_room_inj
+        0x74, 0x2a, // jz to end of function
+        0x90, // nop
+    ]);
+    patch_call(0x692fbb as _, rename_room_inj as _);
+
     // replace ids in new room when duplicating
     #[rustfmt::skip]
     patch(0x692e72 as _, &[
         0x8b, 0x14, 0x98, // mov edx, [eax+ebx*4]
         0x8b, 0x04, 0xb0, // mov eax, [eax+esi*4]
-        0x50, // push eax
-        0xe8, 0x16, 0x4b, 0xfc, 0xff, // call CRoom.Assign
+        0x56, // push esi (new id)
+        0x53, // push ebx (old id)
+        0x50, // push eax (room ptr)
+        0xe8, 0x14, 0x4b, 0xfc, 0xff, // call CRoom.Assign
         0xe8, 0x00, 0x00, 0x00, 0x00, // call freshen_room_ids
-        0x90, 0x90, 0x90, 0x90, 0x90, // nop padding
+        0x90, 0x90, 0x90, // nop padding
     ]);
-    patch_call(0x692e7e as _, freshen_room_ids as _);
+    patch_call(0x692e80 as _, duplicate_room as _);
 
     // funky room editor shit
     patch_call(0x69319c as _, room_form_inj as _);
