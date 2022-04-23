@@ -589,11 +589,11 @@ unsafe extern "C" fn path_form_mouse_wheel() {
 #[naked]
 unsafe extern "C" fn code_editor_middle_click() {
     asm! {
-        // abort if not middle click
+        // push return address
         "mov ecx, 0x6b734e",
         "push ecx",
+        // abort if not middle click
         "cmp byte ptr [ebp - 1], 2",
-        //"test byte ptr [ebp + 0x10],0x1",
         "jnz 2f",
         // save cursor position
         "push dword ptr [ebx + 0x2ec]",
@@ -601,7 +601,6 @@ unsafe extern "C" fn code_editor_middle_click() {
         // move cursor
         "mov dword ptr [ebx + 0x2ec], edi",
         "mov dword ptr [ebx + 0x2f0], esi",
-
         // show resource on cursor position
         "mov ecx, 0x6b2000",
         "mov eax, ebx",
