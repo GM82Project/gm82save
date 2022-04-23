@@ -12,7 +12,7 @@ unsafe extern "C" fn compile_constants_inj() {
     }
 }
 
-unsafe extern "fastcall" fn compile_constants(stream: usize) {
+unsafe extern "fastcall" fn compile_constants(stream: usize) -> bool {
     let constant_names = ide::get_constant_names();
     let constant_values = ide::get_constants();
     let rooms: &[Option<&Room>] = ide::get_rooms();
@@ -46,6 +46,7 @@ unsafe extern "fastcall" fn compile_constants(stream: usize) {
         // write constant value
         let _: u32 = delphi_call!(0x52f168, stream, UStr::new(id.to_string()).0);
     }
+    true
 }
 
 #[naked]
