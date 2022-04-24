@@ -61,7 +61,7 @@ impl Frame {
         let _: u32 = delphi_call!(0x7026A4, self, file);
     }
 
-    pub unsafe fn thumb(&self, out: &mut [u8]) {
+    pub unsafe fn thumb(&self, out: &mut [u8], flip: bool) {
         // note: this assumes output format == input format
         // these are stored as BGRA8 so make sure to double check what the output should be
         use itertools::Itertools;
@@ -73,7 +73,8 @@ impl Frame {
         };
         let (hoffset, voffset) = (8 - width / 2, 8 - height / 2);
         for (y, row) in out.chunks_exact_mut(16 * 4).enumerate() {
-            let y = 15 - y; // vertical flip for BMP
+            // vertical flip for BMP
+            let y = if flip { 15 - y } else { y };
             if y < voffset || y >= voffset + height {
                 row.fill(0);
                 continue
@@ -120,6 +121,31 @@ impl Frame {
                 }
             }
         }
+    }
+
+    pub unsafe fn register_thumb(&self) -> i32 {
+        let mut icon: [u8; 16 * 16 * 4] = std::mem::MaybeUninit::uninit().assume_init();
+        self.thumb(&mut icon, false);
+        let mut mask: [u8; 16 * 16 / 8] = std::mem::MaybeUninit::uninit().assume_init();
+        for (dst, src) in mask.iter_mut().zip(icon.chunks_exact(8 * 4)) {
+            *dst = u8::from(src[3] == 0) << 7
+                | u8::from(src[3 + 4] == 0) << 6
+                | u8::from(src[3 + 4 * 2] == 0) << 5
+                | u8::from(src[3 + 4 * 3] == 0) << 4
+                | u8::from(src[3 + 4 * 4] == 0) << 3
+                | u8::from(src[3 + 4 * 5] == 0) << 2
+                | u8::from(src[3 + 4 * 6] == 0) << 1
+                | u8::from(src[3 + 4 * 7] == 0);
+        }
+        let CreateBitmap: extern "stdcall" fn(u32, u32, u32, u32, *const u8) -> usize = std::mem::transmute(0x40e008);
+        let ImageList_Add: extern "stdcall" fn(usize, usize, usize) -> i32 = std::mem::transmute(0x40f8ec);
+        let DeleteObject: extern "stdcall" fn(usize) -> bool = std::mem::transmute(0x40e098);
+        let bitmap = CreateBitmap(16, 16, 1, 32, icon.as_ptr());
+        let mask_bitmap = CreateBitmap(16, 16, 1, 1, mask.as_ptr());
+        let thumb = ImageList_Add((0x789b38 as *const *const usize).read().add(16).read(), bitmap, mask_bitmap);
+        DeleteObject(bitmap);
+        DeleteObject(mask_bitmap);
+        thumb
     }
 }
 

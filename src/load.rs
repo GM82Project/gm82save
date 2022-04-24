@@ -1175,16 +1175,14 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         &asset_maps,
     )?;
     advance_progress_form(45);
-    // skip image list OnChange
-    super::patch(0x506f42 as _, &0x506f62u32.to_le_bytes());
     // register sprite icons
     let mut last_refresh = std::time::Instant::now();
     let sprites_len = ide::get_sprites().len();
     for (i, (sp, thumb)) in ide::get_sprites().iter().zip(ide::get_sprite_thumbs_mut()).enumerate() {
-        if let Some(sp) = sp {
-            let icon = sp.get_icon();
-            *thumb = delphi_call!(0x5a9c14, icon);
-            let _: u32 = delphi_call!(0x405a7c, icon);
+        if let Some(frame) =
+            sp.and_then(|sp| sp.get_frames().get(0)).and_then(|f| f.as_ref()).filter(|f| f.width != 0 && f.height != 0)
+        {
+            *thumb = frame.register_thumb();
             if last_refresh.elapsed() > std::time::Duration::from_secs(1) {
                 advance_progress_form((i * 15 / sprites_len + 45) as u32);
                 last_refresh = std::time::Instant::now();
@@ -1198,10 +1196,8 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     let mut last_refresh = std::time::Instant::now();
     let bg_len = ide::get_backgrounds().len();
     for (i, (bg, thumb)) in ide::get_backgrounds().iter().zip(ide::get_background_thumbs_mut()).enumerate() {
-        if let Some(bg) = bg {
-            let icon = bg.get_icon();
-            *thumb = delphi_call!(0x5a9c14, icon);
-            let _: u32 = delphi_call!(0x405a7c, icon);
+        if let Some(frame) = bg.and_then(|bg| bg.frame.as_ref()).filter(|f| f.width != 0 && f.height != 0) {
+            *thumb = frame.register_thumb();
             if last_refresh.elapsed() > std::time::Duration::from_secs(1) {
                 advance_progress_form((i * 5 / bg_len + 60) as u32);
                 last_refresh = std::time::Instant::now();
@@ -1210,8 +1206,6 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
             *thumb = -1;
         }
     }
-    // put image list OnChange back
-    super::patch(0x506f42 as _, &0x506f56u32.to_le_bytes());
     // image list OnChange
     let _: u32 = delphi_call!(0x5081b8, *(0x789b38 as *const usize));
     advance_progress_form(65);
