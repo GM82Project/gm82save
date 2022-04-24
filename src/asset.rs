@@ -123,6 +123,7 @@ impl Frame {
         }
     }
 
+    #[allow(non_snake_case)]
     pub unsafe fn register_thumb(&self) -> i32 {
         let mut icon: [u8; 16 * 16 * 4] = std::mem::MaybeUninit::uninit().assume_init();
         self.thumb(&mut icon, false);
