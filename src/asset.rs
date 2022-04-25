@@ -61,7 +61,7 @@ impl Frame {
         let _: u32 = delphi_call!(0x7026A4, self, file);
     }
 
-    pub unsafe fn thumb(&self, out: &mut [u8], flip: bool) {
+    pub unsafe fn thumb(&self, out: &mut [u8], flip: bool, bg_col: [u8; 3]) {
         // note: this assumes output format == input format
         // these are stored as BGRA8 so make sure to double check what the output should be
         use itertools::Itertools;
@@ -112,7 +112,10 @@ impl Frame {
                     // blend semi-transparent to white
                     let alpha = sum_px[3] / 4.0 / 255.0;
                     if alpha != 1.0 {
-                        px[..3].iter_mut().for_each(|c| *c += (f64::from(255 - *c) * (1.0 - alpha)) as u8);
+                        px[..3]
+                            .iter_mut()
+                            .zip(&bg_col)
+                            .for_each(|(c, &b)| *c = (f64::from(b) * (1.0 - alpha) + f64::from(*c) * alpha) as u8);
                     }
                     px[3] = 255;
                 } else {
@@ -123,9 +126,10 @@ impl Frame {
         }
     }
 
-    pub unsafe fn register_thumb(&self) -> i32 {
+    #[allow(non_snake_case)]
+    pub unsafe fn register_thumb(&self, bg_col: [u8; 3]) -> i32 {
         let mut icon: [u8; 16 * 16 * 4] = std::mem::MaybeUninit::uninit().assume_init();
-        self.thumb(&mut icon, false);
+        self.thumb(&mut icon, false, bg_col);
         let mut mask: [u8; 16 * 16 / 8] = std::mem::MaybeUninit::uninit().assume_init();
         for (dst, src) in mask.iter_mut().zip(icon.chunks_exact(8 * 4)) {
             *dst = u8::from(src[3] == 0) << 7

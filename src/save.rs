@@ -871,7 +871,7 @@ unsafe fn save_icon_cache(path: &mut PathBuf) -> Result<()> {
         let mut out = Vec::with_capacity(BMP_SIZE);
         out.extend_from_slice(BMP_HEADER);
         out.set_len(BMP_SIZE);
-        frame.thumb(&mut out[BMP_HEADER.len()..], true);
+        frame.thumb(&mut out[BMP_HEADER.len()..], true, [255, 255, 255]);
         let mut path = path.join(name.to_os_string());
         path.set_extension("bmp");
         write_file(&path, out)
