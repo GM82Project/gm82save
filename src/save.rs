@@ -411,18 +411,8 @@ fn save_instances(instances: &[Instance], path: &mut PathBuf) -> Result<()> {
     for instance in instances {
         let mut code = Vec::with_capacity(instance.creation_code.len());
         write_gml(&mut code, &instance.creation_code)?;
-        let fname = {
-            // get id
-            let mut hash = extra_data.entry(instance.id).or_default().name;
-            if hash == 0 {
-                // generate random unique id
-                while hash == 0 || extra_data.values().any(|x| x.name == hash) {
-                    hash = delphi::Random();
-                }
-                extra_data.get_mut(&instance.id).unwrap().name = hash;
-            }
-            format!("{:08X}", hash)
-        };
+        // get id
+        let fname = format!("{:08X}", extra_data.get(&instance.id).unwrap().name);
         if !code.is_empty() {
             path.push(&fname);
             path.set_extension("gml");
@@ -982,6 +972,22 @@ pub unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
         &mut path,
     )?;
     advance_progress_form(90);
+    // give instances ids if they don't already have one
+    for room in ide::get_rooms().iter().flatten() {
+        let extra_data = &mut EXTRA_DATA.get_or_insert_with(Default::default).0;
+        for id in room.get_instances().iter().map(|i| i.id) {
+            let mut name = extra_data.entry(id).or_default().name;
+            if name == 0 {
+                loop {
+                    name = delphi::Random();
+                    if !extra_data.values().any(|ex| ex.name == name) {
+                        extra_data.get_mut(&id).unwrap().name = name;
+                        break
+                    }
+                }
+            }
+        }
+    }
     save_assets(90, 95, "rooms", ide::get_rooms(), ide::get_room_names(), ide::RT_ROOMS, save_room, &mut path)?;
     advance_progress_form(95);
     save_included_files(&mut path)?;
