@@ -130,7 +130,9 @@ impl TTreeNodes {
 
 #[repr(C)]
 pub struct TTreeView {
-    padding: [u8; 0x2d8],
+    padding: [u8; 0x6c],
+    pub color: [u8; 3],
+    padding2: [u8; 0x269],
     pub nodes: *const TTreeNodes,
 }
 
