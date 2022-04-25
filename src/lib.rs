@@ -207,9 +207,11 @@ impl Default for TileExtra {
     }
 }
 
-unsafe extern "fastcall" fn reset_extra_data_inj() {
+unsafe extern "fastcall" fn reset_extra_data_and_insert_blank_object_inj() {
     EXTRA_DATA = None;
-    let _: u32 = delphi_call!(0x6bc964); // reset triggers (what this overwrote)
+    let _: u32 = delphi_call!(0x62c554); // reset objects (what this overwrote)
+    // insert a blank object
+    ide::alloc_objects(1);
 }
 
 static mut EXTRA_DATA: Option<(HashMap<usize, InstanceExtra>, HashMap<usize, TileExtra>)> = None;
@@ -969,8 +971,8 @@ unsafe fn injector() {
 
     // compiler injections
     compiler::inject();
-    // reset extra data when loading a new project
-    patch_call(0x705982 as _, reset_extra_data_inj as _);
+    // reset extra data and add a blank object when loading a new project
+    patch_call(0x70598c as _, reset_extra_data_and_insert_blank_object_inj as _);
 
     // read text as ANSI on pre-8.1
     patch(0x70537b as _, &[0xe8]);
