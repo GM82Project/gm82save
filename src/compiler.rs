@@ -1,5 +1,53 @@
 use super::{patch, patch_call, InstanceExtra, TileExtra, EXTRA_DATA};
+use crate::{asset::Room, ide, UStr};
 use std::arch::asm;
+
+#[naked]
+unsafe extern "C" fn compile_constants_inj() {
+    asm! {
+        "mov ecx, eax",
+        "jmp {}",
+        sym compile_constants,
+        options(noreturn),
+    }
+}
+
+unsafe extern "fastcall" fn compile_constants(stream: usize) -> bool {
+    let constant_names = ide::get_constant_names();
+    let constant_values = ide::get_constants();
+    let rooms: &[Option<&Room>] = ide::get_rooms();
+    let room_names: &[UStr] = ide::get_room_names();
+    let instances = rooms
+        .iter()
+        .zip(room_names)
+        .filter_map(|(room, name)| room.as_ref().map(|r| (r, name)))
+        .flat_map(|(room, name)| {
+            room.get_instances().iter().filter_map(move |inst| {
+                EXTRA_DATA.as_ref().and_then(|(extra, _)| extra.get(&inst.id)).map(|extra| (name, inst.id, extra.name))
+            })
+        })
+        .filter(|(_, id, _)| *id != 0)
+        .collect::<Vec<_>>();
+    // write version
+    let _: u32 = delphi_call!(0x52f12c, stream, 800);
+    // write count
+    let _: u32 = delphi_call!(0x52f12c, stream, constant_names.len() + instances.len());
+    for (name, value) in constant_names.iter().zip(constant_values) {
+        let _: u32 = delphi_call!(0x52f168, stream, name.0);
+        let _: u32 = delphi_call!(0x52f168, stream, value.0);
+    }
+    for (room_name, id, name) in instances {
+        // write constant name
+        let _: u32 = delphi_call!(
+            0x52f168,
+            stream,
+            UStr::new(format!("{}_{:08X}", room_name.to_os_string().to_str().unwrap(), name)).0
+        );
+        // write constant value
+        let _: u32 = delphi_call!(0x52f168, stream, UStr::new(id.to_string()).0);
+    }
+    true
+}
 
 #[naked]
 unsafe extern "C" fn save_82_if_exe() {
@@ -145,6 +193,9 @@ unsafe extern "fastcall" fn save_tile_extra(file: usize, id: usize, exe: bool) {
 }
 
 pub unsafe fn inject() {
+    // add instance ids to constants
+    patch_call(0x6cd90d as _, compile_constants_inj as _);
+
     // save creation code flag (reusing the software vertex processing flag)
     // write 825 instead of 800 for settings version if saving exe
     patch(0x70997c as _, &[0xe8]);

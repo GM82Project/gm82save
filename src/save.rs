@@ -406,50 +406,24 @@ fn save_instances(instances: &[Instance], path: &mut PathBuf) -> Result<()> {
     path.push("instances.txt");
     let mut f = open_file(&path)?;
     path.pop();
-    let mut codes = HashMap::with_capacity(instances.len());
+    let extra_data = unsafe { &mut EXTRA_DATA.get_or_insert_with(Default::default).0 };
+
     for instance in instances {
-        // pre-process the code so the hash stays consistent
         let mut code = Vec::with_capacity(instance.creation_code.len());
         write_gml(&mut code, &instance.creation_code)?;
-        let mut hash_hex = [0; 8];
-        let fname = if !code.is_empty() {
-            let hash = crc::crc32::checksum_ieee(&code);
-            for i in 0..8 {
-                hash_hex[7 - i] = match (hash >> (i * 4)) & 0xf {
-                    i if i < 10 => b'0' + i as u8,
-                    i => b'A' - 10 + i as u8,
-                };
-            }
-            let mut fname = unsafe { str::from_utf8_unchecked(&hash_hex).to_string() };
-            if let Some(fname) = loop {
-                if let Some(old_code) = codes.get(&fname) {
-                    if &code == old_code {
-                        // we already saved this code, no need to repeat
-                        break None
-                    } else {
-                        // new code with hash collision
-                        fname.push('_');
-                    }
-                } else {
-                    // new code, safe hash
-                    codes.insert(fname.to_string(), code.clone());
-                    break Some(&fname)
-                }
-            } {
-                path.push(&fname);
-                path.set_extension("gml");
-                write_file(&path, code)?;
-                path.pop();
-            }
-            fname
-        } else {
-            String::new() // ""
-        };
-        let InstanceExtra { xscale, yscale, blend, angle } =
+        // get id
+        let fname = format!("{:08X}", extra_data.get(&instance.id).unwrap().name);
+        if !code.is_empty() {
+            path.push(&fname);
+            path.set_extension("gml");
+            write_file(&path, &code)?;
+            path.pop();
+        }
+        let InstanceExtra { xscale, yscale, blend, angle, .. } =
             unsafe { EXTRA_DATA.as_ref().and_then(|e| e.0.get(&instance.id).cloned()).unwrap_or_default() };
         writeln!(
             f,
-            "{},{},{},{},{},{},{},{},{}",
+            "{},{},{},{},{},{},{},{},{},{}",
             ide::get_object_names().get_asset(instance.object),
             instance.x,
             instance.y,
@@ -459,6 +433,7 @@ fn save_instances(instances: &[Instance], path: &mut PathBuf) -> Result<()> {
             yscale,
             blend,
             angle,
+            u8::from(!code.is_empty()),
         )?;
     }
     f.flush()?;
@@ -904,7 +879,7 @@ pub unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
         create_dirs(path.parent().unwrap())?;
         // some stuff to go in the main gmk
         let mut f = open_file(&path)?;
-        writeln!(f, "gm82_version=3")?;
+        writeln!(f, "gm82_version=4")?;
         writeln!(f, "gameid={}", ide::GAME_ID.read())?;
         writeln!(f)?;
         writeln!(f, "info_author={}", (&*ide::settings::INFO_AUTHOR).try_decode()?)?;
@@ -997,6 +972,22 @@ pub unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
         &mut path,
     )?;
     advance_progress_form(90);
+    // give instances ids if they don't already have one
+    for room in ide::get_rooms().iter().flatten() {
+        let extra_data = &mut EXTRA_DATA.get_or_insert_with(Default::default).0;
+        for id in room.get_instances().iter().map(|i| i.id) {
+            let mut name = extra_data.entry(id).or_default().name;
+            if name == 0 {
+                loop {
+                    name = delphi::Random();
+                    if !extra_data.values().any(|ex| ex.name == name) {
+                        extra_data.get_mut(&id).unwrap().name = name;
+                        break
+                    }
+                }
+            }
+        }
+    }
     save_assets(90, 95, "rooms", ide::get_rooms(), ide::get_room_names(), ide::RT_ROOMS, save_room, &mut path)?;
     advance_progress_form(95);
     save_included_files(&mut path)?;

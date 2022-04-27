@@ -319,6 +319,8 @@ pub unsafe fn CompareText(a: &UStr, b: *const u16) -> i32 {
 pub struct UStr(pub *mut u16);
 
 impl UStr {
+    pub const EMPTY: Self = Self(ptr::null_mut());
+
     pub fn new(s: impl AsRef<OsStr>) -> Self {
         let mut out = UStr(std::ptr::null_mut());
         let s = s.as_ref();
@@ -348,7 +350,7 @@ impl UStr {
         OsString::from_wide(self.as_slice())
     }
 
-    pub unsafe fn from_ptr(s: &*const u16) -> &Self {
+    pub const unsafe fn from_ptr(s: &*const u16) -> &Self {
         std::mem::transmute(s)
     }
 }
@@ -391,6 +393,10 @@ pub unsafe fn Free<T>(a: *const T) {
 
 pub unsafe fn DynArrayClear<T, U>(a: *mut T, type_info: *const U) {
     let _: u32 = delphi_call!(0x409ce0, a, type_info);
+}
+
+pub fn Random() -> u32 {
+    unsafe { delphi_call!(0x4047b0) }
 }
 
 pub unsafe fn DynArraySetLength<T>(a: *mut *mut T, type_info: *const u8, dimensions: usize, size: usize) {
