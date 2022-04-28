@@ -773,6 +773,41 @@ unsafe extern "fastcall" fn dont_make_room_form(node: &TTreeNode) {
     }
 }
 
+#[naked]
+unsafe extern "fastcall" fn show_instance_id_inj() {
+    asm! {
+        "mov ecx, eax",
+        "mov eax, [ebx + 0x630]",
+        "push eax",
+        "call {}",
+        "ret",
+        sym show_instance_id,
+        options(noreturn),
+    }
+}
+
+unsafe extern "fastcall" fn show_instance_id(id: usize, out: &mut UStr, room_id: usize) {
+    if let Some((insts, _)) = EXTRA_DATA.as_mut() {
+        let room_names: &[UStr] = ide::get_room_names();
+        let suffix = {
+            let mut name = insts.entry(id).or_default().name;
+            if name == 0 {
+                loop {
+                    name = delphi::Random();
+                    if !insts.values().any(|ex| ex.name == name) {
+                        insts.get_mut(&id).unwrap().name = name;
+                        break
+                    }
+                }
+            }
+            UStr::new(format!("_{:08X}", name))
+        };
+        let _: u32 = delphi_call!(0x40839c, out, room_names[room_id].0, suffix.0);
+    } else {
+        let _: u32 = delphi_call!(0x41666c, id, out);
+    }
+}
+
 static mut SAW_APPLIES_TO_WARNING: bool = false;
 
 static mut SAVING_FOR_ROOM_EDITOR: bool = false;
@@ -1019,6 +1054,9 @@ unsafe fn injector() {
         0x90, 0x90, 0x90, // nop padding
     ]);
     patch_call(0x692e80 as _, duplicate_room as _);
+
+    // show instance id in old room editor
+    patch_call(0x68fbc9 as _, show_instance_id_inj as _);
 
     // funky room editor shit
     patch_call(0x69319c as _, room_form_inj as _);
