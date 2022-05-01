@@ -16,7 +16,7 @@ unsafe extern "C" fn compile_constants_inj() {
 }
 
 lazy_static! {
-    static ref INSTANCE_ID_REGEX: Regex = Regex::new(r"[A-Za-z0-9_]*?_([0-9A-F]{8})").unwrap();
+    static ref INSTANCE_ID_REGEX: Regex = Regex::new(r"[A-Za-z0-9_]+_([0-9A-F]{8})").unwrap();
 }
 
 unsafe extern "fastcall" fn compile_constants(stream: usize) -> bool {
