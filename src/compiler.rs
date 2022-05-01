@@ -32,6 +32,7 @@ unsafe extern "fastcall" fn compile_constants(stream: usize) -> bool {
     let rooms: &[Option<&Room>] = ide::get_rooms();
     let room_names: &[UStr] = ide::get_room_names();
     let objects: &[Option<&asset::Object>] = ide::get_objects();
+    let timelines: &[Option<&asset::Timeline>] = ide::get_timelines();
     let scripts: &[Option<&asset::Script>] = ide::get_scripts();
 
     // we want to collect instance names that are actually used
@@ -53,6 +54,15 @@ unsafe extern "fastcall" fn compile_constants(stream: usize) -> bool {
             .flat_map(|a| &a.param_strings)
             .map(cnv)
     });
+    let timeline_iter = timelines.par_iter().flatten().flat_map_iter(|t| {
+        t.get_events()
+            .iter()
+            .filter_map(|e| e.as_ref())
+            .flat_map(|e| e.get_actions())
+            .filter_map(|a| a.as_ref())
+            .flat_map(|a| &a.param_strings)
+            .map(cnv)
+    });
     let script_iter = scripts.par_iter().flatten().map(|s| cnv(&s.source));
     let trigger_iter = ide::get_triggers().par_iter().flatten().map(|t| cnv(&t.condition));
     let constant_iter = constant_values.par_iter().map(cnv);
@@ -60,6 +70,7 @@ unsafe extern "fastcall" fn compile_constants(stream: usize) -> bool {
     // find instance names in code
     let instance_names: HashSet<u32> = room_iter
         .chain(object_iter)
+        .chain(timeline_iter)
         .chain(script_iter)
         .chain(trigger_iter)
         .chain(constant_iter)
