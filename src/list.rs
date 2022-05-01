@@ -35,6 +35,15 @@ impl<T, const P: usize> DerefMut for DelphiList<T, P> {
     }
 }
 
+impl<'a, T, const P: usize> IntoIterator for &'a DelphiList<T, P> {
+    type IntoIter = slice::Iter<'a, T>;
+    type Item = &'a T;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.deref().into_iter()
+    }
+}
+
 impl<T, const P: usize> DelphiList<T, P> {
     pub fn alloc(&mut self, len: usize) {
         unsafe {

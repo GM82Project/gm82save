@@ -1,7 +1,9 @@
 use super::{patch, patch_call, InstanceExtra, TileExtra, EXTRA_DATA};
-use crate::{asset::Room, ide, UStr};
-use std::arch::asm;
+use crate::{asset, asset::Room, ide, UStr};
+use lazy_static::lazy_static;
 use rayon::prelude::*;
+use regex::Regex;
+use std::{arch::asm, collections::HashSet};
 
 #[naked]
 unsafe extern "C" fn compile_constants_inj() {
@@ -13,6 +15,10 @@ unsafe extern "C" fn compile_constants_inj() {
     }
 }
 
+lazy_static! {
+    static ref INSTANCE_ID_REGEX: Regex = Regex::new(r"[A-Za-z0-9_]*?_([0-9A-F]{8})").unwrap();
+}
+
 unsafe extern "fastcall" fn compile_constants(stream: usize) -> bool {
     if EXTRA_DATA.is_none() {
         let res: usize = delphi_call!(0x696744, stream, 1);
@@ -22,17 +28,62 @@ unsafe extern "fastcall" fn compile_constants(stream: usize) -> bool {
     let constant_names = ide::get_constant_names();
     let constant_values = ide::get_constants();
     // these are just so my ide will give me autocomplete
+    let re = &INSTANCE_ID_REGEX;
     let rooms: &[Option<&Room>] = ide::get_rooms();
     let room_names: &[UStr] = ide::get_room_names();
+    let objects: &[Option<&asset::Object>] = ide::get_objects();
+    let scripts: &[Option<&asset::Script>] = ide::get_scripts();
+
+    // we want to collect instance names that are actually used
+    // iterate over all code
+    let cnv = |s: &UStr| s.to_os_string().into_string().unwrap_or_else(|s| s.to_string_lossy().into_owned());
+    let room_iter = rooms.par_iter().flatten().flat_map(|room| {
+        room.get_instances()
+            .par_iter()
+            .map(|i| cnv(&i.creation_code))
+            .chain(rayon::iter::once(cnv(&room.creation_code)))
+    });
+    let object_iter = objects.par_iter().flatten().flat_map_iter(|o| {
+        o.events
+            .iter()
+            .flatten()
+            .filter_map(|e| e.as_ref())
+            .flat_map(|e| e.get_actions())
+            .filter_map(|a| a.as_ref())
+            .flat_map(|a| &a.param_strings)
+            .map(cnv)
+    });
+    let script_iter = scripts.par_iter().flatten().map(|s| cnv(&s.source));
+    let trigger_iter = ide::get_triggers().par_iter().flatten().map(|t| cnv(&t.condition));
+    let constant_iter = constant_values.par_iter().map(cnv);
+
+    // find instance names in code
+    let instance_names: HashSet<u32> = room_iter
+        .chain(object_iter)
+        .chain(script_iter)
+        .chain(trigger_iter)
+        .chain(constant_iter)
+        .flat_map(|s| {
+            // gotta collect into vec because otherwise string reference is lost
+            re.captures_iter(&s)
+                .filter_map(|c| c.get(1))
+                .flat_map(|m| u32::from_str_radix(m.as_str(), 16))
+                .collect::<Vec<_>>()
+        })
+        .collect();
+
+    // collect data for referenced instances
     let instances = rooms
         .par_iter()
         .zip(room_names)
         .filter_map(|(room, name)| room.as_ref().map(|r| (r, name)))
         .flat_map(|(room, name)| {
+            let instance_names = &instance_names;
             room.get_instances().par_iter().filter_map(move |inst| {
                 EXTRA_DATA
                     .as_ref()
                     .and_then(|(extra, _)| extra.get(&inst.id))
+                    .filter(|extra| instance_names.contains(&extra.name))
                     .map(|extra| (name, inst.id, extra.name))
             })
         })
