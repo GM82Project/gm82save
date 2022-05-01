@@ -1,6 +1,7 @@
 use super::{patch, patch_call, InstanceExtra, TileExtra, EXTRA_DATA};
 use crate::{asset::Room, ide, UStr};
 use std::arch::asm;
+use rayon::prelude::*;
 
 #[naked]
 unsafe extern "C" fn compile_constants_inj() {
@@ -13,29 +14,36 @@ unsafe extern "C" fn compile_constants_inj() {
 }
 
 unsafe extern "fastcall" fn compile_constants(stream: usize) -> bool {
+    if EXTRA_DATA.is_none() {
+        let res: usize = delphi_call!(0x696744, stream, 1);
+        return res as u8 != 0
+    }
+
     let constant_names = ide::get_constant_names();
     let constant_values = ide::get_constants();
+    // these are just so my ide will give me autocomplete
     let rooms: &[Option<&Room>] = ide::get_rooms();
     let room_names: &[UStr] = ide::get_room_names();
     let instances = rooms
-        .iter()
+        .par_iter()
         .zip(room_names)
         .filter_map(|(room, name)| room.as_ref().map(|r| (r, name)))
         .flat_map(|(room, name)| {
-            room.get_instances().iter().filter_map(move |inst| {
-                EXTRA_DATA.as_ref().and_then(|(extra, _)| extra.get(&inst.id)).map(|extra| (name, inst.id, extra.name))
+            room.get_instances().par_iter().filter_map(move |inst| {
+                EXTRA_DATA
+                    .as_ref()
+                    .and_then(|(extra, _)| extra.get(&inst.id))
+                    .map(|extra| (name, inst.id, extra.name))
             })
         })
         .filter(|(_, id, _)| *id != 0)
         .collect::<Vec<_>>();
+
     // write version
     let _: u32 = delphi_call!(0x52f12c, stream, 800);
     // write count
     let _: u32 = delphi_call!(0x52f12c, stream, constant_names.len() + instances.len());
-    for (name, value) in constant_names.iter().zip(constant_values) {
-        let _: u32 = delphi_call!(0x52f168, stream, name.0);
-        let _: u32 = delphi_call!(0x52f168, stream, value.0);
-    }
+    // write instance ids
     for (room_name, id, name) in instances {
         // write constant name
         let _: u32 = delphi_call!(
@@ -45,6 +53,11 @@ unsafe extern "fastcall" fn compile_constants(stream: usize) -> bool {
         );
         // write constant value
         let _: u32 = delphi_call!(0x52f168, stream, UStr::new(id.to_string()).0);
+    }
+    // write original constants
+    for (name, value) in constant_names.iter().zip(constant_values) {
+        let _: u32 = delphi_call!(0x52f168, stream, name.0);
+        let _: u32 = delphi_call!(0x52f168, stream, value.0);
     }
     true
 }
