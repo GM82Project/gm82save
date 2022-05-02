@@ -3,7 +3,7 @@ use crate::{
     delphi,
     delphi::{advance_progress_form, TTreeNode, UStr},
     events, ide, run_while_updating_bar, show_message, update_timestamp, Error, InstanceExtra, Result, TileExtra,
-    ACTION_TOKEN, EXTRA_DATA, SAVING_FOR_ROOM_EDITOR, SAW_APPLIES_TO_WARNING,
+    ACTION_TOKEN, EXTRA_DATA, PATH_FORM_UPDATED, SAVING_FOR_ROOM_EDITOR, SAW_APPLIES_TO_WARNING,
 };
 use itertools::Itertools;
 use rayon::prelude::*;
@@ -875,6 +875,7 @@ unsafe fn save_icon_cache(path: &mut PathBuf) -> Result<()> {
 }
 
 pub unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
+    PATH_FORM_UPDATED = false;
     {
         create_dirs(path.parent().unwrap())?;
         // some stuff to go in the main gmk

@@ -602,6 +602,19 @@ unsafe extern "C" fn path_form_mouse_wheel() {
 }
 
 #[naked]
+unsafe extern "C" fn path_room_change_forces_room_editor_save() {
+    asm! {
+        "mov ecx, 0x720560", // draw form
+        "call ecx",
+        "mov byte ptr {}, 1",
+        sym PATH_FORM_UPDATED,
+        options(noreturn),
+    }
+}
+
+static mut PATH_FORM_UPDATED: bool = false;
+
+#[naked]
 unsafe extern "C" fn code_editor_middle_click() {
     asm! {
         // push return address
@@ -859,8 +872,11 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
                     }
                 }
             }
-            let project_modified: u32 = delphi_call!(0x7060e8);
-            if project_modified as u8 != 0 {
+            let project_modified = PATH_FORM_UPDATED || {
+                let out: u32 = delphi_call!(0x7060e8);
+                out != 0
+            };
+            if project_modified {
                 SAVING_FOR_ROOM_EDITOR = true;
                 let _: u32 = delphi_call!(0x6e0540, *(0x790100 as *const u32)); // save
                 SAVING_FOR_ROOM_EDITOR = false;
@@ -994,6 +1010,9 @@ unsafe fn injector() {
 
     // add scrolling to path form
     patch_call(0x71fdcb as _, path_form_mouse_wheel_inj as _);
+
+    // changing room in path form counts as a change
+    patch_call(0x7211ff as _, path_room_change_forces_room_editor_save as _);
 
     // use zlib-ng for compression
     patch(0x52f34c as _, &[0xe9]);

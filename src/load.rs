@@ -3,7 +3,7 @@ use crate::{
     delphi,
     delphi::{advance_progress_form, UStr},
     events, ide, run_while_updating_bar, update_timestamp, Error, InstanceExtra, Result, TileExtra, ACTION_TOKEN,
-    EXTRA_DATA,
+    EXTRA_DATA, PATH_FORM_UPDATED,
 };
 use itertools::izip;
 use parking_lot::Mutex;
@@ -1096,6 +1096,7 @@ pub fn load_asset_maps(path: &mut PathBuf) -> Result<AssetMaps> {
 
 pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     ide::initialize_project();
+    PATH_FORM_UPDATED = false;
     EXTRA_DATA = Some(Default::default());
     read_txt(&path, |k, v| {
         match k {
