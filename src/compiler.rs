@@ -38,13 +38,13 @@ unsafe extern "fastcall" fn compile_constants(stream: usize) -> bool {
     // we want to collect instance names that are actually used
     // iterate over all code
     let cnv = |s: &UStr| s.to_os_string().into_string().unwrap_or_else(|s| s.to_string_lossy().into_owned());
-    let room_iter = rooms.par_iter().flatten().flat_map(|room| {
+    let room_iter = rooms.into_par_iter().flatten().flat_map(|room| {
         room.get_instances()
-            .par_iter()
+            .into_par_iter()
             .map(|i| cnv(&i.creation_code))
             .chain(rayon::iter::once(cnv(&room.creation_code)))
     });
-    let object_iter = objects.par_iter().flatten().flat_map_iter(|o| {
+    let object_iter = objects.into_par_iter().flatten().flat_map_iter(|o| {
         o.events
             .iter()
             .flatten()
@@ -54,7 +54,7 @@ unsafe extern "fastcall" fn compile_constants(stream: usize) -> bool {
             .flat_map(|a| &a.param_strings)
             .map(cnv)
     });
-    let timeline_iter = timelines.par_iter().flatten().flat_map_iter(|t| {
+    let timeline_iter = timelines.into_par_iter().flatten().flat_map_iter(|t| {
         t.get_events()
             .iter()
             .filter_map(|e| e.as_ref())
@@ -63,8 +63,8 @@ unsafe extern "fastcall" fn compile_constants(stream: usize) -> bool {
             .flat_map(|a| &a.param_strings)
             .map(cnv)
     });
-    let script_iter = scripts.par_iter().flatten().map(|s| cnv(&s.source));
-    let trigger_iter = ide::get_triggers().par_iter().flatten().map(|t| cnv(&t.condition));
+    let script_iter = scripts.into_par_iter().flatten().map(|s| cnv(&s.source));
+    let trigger_iter = ide::get_triggers().into_par_iter().flatten().map(|t| cnv(&t.condition));
     let constant_iter = constant_values.par_iter().map(cnv);
 
     // find instance names in code
@@ -85,9 +85,9 @@ unsafe extern "fastcall" fn compile_constants(stream: usize) -> bool {
 
     // collect data for referenced instances
     let instances = rooms
-        .par_iter()
+        .into_par_iter()
         .zip(room_names)
-        .filter_map(|(room, name)| room.as_ref().map(|r| (r, name)))
+        .filter_map(|(&room, name)| Some((room?, name)))
         .flat_map(|(room, name)| {
             let instance_names = &instance_names;
             room.get_instances().par_iter().filter_map(move |inst| {
