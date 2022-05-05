@@ -607,6 +607,7 @@ unsafe extern "C" fn path_room_change_forces_room_editor_save() {
         "mov ecx, 0x720560", // draw form
         "call ecx",
         "mov byte ptr {}, 1",
+        "ret",
         sym PATH_FORM_UPDATED,
         options(noreturn),
     }
