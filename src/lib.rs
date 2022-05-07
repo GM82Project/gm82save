@@ -879,8 +879,11 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
             };
             if project_modified {
                 SAVING_FOR_ROOM_EDITOR = true;
-                let _: u32 = delphi_call!(0x6e0540, *(0x790100 as *const u32)); // save
+                let _: u32 = delphi_call!(0x51cc64, *(0x7882f0 as *const u32), 0xfff5); // set cursor
+                let success: u32 = delphi_call!(0x705c84, (*ide::PROJECT_PATH).0); // save
+                let _: u32 = delphi_call!(0x51cc64, *(0x7882f0 as *const u32), 0); // reset cursor
                 SAVING_FOR_ROOM_EDITOR = false;
+                if success == 0 { return 0 }
             }
             if room_path.exists() {
                 room_path.pop();
