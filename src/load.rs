@@ -97,7 +97,7 @@ fn read_txt<F: FnMut(&str, &str) -> Result<()>>(path: &std::path::Path, mut func
 unsafe fn read_resource_tree(
     base: *const *const delphi::TTreeNode,
     kind: u32,
-    type_name: &str,
+    type_name: &'static str,
     names: &HashMap<String, usize>,
     visible: bool,
     path: &mut PathBuf,
@@ -121,8 +121,13 @@ unsafe fn read_resource_tree(
             _ => return Err(Error::SyntaxError(path.to_path_buf())),
         };
         let name = &trimmed[1..];
-        let index =
-            if rtype == 3 { *names.get(name).ok_or_else(|| Error::AssetNotFound(name.to_string()))? } else { 0 };
+        let index = if rtype == 3 {
+            *names.get(name).ok_or_else(|| {
+                Error::AssetNotFound(name.to_string(), &type_name[..type_name.len() - 1], "resource tree".to_string())
+            })?
+        } else {
+            0
+        };
 
         let node = &*nodes.AddChild(*stack.last().unwrap(), &UStr::new(name));
         node.SetData(delphi::TreeNodeData::new(rtype, kind, index));
@@ -366,6 +371,7 @@ unsafe fn load_event(
     event_code: &str,
     asset_maps: &AssetMaps,
 ) -> Result<()> {
+    let object_name = path.file_stem().map(OsStr::to_string_lossy).unwrap_or_default();
     for action_code in event_code.split(ACTION_TOKEN) {
         if action_code.trim().is_empty() {
             continue
@@ -406,12 +412,13 @@ unsafe fn load_event(
                             "other" => -2,
                             "self" => -1,
                             "" => -4,
-                            name => *asset_maps
-                                .objects
-                                .map
-                                .get(name)
-                                .ok_or_else(|| Error::AssetNotFound(name.to_string()))?
-                                as _,
+                            name => *asset_maps.objects.map.get(name).ok_or_else(|| {
+                                Error::AssetNotFound(
+                                    name.to_string(),
+                                    "object",
+                                    format!("object {object_name} code action applies_to"),
+                                )
+                            })? as _,
                         }
                     },
                     "invert" => action.invert_condition = v.parse::<u8>()? != 0,
@@ -422,21 +429,27 @@ unsafe fn load_event(
                             return Err(Error::SyntaxError(path.to_path_buf()))
                         }
                         let i = k.chars().last().unwrap().to_digit(8).unwrap() as usize;
-                        let err = || Error::AssetNotFound(v.to_string());
+                        let err = |t| {
+                            Error::AssetNotFound(
+                                v.to_string(),
+                                t,
+                                format!("object {object_name} code action parameter"),
+                            )
+                        };
                         let ptype = action.param_types[i];
                         if (5..=14).contains(&ptype) && ptype != 13 {
                             action.param_strings[i] = UStr::new(
                                 match action.param_types[i] {
                                     _ if v.is_empty() => -1,
-                                    5 => *asset_maps.sprites.map.get(v).ok_or_else(err)? as _,
-                                    6 => *asset_maps.sounds.map.get(v).ok_or_else(err)? as _,
-                                    7 => *asset_maps.backgrounds.map.get(v).ok_or_else(err)? as _,
-                                    8 => *asset_maps.paths.map.get(v).ok_or_else(err)? as _,
-                                    9 => *asset_maps.scripts.map.get(v).ok_or_else(err)? as _,
-                                    10 => *asset_maps.objects.map.get(v).ok_or_else(err)? as _,
-                                    11 => *asset_maps.rooms.map.get(v).ok_or_else(err)? as _,
-                                    12 => *asset_maps.fonts.map.get(v).ok_or_else(err)? as _,
-                                    14 => *asset_maps.timelines.map.get(v).ok_or_else(err)? as _,
+                                    5 => *asset_maps.sprites.map.get(v).ok_or_else(|| err("sprite"))? as _,
+                                    6 => *asset_maps.sounds.map.get(v).ok_or_else(|| err("sound"))? as _,
+                                    7 => *asset_maps.backgrounds.map.get(v).ok_or_else(|| err("background"))? as _,
+                                    8 => *asset_maps.paths.map.get(v).ok_or_else(|| err("path"))? as _,
+                                    9 => *asset_maps.scripts.map.get(v).ok_or_else(|| err("script"))? as _,
+                                    10 => *asset_maps.objects.map.get(v).ok_or_else(|| err("object"))? as _,
+                                    11 => *asset_maps.rooms.map.get(v).ok_or_else(|| err("room"))? as _,
+                                    12 => *asset_maps.fonts.map.get(v).ok_or_else(|| err("font"))? as _,
+                                    14 => *asset_maps.timelines.map.get(v).ok_or_else(|| err("timeline"))? as _,
                                     _ => unreachable_unchecked(),
                                 }
                                 .to_string(),
@@ -468,6 +481,7 @@ unsafe fn load_event(
 
 unsafe fn load_object(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const Object> {
     path.set_extension("txt");
+    let object_name = path.file_stem().map(OsStr::to_string_lossy).unwrap_or_default();
     let obj = &mut *Object::new();
     let sprite_map = &asset_maps.sprites.map;
     let object_map = &asset_maps.objects.map;
@@ -478,7 +492,13 @@ unsafe fn load_object(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*con
                 obj.sprite_index = match sprite_map.get(v) {
                     Some(&i) => i as _,
                     None if v.is_empty() => -1,
-                    _ => return Err(Error::AssetNotFound(v.to_string())),
+                    _ => {
+                        return Err(Error::AssetNotFound(
+                            v.to_string(),
+                            "sprite",
+                            format!("object {object_name} sprite"),
+                        ))
+                    },
                 }
             },
             "visible" => obj.visible = v.parse::<u8>()? != 0,
@@ -489,14 +509,22 @@ unsafe fn load_object(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*con
                 obj.parent_index = match object_map.get(v) {
                     Some(&i) => i as _,
                     None if v.is_empty() => -1,
-                    _ => return Err(Error::AssetNotFound(v.to_string())),
+                    _ => {
+                        return Err(Error::AssetNotFound(
+                            v.to_string(),
+                            "object",
+                            format!("object {object_name} parent"),
+                        ))
+                    },
                 }
             },
             "mask" => {
                 obj.mask_index = match sprite_map.get(v) {
                     Some(&i) => i as _,
                     None if v.is_empty() => -1,
-                    _ => return Err(Error::AssetNotFound(v.to_string())),
+                    _ => {
+                        return Err(Error::AssetNotFound(v.to_string(), "sprite", format!("object {object_name} mask")))
+                    },
                 }
             },
             _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
@@ -550,6 +578,8 @@ unsafe fn load_timeline(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*c
 unsafe fn load_path(file_path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const Path> {
     let path = &mut *Path::new();
     file_path.push("path.txt");
+    let path_name =
+        file_path.parent().and_then(std::path::Path::file_name).map(OsStr::to_string_lossy).unwrap_or_default();
     read_txt(&file_path, |k, v| {
         match k {
             "connection" => path.connection = v.parse()?,
@@ -559,7 +589,9 @@ unsafe fn load_path(file_path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*
                 path.path_editor_room_background = if v.is_empty() {
                     -1
                 } else {
-                    *asset_maps.rooms.map.get(v).ok_or_else(|| Error::AssetNotFound(v.to_string()))? as _
+                    *asset_maps.rooms.map.get(v).ok_or_else(|| {
+                        Error::AssetNotFound(v.to_string(), "room", format!("path {path_name} room background"))
+                    })? as _
                 }
             },
             "snap_x" => path.snap_x = v.parse()?,
@@ -593,6 +625,7 @@ unsafe fn load_instances(room: &mut Room, path: &mut PathBuf, objs: &HashMap<Str
     let instances: Vec<_> = instances_txt.lines().filter(|s| !s.is_empty()).collect();
     let inst_path = path.to_path_buf(); // save instances.txt path for errors
     path.pop();
+    let room_name = path.file_name().map(OsStr::to_string_lossy).unwrap_or_default();
     let err = || Error::SyntaxError(inst_path.to_path_buf());
     let last_instance_id = *ide::LAST_INSTANCE_ID + 1;
     let ids = Mutex::new(HashSet::with_capacity(instances.len()));
@@ -602,7 +635,9 @@ unsafe fn load_instances(room: &mut Room, path: &mut PathBuf, objs: &HashMap<Str
             let mut iter = line.split(',');
             instance.object = match iter.next().ok_or_else(err)? {
                 "" => -1,
-                obj => *objs.get(obj).ok_or_else(|| Error::AssetNotFound(obj.to_string()))? as _,
+                obj => *objs.get(obj).ok_or_else(|| {
+                    Error::AssetNotFound(obj.to_string(), "object", format!("room {room_name} instances"))
+                })? as _,
             };
             instance.x = iter.next().ok_or_else(err)?.parse()?;
             instance.y = iter.next().ok_or_else(err)?.parse()?;
@@ -672,6 +707,8 @@ unsafe fn load_tiles(path: &mut PathBuf, bgs: &HashMap<String, usize>) -> Result
         let depth = line.parse()?;
         path.push(line);
         path.set_extension("txt");
+        let room_name =
+            path.parent().and_then(std::path::Path::file_name).map(OsStr::to_string_lossy).unwrap_or_default();
         let layer_txt = read_file(&path)?;
         let layer: Vec<_> = layer_txt.lines().filter(|s| !s.is_empty()).collect();
         tiles.reserve(layer.len());
@@ -687,7 +724,9 @@ unsafe fn load_tiles(path: &mut PathBuf, bgs: &HashMap<String, usize>) -> Result
                 let t = Tile {
                     source_bg: match iter.next().ok_or_else(err)? {
                         "" => -1,
-                        bg => *bgs.get(bg).ok_or_else(|| Error::AssetNotFound(bg.to_string()))? as _,
+                        bg => *bgs.get(bg).ok_or_else(|| {
+                            Error::AssetNotFound(bg.to_string(), "background", format!("room {room_name} tiles"))
+                        })? as _,
                     },
                     x: iter.next().ok_or_else(err)?.parse()?,
                     y: iter.next().ok_or_else(err)?.parse()?,
@@ -728,6 +767,7 @@ unsafe fn load_tiles(path: &mut PathBuf, bgs: &HashMap<String, usize>) -> Result
 pub unsafe fn load_room(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const Room> {
     let room = &mut *Room::new();
     path.push("room.txt");
+    let room_name = path.parent().and_then(std::path::Path::file_name).map(OsStr::to_string_lossy).unwrap_or_default();
     read_txt(&path, |k, v| {
         match k {
             "caption" => room.caption = UStr::new(v),
@@ -751,7 +791,13 @@ pub unsafe fn load_room(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*c
                         room.backgrounds[i].source_bg = if v.is_empty() {
                             -1
                         } else {
-                            *asset_maps.backgrounds.map.get(v).ok_or_else(|| Error::AssetNotFound(v.to_string()))? as _
+                            *asset_maps.backgrounds.map.get(v).ok_or_else(|| {
+                                Error::AssetNotFound(
+                                    v.to_string(),
+                                    "background",
+                                    format!("room {room_name} backgrounds"),
+                                )
+                            })? as _
                         }
                     },
                     "bg_xoffset" => room.backgrounds[i].xoffset = v.parse()?,
@@ -784,7 +830,9 @@ pub unsafe fn load_room(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*c
                         room.views[i].following_target = if v.is_empty() {
                             -1
                         } else {
-                            *asset_maps.objects.map.get(v).ok_or_else(|| Error::AssetNotFound(v.to_string()))? as _
+                            *asset_maps.objects.map.get(v).ok_or_else(|| {
+                                Error::AssetNotFound(v.to_string(), "object", format!("room {room_name} view targets"))
+                            })? as _
                         }
                     },
                     _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),

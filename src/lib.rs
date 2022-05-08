@@ -33,7 +33,7 @@ pub enum Error {
     DirIoError(std::io::Error, PathBuf),
     PngDecodeError(PathBuf, png::DecodingError),
     UnicodeError(String),
-    AssetNotFound(String),
+    AssetNotFound(String, &'static str, String),
     SyntaxError(PathBuf),
     UnknownKey(PathBuf, String),
     UnknownAction(u32, u32),
@@ -58,7 +58,7 @@ impl std::fmt::Display for Error {
             Self::DirIoError(e, p) => write!(f, "io error in directory {}: {}", p.to_string_lossy(), e),
             Self::PngDecodeError(p, e) => write!(f, "couldn't decode image {}: {}", p.to_string_lossy(), e),
             Self::UnicodeError(s) => write!(f, "couldn't encode {}", s),
-            Self::AssetNotFound(s) => write!(f, "couldn't find asset {}", s),
+            Self::AssetNotFound(s, t, src) => write!(f, "couldn't find {} {} (from {})", t, s, src),
             Self::SyntaxError(p) => write!(f, "syntax error in file {}", p.to_string_lossy()),
             Self::UnknownKey(p, k) => write!(f, "unknown key in {}: {}", p.to_string_lossy(), k),
             Self::UnknownAction(lib_id, act_id) => write!(f, "unknown action {} in lib with id {}", act_id, lib_id),
@@ -883,7 +883,9 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
                 let success: u32 = delphi_call!(0x705c84, (*ide::PROJECT_PATH).0); // save
                 let _: u32 = delphi_call!(0x51cc64, *(0x7882f0 as *const u32), 0); // reset cursor
                 SAVING_FOR_ROOM_EDITOR = false;
-                if success == 0 { return 0 }
+                if success == 0 {
+                    return 0
+                }
             }
             if room_path.exists() {
                 room_path.pop();
