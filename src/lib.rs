@@ -908,8 +908,10 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
                         }
                         let _: u32 = delphi_call!(0x657820, room); // clear room
                     }
-                    ide::get_rooms_mut()[room_id] =
-                        load::load_room(&mut room_path, &asset_maps).expect("loading the updated room failed").as_ref();
+                    ide::get_rooms_mut()[room_id] = load::load_room(&mut room_path, &asset_maps)
+                        .map_err(|e| e.to_string())
+                        .expect("loading the updated room failed")
+                        .as_ref();
                     return 0
                 }
             }
