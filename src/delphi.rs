@@ -306,6 +306,10 @@ pub unsafe fn UStrSetLength(dest: &mut UStr, length: usize) {
     let _: u32 = delphi_call!(0x0408244, dest, length);
 }
 
+pub unsafe fn UStrAddRef(str: &mut UStr) {
+    let _: u32 = delphi_call!(0x407ea0, str.0);
+}
+
 pub unsafe fn UStrClr(str: &mut UStr) {
     let _: u32 = delphi_call!(0x407ea8, str);
 }
@@ -358,6 +362,16 @@ impl UStr {
 impl Default for UStr {
     fn default() -> Self {
         UStr(ptr::null_mut())
+    }
+}
+
+impl Clone for UStr {
+    fn clone(&self) -> Self {
+        let mut new_str = Self(self.0);
+        unsafe {
+            UStrAddRef(&mut new_str);
+        }
+        new_str
     }
 }
 
