@@ -2,8 +2,8 @@ use crate::{
     asset::*,
     delphi,
     delphi::{advance_progress_form, UStr},
-    events, ide, run_while_updating_bar, update_timestamp, Error, InstanceExtra, Result, TileExtra, ACTION_TOKEN,
-    EXTRA_DATA, PATH_FORM_UPDATED,
+    events, ide, run_while_updating_bar, show_message, update_timestamp, Error, InstanceExtra, Result, TileExtra,
+    ACTION_TOKEN, EXTRA_DATA, PATH_FORM_UPDATED,
 };
 use itertools::izip;
 use parking_lot::Mutex;
@@ -1060,7 +1060,7 @@ unsafe fn load_settings(path: &mut PathBuf) -> Result<()> {
                 *loaded = true;
                 any = true;
             } else {
-                crate::show_message(&format!("Cannot find extension package: {}", name));
+                show_message(format!("Cannot find extension package: {}", name));
             }
         }
         if any {

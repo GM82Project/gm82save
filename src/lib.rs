@@ -20,7 +20,7 @@ use regex::Regex;
 use std::{
     arch::asm,
     collections::{HashMap, HashSet},
-    ffi::c_void,
+    ffi::{c_void, OsStr},
     io::Write,
     path::PathBuf,
     ptr,
@@ -99,7 +99,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 const ACTION_TOKEN: &str = "/*\"/*'/**//* YYD ACTION";
 
-fn show_message(msg: &str) {
+fn show_message(msg: impl AsRef<OsStr>) {
     unsafe {
         delphi::ShowMessage(&UStr::new(msg));
     }
@@ -260,7 +260,7 @@ unsafe extern "fastcall" fn save(proj_path: &UStr, stream_ptr: *mut u32) -> u16 
     if let Err(e) = save::save_gmk(path) {
         // display the error
         delphi::close_progress_form();
-        show_message(&format!("Failed to save: {}", e));
+        show_message(format!("Failed to save: {}", e));
         0 | IS_YYD
     } else {
         delphi::close_progress_form();
@@ -299,7 +299,7 @@ unsafe extern "fastcall" fn load(proj_path: &UStr, stream_ptr: *mut u32, result_
     if let Err(e) = load::load_gmk(path) {
         // display the error and reload
         delphi::close_progress_form();
-        show_message(&format!("Failed to load: {}", e));
+        show_message(format!("Failed to load: {}", e));
         ide::initialize_project();
     } else {
         delphi::close_progress_form();
