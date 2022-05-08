@@ -1170,8 +1170,8 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         ide::get_background_names_mut,
         ide::alloc_backgrounds,
         &asset_maps.backgrounds,
-        55,
-        60,
+        40,
+        45,
         &mut path,
         &asset_maps,
     )?;
