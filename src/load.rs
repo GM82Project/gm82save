@@ -2,8 +2,8 @@ use crate::{
     asset::*,
     delphi,
     delphi::{advance_progress_form, UStr},
-    events, ide, run_while_updating_bar, show_message, update_timestamp, Error, InstanceExtra, Result, TileExtra,
-    ACTION_TOKEN, EXTRA_DATA, PATH_FORM_UPDATED,
+    events, ide, project_watcher, run_while_updating_bar, show_message, update_timestamp, Error, InstanceExtra, Result,
+    TileExtra, ACTION_TOKEN, EXTRA_DATA, LAST_SAVE, PATH_FORM_UPDATED, SAVE_START,
 };
 use itertools::izip;
 use parking_lot::Mutex;
@@ -1377,6 +1377,9 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     advance_progress_form(100);
 
     update_timestamp();
+    SAVE_START = LAST_SAVE;
+
+    project_watcher::setup_watcher(&mut path);
 
     Ok(())
 }

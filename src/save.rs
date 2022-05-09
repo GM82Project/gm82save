@@ -2,8 +2,8 @@ use crate::{
     asset::*,
     delphi,
     delphi::{advance_progress_form, TTreeNode, UStr},
-    events, ide, run_while_updating_bar, show_message, update_timestamp, Error, InstanceExtra, Result, TileExtra,
-    ACTION_TOKEN, EXTRA_DATA, PATH_FORM_UPDATED, SAVING_FOR_ROOM_EDITOR, SAW_APPLIES_TO_WARNING,
+    events, ide, project_watcher, run_while_updating_bar, show_message, update_timestamp, Error, InstanceExtra, Result,
+    TileExtra, ACTION_TOKEN, EXTRA_DATA, PATH_FORM_UPDATED, SAVE_START, SAVING_FOR_ROOM_EDITOR, SAW_APPLIES_TO_WARNING,
 };
 use itertools::Itertools;
 use rayon::prelude::*;
@@ -14,6 +14,7 @@ use std::{
     io::{BufWriter, Write},
     path::PathBuf,
     slice, str,
+    time::SystemTime,
 };
 
 impl UStr {
@@ -874,7 +875,10 @@ unsafe fn save_icon_cache(path: &mut PathBuf) -> Result<()> {
     Ok(())
 }
 
-pub unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
+pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
+    SAVE_START = SystemTime::now();
+    let _gonna_use_this_later = project_watcher::watching();
+    project_watcher::unwatch();
     PATH_FORM_UPDATED = false;
     {
         create_dirs(path.parent().unwrap())?;
@@ -908,22 +912,13 @@ pub unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
     }
     path.pop();
     advance_progress_form(5);
-    save_settings(&mut path)?;
+    save_settings(path)?;
     advance_progress_form(10);
-    save_triggers(&mut path)?;
+    save_triggers(path)?;
     advance_progress_form(15);
-    save_assets(15, 30, "sounds", ide::get_sounds(), ide::get_sound_names(), ide::RT_SOUNDS, save_sound, &mut path)?;
+    save_assets(15, 30, "sounds", ide::get_sounds(), ide::get_sound_names(), ide::RT_SOUNDS, save_sound, path)?;
     advance_progress_form(30);
-    save_assets(
-        30,
-        55,
-        "sprites",
-        ide::get_sprites(),
-        ide::get_sprite_names(),
-        ide::RT_SPRITES,
-        save_sprite,
-        &mut path,
-    )?;
+    save_assets(30, 55, "sprites", ide::get_sprites(), ide::get_sprite_names(), ide::RT_SPRITES, save_sprite, path)?;
     advance_progress_form(55);
     save_assets(
         55,
@@ -933,23 +928,14 @@ pub unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
         ide::get_background_names(),
         ide::RT_BACKGROUNDS,
         save_background,
-        &mut path,
+        path,
     )?;
     advance_progress_form(65);
-    save_assets(65, 70, "paths", ide::get_paths(), ide::get_path_names(), ide::RT_PATHS, save_path, &mut path)?;
+    save_assets(65, 70, "paths", ide::get_paths(), ide::get_path_names(), ide::RT_PATHS, save_path, path)?;
     advance_progress_form(70);
-    save_assets(
-        70,
-        75,
-        "scripts",
-        ide::get_scripts(),
-        ide::get_script_names(),
-        ide::RT_SCRIPTS,
-        save_script,
-        &mut path,
-    )?;
+    save_assets(70, 75, "scripts", ide::get_scripts(), ide::get_script_names(), ide::RT_SCRIPTS, save_script, path)?;
     advance_progress_form(75);
-    save_assets(75, 80, "fonts", ide::get_fonts(), ide::get_font_names(), ide::RT_FONTS, save_font, &mut path)?;
+    save_assets(75, 80, "fonts", ide::get_fonts(), ide::get_font_names(), ide::RT_FONTS, save_font, path)?;
     advance_progress_form(80);
     save_assets(
         80,
@@ -959,19 +945,10 @@ pub unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
         ide::get_timeline_names(),
         ide::RT_TIMELINES,
         save_timeline,
-        &mut path,
+        path,
     )?;
     advance_progress_form(85);
-    save_assets(
-        85,
-        90,
-        "objects",
-        ide::get_objects(),
-        ide::get_object_names(),
-        ide::RT_OBJECTS,
-        save_object,
-        &mut path,
-    )?;
+    save_assets(85, 90, "objects", ide::get_objects(), ide::get_object_names(), ide::RT_OBJECTS, save_object, path)?;
     advance_progress_form(90);
     // give instances ids if they don't already have one
     for room in ide::get_rooms().iter().flatten() {
@@ -989,12 +966,12 @@ pub unsafe fn save_gmk(mut path: PathBuf) -> Result<()> {
             }
         }
     }
-    save_assets(90, 95, "rooms", ide::get_rooms(), ide::get_room_names(), ide::RT_ROOMS, save_room, &mut path)?;
+    save_assets(90, 95, "rooms", ide::get_rooms(), ide::get_room_names(), ide::RT_ROOMS, save_room, path)?;
     advance_progress_form(95);
-    save_included_files(&mut path)?;
+    save_included_files(path)?;
 
     if SAVING_FOR_ROOM_EDITOR {
-        save_icon_cache(&mut path)?;
+        save_icon_cache(path)?;
     }
 
     advance_progress_form(100);

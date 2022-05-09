@@ -11,6 +11,7 @@ mod events;
 mod ide;
 mod list;
 mod load;
+mod project_watcher;
 mod save;
 mod stub;
 
@@ -24,6 +25,7 @@ use std::{
     io::Write,
     path::PathBuf,
     ptr,
+    time::SystemTime,
 };
 
 #[derive(Debug)]
@@ -155,19 +157,12 @@ where
     }
 }
 
-static mut LAST_SAVE: f64 = 0.0;
+static mut SAVE_START: SystemTime = SystemTime::UNIX_EPOCH;
+static mut LAST_SAVE: SystemTime = SystemTime::UNIX_EPOCH;
 
 fn update_timestamp() {
     unsafe {
-        asm! {
-        "call {call}",
-        "fstp dword ptr [{output}]",
-        call = in(reg) 0x4199b0,
-        output = sym LAST_SAVE,
-        lateout("eax") _,
-        lateout("edx") _,
-        lateout("ecx") _,
-        }
+        LAST_SAVE = SystemTime::now();
     }
 }
 
@@ -245,10 +240,11 @@ unsafe extern "C" fn save_inj() {
 // set the low byte to nonzero on success
 unsafe extern "fastcall" fn save(proj_path: &UStr, stream_ptr: *mut u32) -> u16 {
     const IS_YYD: u16 = 0x100;
-    let path: PathBuf = proj_path.to_os_string().into();
+    let mut path: PathBuf = proj_path.to_os_string().into();
     // filename ".gm82" works in the ui but rust doesn't get it so check for that specifically
     let is_gm82 = path.extension() == Some("gm82".as_ref()) || path.file_name() == Some(".gm82".as_ref());
     if !is_gm82 {
+        project_watcher::unwatch();
         // CStream.Create
         let buf = delphi_call!(0x405a4c, 0x52e8fc, 1);
         stream_ptr.write(buf);
@@ -257,12 +253,16 @@ unsafe extern "fastcall" fn save(proj_path: &UStr, stream_ptr: *mut u32) -> u16 
         return success as u16
     }
 
-    if let Err(e) = save::save_gmk(path) {
+    if let Err(e) = save::save_gmk(&mut path) {
         // display the error
+        project_watcher::unwatch();
         delphi::close_progress_form();
         show_message(format!("Failed to save: {}", e));
         0 | IS_YYD
     } else {
+        if !SAVING_FOR_ROOM_EDITOR {
+            project_watcher::setup_watcher(&mut path);
+        }
         delphi::close_progress_form();
         1 | IS_YYD
     }
@@ -287,6 +287,7 @@ unsafe extern "C" fn load_inj() {
 
 unsafe extern "fastcall" fn load(proj_path: &UStr, stream_ptr: *mut u32, result_ptr: *mut bool) -> bool {
     SAW_APPLIES_TO_WARNING = false;
+    project_watcher::unwatch();
     let path: PathBuf = proj_path.to_os_string().into();
     // .gm82 works in the ui but rust doesn't get it so check for that specifically
     let is_gm82 = path.extension() == Some("gm82".as_ref()) || path.file_name() == Some(".gm82".as_ref());
@@ -336,6 +337,8 @@ unsafe extern "fastcall" fn make_new_folder(_: u32, path_ptr: *const u16) {
         path.push(path.file_name().unwrap().to_owned());
     }
     ide::PROJECT_PATH.asg(path);
+    // throw this in here as well
+    project_watcher::unwatch();
 }
 
 #[naked]
@@ -912,6 +915,10 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
                         .map_err(|e| e.to_string())
                         .expect("loading the updated room failed")
                         .as_ref();
+                    room_path.pop();
+                    room_path.pop();
+                    update_timestamp();
+                    project_watcher::setup_watcher(&mut room_path);
                     return 0
                 }
             }
