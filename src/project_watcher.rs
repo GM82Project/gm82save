@@ -1,4 +1,4 @@
-use crate::{ide, show_message, UStr, LAST_SAVE, SAVE_START};
+use crate::{ide, show_message, UStr, SAVE_END, SAVE_START};
 use notify::{watcher, DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use once_cell::unsync::Lazy;
 use parking_lot::Mutex;
@@ -29,16 +29,16 @@ extern "fastcall" fn on_notify() {
             DebouncedEvent::NoticeWrite(p) | DebouncedEvent::Write(p) => {
                 if let Ok(modified) = p.metadata().and_then(|m| m.modified()) {
                     unsafe {
-                        if SAVE_START == LAST_SAVE {
+                        if SAVE_START == SAVE_END {
                             // from load, most likely not ours but give 2 seconds of leeway anyway
-                            LAST_SAVE.duration_since(modified).unwrap_or_else(|e| e.duration()).as_secs() > 2
+                            SAVE_END.duration_since(modified).unwrap_or_else(|e| e.duration()).as_secs() > 2
                         } else {
                             // it's ours if it's between save start and save end, give 2 secs of leeway
                             let earlier = modified
                                 .checked_add(Duration::from_secs(2))
                                 .and_then(|t| t.duration_since(SAVE_START).ok())
                                 .is_none();
-                            let later = LAST_SAVE
+                            let later = SAVE_END
                                 .checked_add(Duration::from_secs(2))
                                 .and_then(|t| t.duration_since(modified).ok())
                                 .is_none();

@@ -158,11 +158,11 @@ where
 }
 
 static mut SAVE_START: SystemTime = SystemTime::UNIX_EPOCH;
-static mut LAST_SAVE: SystemTime = SystemTime::UNIX_EPOCH;
+static mut SAVE_END: SystemTime = SystemTime::UNIX_EPOCH;
 
 fn update_timestamp() {
     unsafe {
-        LAST_SAVE = SystemTime::now();
+        SAVE_END = SystemTime::now();
     }
 }
 
