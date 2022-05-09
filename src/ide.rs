@@ -326,6 +326,7 @@ read_array!(get_constants, UStr, *CONSTANT_VALUES, *CONSTANT_COUNT);
 read_array!(get_triggers, Option<&'static Trigger>, *TRIGGERS, *TRIGGER_COUNT);
 
 read_array!(get_included_files, &'static IncludedFile, *INCLUDED_FILES, *INCLUDED_FILE_COUNT);
+read_array!(get_included_file_timestamps, f64, *INCLUDED_FILE_TIMESTAMPS, *INCLUDED_FILE_COUNT);
 read_array!(get_extensions, &'static Extension, *EXTENSIONS, *EXTENSION_COUNT);
 read_array!(get_extensions_loaded, bool, *EXTENSIONS_LOADED, *EXTENSION_COUNT);
 

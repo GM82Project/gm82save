@@ -3,7 +3,7 @@ use crate::{
     delphi,
     delphi::{advance_progress_form, TTreeNode, UStr},
     events, ide, project_watcher, run_while_updating_bar, show_message, update_timestamp, Error, InstanceExtra, Result,
-    TileExtra, ACTION_TOKEN, EXTRA_DATA, PATH_FORM_UPDATED, SAVE_START, SAVING_FOR_ROOM_EDITOR, SAW_APPLIES_TO_WARNING,
+    TileExtra, ACTION_TOKEN, EXTRA_DATA, LAST_SAVE, PATH_FORM_UPDATED, SAVE_START, SAW_APPLIES_TO_WARNING,
 };
 use itertools::Itertools;
 use rayon::prelude::*;
@@ -532,92 +532,100 @@ unsafe fn save_constants(path: &mut PathBuf) -> Result<()> {
     Ok(())
 }
 
-unsafe fn save_settings(path: &mut PathBuf) -> Result<()> {
+unsafe fn save_settings(path: &mut PathBuf, smart_save: bool) -> Result<()> {
     use ide::settings::*;
     path.push("settings");
     create_dirs(&path)?;
-    save_constants(path)?;
-    // not the usual behaviour, but i don't feel like adding more flags than necessary
-    if *HAS_CUSTOM_LOAD_IMAGE && CUSTOM_LOAD_IMAGE.read().is_null() {
-        HAS_CUSTOM_LOAD_IMAGE.write(false);
+    if !smart_save || *ide::CONSTANTS_UPDATED {
+        save_constants(path)?;
     }
-    {
-        path.push("settings.txt");
-        let mut f = open_file(&path)?;
-        path.pop();
-        writeln!(f, "fullscreen={}", u8::from(FULLSCREEN.read()))?;
-        writeln!(f, "interpolate_pixels={}", u8::from(INTERPOLATE_PIXELS.read()))?;
-        writeln!(f, "dont_draw_border={}", u8::from(DONT_DRAW_BORDER.read()))?;
-        writeln!(f, "display_cursor={}", u8::from(DISPLAY_CURSOR.read()))?;
-        writeln!(f, "scaling={}", SCALING.read())?;
-        writeln!(f, "allow_resize={}", u8::from(ALLOW_RESIZE.read()))?;
-        writeln!(f, "window_on_top={}", u8::from(*WINDOW_ON_TOP))?;
-        writeln!(f, "clear_color={}", *CLEAR_COLOUR)?;
-        writeln!(f, "set_resolution={}", u8::from(*SET_RESOLUTION))?;
-        writeln!(f, "color_depth={}", *COLOUR_DEPTH)?;
-        writeln!(f, "resolution={}", *RESOLUTION)?;
-        writeln!(f, "frequency={}", *FREQUENCY)?;
-        writeln!(f, "dont_show_buttons={}", u8::from(*DONT_SHOW_BUTTONS))?;
-        writeln!(f, "vsync={}", *VSYNC_AND_FORCE_CPU & 1)?;
-        writeln!(f, "swap_creation_events={}", u8::from(*VSYNC_AND_FORCE_CPU & (1 << 31) != 0))?;
-        writeln!(f, "disable_screensaver={}", u8::from(*DISABLE_SCREENSAVER))?;
-        writeln!(f, "f4_fullscreen_toggle={}", u8::from(*F4_FULLSCREEN))?;
-        writeln!(f, "f1_help_menu={}", u8::from(*F1_HELP))?;
-        writeln!(f, "esc_close_game={}", u8::from(*ESC_CLOSE))?;
-        writeln!(f, "f5_save_f6_load={}", u8::from(*F5_SAVE_F6_LOAD))?;
-        writeln!(f, "f9_screenshot={}", u8::from(*F9_SCREENSHOT))?;
-        writeln!(f, "treat_close_as_esc={}", u8::from(*TREAT_CLOSE_AS_ESC))?;
-        writeln!(f, "priority={}", *PRIORITY)?;
-        writeln!(f, "freeze_on_lose_focus={}", u8::from(*FREEZE_ON_LOSE_FOCUS))?;
-        writeln!(f, "custom_loader={}", u8::from(*HAS_CUSTOM_LOAD_IMAGE))?;
-        writeln!(f, "custom_bar={}", *LOADING_BAR)?;
-        writeln!(f, "bar_has_bg={}", u8::from(!LOADING_BACKGROUND.read().is_null()))?;
-        writeln!(f, "bar_has_fg={}", u8::from(!LOADING_FOREGROUND.read().is_null()))?;
-        writeln!(f, "transparent={}", u8::from(*LOADING_TRANSPARENT))?;
-        writeln!(f, "translucency={}", *LOADING_TRANSLUCENCY)?;
-        writeln!(f, "scale_progress_bar={}", u8::from(*LOADING_PROGRESS_BAR_SCALE))?;
-        writeln!(f, "show_error_messages={}", u8::from(*SHOW_ERROR_MESSAGES))?;
-        writeln!(f, "log_errors={}", u8::from(*LOG_ERRORS))?;
-        writeln!(f, "always_abort={}", u8::from(*ALWAYS_ABORT))?;
-        writeln!(f, "zero_uninitialized_vars={}", u8::from(*ZERO_UNINITIALIZED_VARS))?;
-        writeln!(f, "error_on_uninitialized_args={}", u8::from(*ERROR_ON_UNINITIALIZED_ARGS))?;
-        f.flush()?;
-    }
-    if LOADING_BAR.read() == 2 {
-        if let Some(bg) = LOADING_BACKGROUND.read().as_ref() {
-            path.push("back.bmp");
-            bg.SaveToFile(&UStr::new(&path));
-            path.pop();
+    if !smart_save || *ide::SETTINGS_UPDATED {
+        // not the usual behaviour, but i don't feel like adding more flags than necessary
+        if *HAS_CUSTOM_LOAD_IMAGE && CUSTOM_LOAD_IMAGE.read().is_null() {
+            HAS_CUSTOM_LOAD_IMAGE.write(false);
         }
-        if let Some(fg) = LOADING_FOREGROUND.read().as_ref() {
-            path.push("front.bmp");
-            fg.SaveToFile(&UStr::new(&path));
+        {
+            path.push("settings.txt");
+            let mut f = open_file(&path)?;
             path.pop();
+            writeln!(f, "fullscreen={}", u8::from(FULLSCREEN.read()))?;
+            writeln!(f, "interpolate_pixels={}", u8::from(INTERPOLATE_PIXELS.read()))?;
+            writeln!(f, "dont_draw_border={}", u8::from(DONT_DRAW_BORDER.read()))?;
+            writeln!(f, "display_cursor={}", u8::from(DISPLAY_CURSOR.read()))?;
+            writeln!(f, "scaling={}", SCALING.read())?;
+            writeln!(f, "allow_resize={}", u8::from(ALLOW_RESIZE.read()))?;
+            writeln!(f, "window_on_top={}", u8::from(*WINDOW_ON_TOP))?;
+            writeln!(f, "clear_color={}", *CLEAR_COLOUR)?;
+            writeln!(f, "set_resolution={}", u8::from(*SET_RESOLUTION))?;
+            writeln!(f, "color_depth={}", *COLOUR_DEPTH)?;
+            writeln!(f, "resolution={}", *RESOLUTION)?;
+            writeln!(f, "frequency={}", *FREQUENCY)?;
+            writeln!(f, "dont_show_buttons={}", u8::from(*DONT_SHOW_BUTTONS))?;
+            writeln!(f, "vsync={}", *VSYNC_AND_FORCE_CPU & 1)?;
+            writeln!(f, "swap_creation_events={}", u8::from(*VSYNC_AND_FORCE_CPU & (1 << 31) != 0))?;
+            writeln!(f, "disable_screensaver={}", u8::from(*DISABLE_SCREENSAVER))?;
+            writeln!(f, "f4_fullscreen_toggle={}", u8::from(*F4_FULLSCREEN))?;
+            writeln!(f, "f1_help_menu={}", u8::from(*F1_HELP))?;
+            writeln!(f, "esc_close_game={}", u8::from(*ESC_CLOSE))?;
+            writeln!(f, "f5_save_f6_load={}", u8::from(*F5_SAVE_F6_LOAD))?;
+            writeln!(f, "f9_screenshot={}", u8::from(*F9_SCREENSHOT))?;
+            writeln!(f, "treat_close_as_esc={}", u8::from(*TREAT_CLOSE_AS_ESC))?;
+            writeln!(f, "priority={}", *PRIORITY)?;
+            writeln!(f, "freeze_on_lose_focus={}", u8::from(*FREEZE_ON_LOSE_FOCUS))?;
+            writeln!(f, "custom_loader={}", u8::from(*HAS_CUSTOM_LOAD_IMAGE))?;
+            writeln!(f, "custom_bar={}", *LOADING_BAR)?;
+            writeln!(f, "bar_has_bg={}", u8::from(!LOADING_BACKGROUND.read().is_null()))?;
+            writeln!(f, "bar_has_fg={}", u8::from(!LOADING_FOREGROUND.read().is_null()))?;
+            writeln!(f, "transparent={}", u8::from(*LOADING_TRANSPARENT))?;
+            writeln!(f, "translucency={}", *LOADING_TRANSLUCENCY)?;
+            writeln!(f, "scale_progress_bar={}", u8::from(*LOADING_PROGRESS_BAR_SCALE))?;
+            writeln!(f, "show_error_messages={}", u8::from(*SHOW_ERROR_MESSAGES))?;
+            writeln!(f, "log_errors={}", u8::from(*LOG_ERRORS))?;
+            writeln!(f, "always_abort={}", u8::from(*ALWAYS_ABORT))?;
+            writeln!(f, "zero_uninitialized_vars={}", u8::from(*ZERO_UNINITIALIZED_VARS))?;
+            writeln!(f, "error_on_uninitialized_args={}", u8::from(*ERROR_ON_UNINITIALIZED_ARGS))?;
+            f.flush()?;
         }
-    }
-    if HAS_CUSTOM_LOAD_IMAGE.read() {
-        path.push("loader.bmp");
-        (&*CUSTOM_LOAD_IMAGE.read()).SaveToFile(&UStr::new(&path));
-        path.pop();
-    }
-    // icon is never legally null, so no need to check
-    path.push("icon.ico");
-    (&*ICON.read()).SaveToFile(&UStr::new(&path));
-    path.pop();
-    path.push("extensions.txt");
-    let extensions = ide::get_extensions();
-    let extensions_loaded = ide::get_extensions_loaded();
-    {
-        let mut f = open_file(&path)?;
-        for (extension, &loaded) in extensions.iter().zip(extensions_loaded) {
-            if loaded {
-                writeln!(f, "{}", &(**extension).name.try_decode()?)?;
+        if LOADING_BAR.read() == 2 {
+            if let Some(bg) = LOADING_BACKGROUND.read().as_ref() {
+                path.push("back.bmp");
+                bg.SaveToFile(&UStr::new(&path));
+                path.pop();
+            }
+            if let Some(fg) = LOADING_FOREGROUND.read().as_ref() {
+                path.push("front.bmp");
+                fg.SaveToFile(&UStr::new(&path));
+                path.pop();
             }
         }
-        f.flush()?;
+        if HAS_CUSTOM_LOAD_IMAGE.read() {
+            path.push("loader.bmp");
+            (&*CUSTOM_LOAD_IMAGE.read()).SaveToFile(&UStr::new(&path));
+            path.pop();
+        }
+        // icon is never legally null, so no need to check
+        path.push("icon.ico");
+        (&*ICON.read()).SaveToFile(&UStr::new(&path));
+        path.pop();
     }
-    path.pop();
-    save_game_information(path)?;
+    if !smart_save || *ide::EXTENSIONS_UPDATED {
+        path.push("extensions.txt");
+        let extensions = ide::get_extensions();
+        let extensions_loaded = ide::get_extensions_loaded();
+        {
+            let mut f = open_file(&path)?;
+            for (extension, &loaded) in extensions.iter().zip(extensions_loaded) {
+                if loaded {
+                    writeln!(f, "{}", &(**extension).name.try_decode()?)?;
+                }
+            }
+            f.flush()?;
+        }
+        path.pop();
+    }
+    if !smart_save || *ide::GAME_INFO_UPDATED {
+        save_game_information(path)?;
+    }
     path.pop();
     Ok(())
 }
@@ -673,8 +681,10 @@ unsafe fn save_assets<'a, T: Sync>(
     name: &str,
     assets: &[Option<&'a T>],
     names: &[UStr],
+    timestamps: &[f64],
     tree: *const *const TTreeNode,
     save_func: unsafe fn(&T, &mut PathBuf) -> Result<()>,
+    smart_save: bool,
     path: &mut PathBuf,
 ) -> Result<()> {
     path.push(name);
@@ -701,12 +711,14 @@ unsafe fn save_assets<'a, T: Sync>(
         path.pop();
     }
     run_while_updating_bar(_bar_start, _bar_end, count, |tx| {
-        (assets, names).into_par_iter().try_for_each(|(asset, name)| -> Result<()> {
-            if let Some(asset) = asset {
-                let name = name.try_decode()?;
-                let mut p = path.join(name);
-                save_func(asset, &mut p)?;
-                let _ = tx.send(());
+        (assets, names, timestamps).into_par_iter().try_for_each(|(asset, name, timestamp)| -> Result<()> {
+            if !smart_save || *timestamp > LAST_SAVE {
+                if let Some(asset) = asset {
+                    let name = name.try_decode()?;
+                    let mut p = path.join(name);
+                    save_func(asset, &mut p)?;
+                    let _ = tx.send(());
+                }
             }
             Ok(())
         })
@@ -722,7 +734,7 @@ unsafe fn save_assets<'a, T: Sync>(
     Ok(())
 }
 
-unsafe fn save_included_files(path: &mut PathBuf) -> Result<()> {
+unsafe fn save_included_files(path: &mut PathBuf, smart_save: bool) -> Result<()> {
     path.push("datafiles");
     path.push("include");
     create_dirs(&path)?;
@@ -746,7 +758,10 @@ unsafe fn save_included_files(path: &mut PathBuf) -> Result<()> {
         write_file(&path, index)?;
         path.pop();
     }
-    for file in files {
+    for (file, timestamp) in files.iter().zip(ide::get_included_file_timestamps()) {
+        if smart_save && *timestamp < LAST_SAVE {
+            continue
+        }
         let file = &**file;
         let mut name = file.file_name.try_decode()?;
         if file.data_exists {
@@ -837,49 +852,59 @@ unsafe fn write_tree_children<F: Write>(
     Ok(())
 }
 
-unsafe fn save_icon_cache(path: &mut PathBuf) -> Result<()> {
+unsafe fn save_icon_cache(path: &mut PathBuf, smart_save: bool) -> Result<()> {
     const BMP_HEADER: &[u8] = include_bytes!("../assets/thumb_header.dat");
     const BMP_SIZE: usize = 16 * 16 * 4 + BMP_HEADER.len();
-    unsafe fn save_frame(frame: &Frame, name: &UStr, path: &std::path::Path) -> Result<()> {
+    unsafe fn save_frame(frame: &Frame, name: &UStr, path: &std::path::Path, only_if_needed: bool) -> Result<()> {
         if frame.width == 0 || frame.height == 0 {
+            return Ok(())
+        }
+        let mut path = path.join(name.to_os_string());
+        path.set_extension("bmp");
+        if only_if_needed && path.exists() {
             return Ok(())
         }
         let mut out = Vec::with_capacity(BMP_SIZE);
         out.extend_from_slice(BMP_HEADER);
         out.set_len(BMP_SIZE);
         frame.thumb(&mut out[BMP_HEADER.len()..], true, [255, 255, 255]);
-        let mut path = path.join(name.to_os_string());
-        path.set_extension("bmp");
         write_file(&path, out)
     }
     path.push("cache");
     path.push("sprites");
     create_dirs(path)?;
-    ide::get_sprites().par_iter().zip(ide::get_sprite_names()).try_for_each(|(sprite, name)| -> Result<()> {
-        if let Some(&frame) = sprite.and_then(|s| s.get_frames().get(0)) {
-            save_frame(&*frame, name, path)?;
-        }
-        Ok(())
-    })?;
+    (ide::get_sprites(), ide::get_sprite_names(), ide::get_sprite_timestamps()).into_par_iter().try_for_each(
+        |(sprite, name, timestamp)| -> Result<()> {
+            if let Some(&frame) = sprite.and_then(|s| s.get_frames().get(0)) {
+                save_frame(&*frame, name, path, smart_save && *timestamp < LAST_SAVE)?;
+            }
+            Ok(())
+        },
+    )?;
     path.pop();
     path.push("backgrounds");
     create_dirs(path)?;
-    ide::get_backgrounds().par_iter().zip(ide::get_background_names()).try_for_each(|(bg, name)| -> Result<()> {
-        if let Some(bg) = bg {
-            save_frame(&*bg.frame, name, path)?;
-        }
-        Ok(())
-    })?;
+    (ide::get_backgrounds(), ide::get_background_names(), ide::get_background_timestamps())
+        .into_par_iter()
+        .try_for_each(|(bg, name, timestamp)| -> Result<()> {
+            if let Some(bg) = bg {
+                save_frame(&*bg.frame, name, path, smart_save && *timestamp < LAST_SAVE)?;
+            }
+            Ok(())
+        })?;
     path.pop();
     path.pop();
     Ok(())
 }
 
 pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
-    SAVE_START = SystemTime::now();
-    let _gonna_use_this_later = project_watcher::watching();
+    // if we have a watcher, we can do a smart save
+    // but if time went backwards, we must do a full save
+    let smart_save = project_watcher::watching() && LAST_SAVE != 0.0;
     project_watcher::unwatch();
     PATH_FORM_UPDATED = false;
+    SAVE_START = SystemTime::now();
+    // always rewrite the .gm82 file so you can easily see the timestamp
     {
         create_dirs(path.parent().unwrap())?;
         // some stuff to go in the main gmk
@@ -912,50 +937,142 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
     }
     path.pop();
     advance_progress_form(5);
-    save_settings(path)?;
+    save_settings(path, smart_save)?;
     advance_progress_form(10);
-    save_triggers(path)?;
+    if !smart_save || *ide::TRIGGERS_UPDATED {
+        save_triggers(path)?;
+    }
     advance_progress_form(15);
-    save_assets(15, 30, "sounds", ide::get_sounds(), ide::get_sound_names(), ide::RT_SOUNDS, save_sound, path)?;
+    if !smart_save || *ide::SOUNDS_UPDATED {
+        save_assets(
+            15,
+            30,
+            "sounds",
+            ide::get_sounds(),
+            ide::get_sound_names(),
+            ide::get_sound_timestamps(),
+            ide::RT_SOUNDS,
+            save_sound,
+            smart_save,
+            path,
+        )?;
+    }
     advance_progress_form(30);
-    save_assets(30, 55, "sprites", ide::get_sprites(), ide::get_sprite_names(), ide::RT_SPRITES, save_sprite, path)?;
+    if !smart_save || *ide::SPRITES_UPDATED {
+        save_assets(
+            30,
+            55,
+            "sprites",
+            ide::get_sprites(),
+            ide::get_sprite_names(),
+            ide::get_sprite_timestamps(),
+            ide::RT_SPRITES,
+            save_sprite,
+            smart_save,
+            path,
+        )?;
+    }
     advance_progress_form(55);
-    save_assets(
-        55,
-        65,
-        "backgrounds",
-        ide::get_backgrounds(),
-        ide::get_background_names(),
-        ide::RT_BACKGROUNDS,
-        save_background,
-        path,
-    )?;
+    if !smart_save || *ide::BACKGROUNDS_UPDATED {
+        save_assets(
+            55,
+            65,
+            "backgrounds",
+            ide::get_backgrounds(),
+            ide::get_background_names(),
+            ide::get_background_timestamps(),
+            ide::RT_BACKGROUNDS,
+            save_background,
+            smart_save,
+            path,
+        )?;
+    }
     advance_progress_form(65);
-    save_assets(65, 70, "paths", ide::get_paths(), ide::get_path_names(), ide::RT_PATHS, save_path, path)?;
+    if !smart_save || *ide::PATHS_UPDATED {
+        save_assets(
+            65,
+            70,
+            "paths",
+            ide::get_paths(),
+            ide::get_path_names(),
+            ide::get_path_timestamps(),
+            ide::RT_PATHS,
+            save_path,
+            smart_save,
+            path,
+        )?;
+    }
     advance_progress_form(70);
-    save_assets(70, 75, "scripts", ide::get_scripts(), ide::get_script_names(), ide::RT_SCRIPTS, save_script, path)?;
+    if !smart_save || *ide::SCRIPTS_UPDATED {
+        save_assets(
+            70,
+            75,
+            "scripts",
+            ide::get_scripts(),
+            ide::get_script_names(),
+            ide::get_script_timestamps(),
+            ide::RT_SCRIPTS,
+            save_script,
+            smart_save,
+            path,
+        )?;
+    }
     advance_progress_form(75);
-    save_assets(75, 80, "fonts", ide::get_fonts(), ide::get_font_names(), ide::RT_FONTS, save_font, path)?;
+    if !smart_save || *ide::FONTS_UPDATED {
+        save_assets(
+            75,
+            80,
+            "fonts",
+            ide::get_fonts(),
+            ide::get_font_names(),
+            ide::get_font_timestamps(),
+            ide::RT_FONTS,
+            save_font,
+            smart_save,
+            path,
+        )?;
+    }
     advance_progress_form(80);
-    save_assets(
-        80,
-        85,
-        "timelines",
-        ide::get_timelines(),
-        ide::get_timeline_names(),
-        ide::RT_TIMELINES,
-        save_timeline,
-        path,
-    )?;
+    if !smart_save || *ide::TIMELINES_UPDATED {
+        save_assets(
+            80,
+            85,
+            "timelines",
+            ide::get_timelines(),
+            ide::get_timeline_names(),
+            ide::get_timeline_timestamps(),
+            ide::RT_TIMELINES,
+            save_timeline,
+            smart_save,
+            path,
+        )?;
+    }
     advance_progress_form(85);
-    save_assets(85, 90, "objects", ide::get_objects(), ide::get_object_names(), ide::RT_OBJECTS, save_object, path)?;
+    if !smart_save || *ide::OBJECTS_UPDATED {
+        save_assets(
+            85,
+            90,
+            "objects",
+            ide::get_objects(),
+            ide::get_object_names(),
+            ide::get_object_timestamps(),
+            ide::RT_OBJECTS,
+            save_object,
+            smart_save,
+            path,
+        )?;
+    }
     advance_progress_form(90);
     // give instances ids if they don't already have one
-    for room in ide::get_rooms().iter().flatten() {
+    for (room, timestamp) in
+        ide::get_rooms().iter().zip(ide::get_room_timestamps_mut()).filter_map(|(&r, t)| Some((r?, t)))
+    {
         let extra_data = &mut EXTRA_DATA.get_or_insert_with(Default::default).0;
         for id in room.get_instances().iter().map(|i| i.id) {
             let mut name = extra_data.entry(id).or_default().name;
             if name == 0 {
+                *ide::ROOMS_UPDATED = true;
+                delphi::Now(timestamp);
                 loop {
                     name = delphi::Random();
                     if !extra_data.values().any(|ex| ex.name == name) {
@@ -966,12 +1083,27 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
             }
         }
     }
-    save_assets(90, 95, "rooms", ide::get_rooms(), ide::get_room_names(), ide::RT_ROOMS, save_room, path)?;
+    if !smart_save || *ide::ROOMS_UPDATED {
+        save_assets(
+            90,
+            95,
+            "rooms",
+            ide::get_rooms(),
+            ide::get_room_names(),
+            ide::get_room_timestamps(),
+            ide::RT_ROOMS,
+            save_room,
+            smart_save,
+            path,
+        )?;
+    }
     advance_progress_form(95);
-    save_included_files(path)?;
+    if !smart_save || *ide::INCLUDED_FILES_UPDATED {
+        save_included_files(path, smart_save)?;
+    }
 
-    if SAVING_FOR_ROOM_EDITOR {
-        save_icon_cache(path)?;
+    if !smart_save || *ide::SPRITES_UPDATED || *ide::BACKGROUNDS_UPDATED {
+        save_icon_cache(path, smart_save)?;
     }
 
     advance_progress_form(100);

@@ -426,3 +426,17 @@ pub unsafe fn DynArraySetLength<T>(a: *mut *mut T, type_info: *const u8, dimensi
         inlateout("ecx") dimensions => _,
     };
 }
+
+pub fn Now(out: &mut f64) {
+    unsafe {
+        asm! {
+            "call {call}",
+            "fstp qword ptr [{output}]",
+            call = in(reg) 0x4199b0,
+            output = in(reg) out,
+            out("eax") _,
+            out("edx") _,
+            out("ecx") _,
+        }
+    }
+}

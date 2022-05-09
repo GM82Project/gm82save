@@ -159,10 +159,27 @@ where
 
 static mut SAVE_START: SystemTime = SystemTime::UNIX_EPOCH;
 static mut SAVE_END: SystemTime = SystemTime::UNIX_EPOCH;
+static mut LAST_SAVE: f64 = 0.0;
 
 fn update_timestamp() {
     unsafe {
         SAVE_END = SystemTime::now();
+        delphi::Now(&mut LAST_SAVE);
+    }
+}
+
+#[naked]
+unsafe extern "C" fn reset_if_time_went_backwards() {
+    asm! {
+        "movsd xmm0, qword ptr [{last_save}]", // load last save
+        "ucomisd xmm0, qword ptr [esp]",       // compare to now
+        "jb 2f", // jump if now > last save (i.e. no change needed)
+        "mov dword ptr [{last_save}], 0",      // null out last_save
+        "mov dword ptr [{last_save}+4], 0",
+        "2: add esp, 0x20", // return
+        "ret",
+        last_save = sym LAST_SAVE,
+        options(noreturn),
     }
 }
 
@@ -1174,4 +1191,8 @@ unsafe fn injector() {
     patch_timestamps(0x722901 as _); // paths
     patch_timestamps(0x6fcd19 as _); // fonts
     patch_timestamps(0x6fa6c9 as _); // timelines
+
+    // check for time going backwards
+    patch(0x4199fb as _, &[0xe9]);
+    patch_call(0x4199fb as _, reset_if_time_went_backwards as _);
 }

@@ -59,19 +59,20 @@ extern "fastcall" fn on_notify() {
         unsafe {
             let message = UStr::new(
                 "Project files have been modified outside Game Maker. Reload project? \
-                   Unsaved changes will be lost.",
+                   Unsaved changes will be lost.\r\n\
+                   If you click \"No\", saving will overwrite any foreign changes.",
             );
             let mut answer: i32;
             asm! {
-            "push 0",  // HelpFileName
-            "push -1", // Y
-            "push -1", // X
-            "push 0",  // HelpCtx
-            "call {}",
-            in(reg) 0x4d437c, // MessageDlgPosHelp
-            inlateout("eax") message.0 => answer,
-            inlateout("edx") 3 => _, // DlgType
-            inlateout("ecx") 3 => _, // Buttons
+                "push 0",  // HelpFileName
+                "push -1", // Y
+                "push -1", // X
+                "push 0",  // HelpCtx
+                "call {}",
+                in(reg) 0x4d437c, // MessageDlgPosHelp
+                inlateout("eax") message.0 => answer,
+                inlateout("edx") 3 => _, // DlgType
+                inlateout("ecx") 3 => _, // Buttons
             }
             if answer == 6 {
                 // yes -> reload project
