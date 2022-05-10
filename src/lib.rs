@@ -893,6 +893,7 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
                     }
                 }
             }
+            // save game first, if needed
             let project_modified = PATH_FORM_UPDATED || {
                 let out: u32 = delphi_call!(0x7060e8);
                 out != 0
@@ -910,38 +911,38 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
                 project_watcher::unwatch();
                 SAVE_START = SystemTime::now();
             }
-            if room_path.exists() {
-                room_path.pop();
-                if let Ok(asset_maps) = load::load_asset_maps(&mut room_path) {
-                    room_path.push("rooms");
-                    room_path.push(ide::get_room_names()[room_id].to_os_string());
-                    let _: u32 = delphi_call!(0x51acd0, *(0x790100 as *const u32)); // hide main form
-                    let _ = std::process::Command::new(editor_path).arg(&room_path).spawn().and_then(|mut c| c.wait());
-                    let _: u32 = delphi_call!(0x51acd8, *(0x790100 as *const u32)); // show main form
-                    {
-                        let room = ide::get_rooms()[room_id].unwrap();
-                        // remove this room's ids from the global thing
-                        if let Some((extra_inst, extra_tile)) = EXTRA_DATA.as_mut() {
-                            for inst in room.get_instances() {
-                                extra_inst.remove(&inst.id);
-                            }
-                            for tile in room.get_tiles() {
-                                extra_tile.remove(&tile.id);
-                            }
-                        }
-                        let _: u32 = delphi_call!(0x657820, room); // clear room
+            // sort out running gm82room
+            room_path.pop();
+            let mut asset_maps_path = room_path.clone();
+            room_path.push("rooms");
+            room_path.push(ide::get_room_names()[room_id].to_os_string());
+            let _: u32 = delphi_call!(0x51acd0, *(0x790100 as *const u32)); // hide main form
+            let _ = std::process::Command::new(editor_path).arg(&room_path).spawn().and_then(|mut c| c.wait());
+            let _: u32 = delphi_call!(0x51acd8, *(0x790100 as *const u32)); // show main form
+            {
+                let room = ide::get_rooms()[room_id].unwrap();
+                // remove this room's ids from the global thing
+                if let Some((extra_inst, extra_tile)) = EXTRA_DATA.as_mut() {
+                    for inst in room.get_instances() {
+                        extra_inst.remove(&inst.id);
                     }
-                    ide::get_rooms_mut()[room_id] = load::load_room(&mut room_path, &asset_maps)
-                        .map_err(|e| e.to_string())
-                        .expect("loading the updated room failed")
-                        .as_ref();
-                    room_path.pop();
-                    room_path.pop();
-                    update_timestamp();
-                    project_watcher::setup_watcher(&mut room_path);
-                    return 0
+                    for tile in room.get_tiles() {
+                        extra_tile.remove(&tile.id);
+                    }
                 }
+                let _: u32 = delphi_call!(0x405a7c, room); // delete room
             }
+            // reload room
+            ide::get_rooms_mut()[room_id] = load::load_asset_maps(&mut asset_maps_path)
+                .and_then(|asset_maps| load::load_room(&mut room_path, &asset_maps))
+                .map_err(|e| e.to_string())
+                .expect("loading the updated room failed")
+                .as_ref();
+            room_path.pop();
+            room_path.pop();
+            update_timestamp();
+            project_watcher::setup_watcher(&mut room_path);
+            return 0
         }
     }
     delphi_call!(0x6884c8, room_id) // the default
