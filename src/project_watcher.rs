@@ -20,47 +20,50 @@ static WATCHER_ERROR: Once = Once::new();
 
 extern "fastcall" fn on_notify() {
     let lock = WATCHER_CHANNEL.lock();
-    while lock
-        .1
-        .try_recv()
-        .ok()
-        .filter(|event| match event {
-            DebouncedEvent::Chmod(_) | DebouncedEvent::Create(_) => false,
-            DebouncedEvent::NoticeWrite(p) | DebouncedEvent::Write(p) => {
-                if let Ok(modified) = p.metadata().and_then(|m| m.modified()) {
-                    unsafe {
-                        if SAVE_START == SAVE_END {
-                            // from load, most likely not ours but give 2 seconds of leeway anyway
-                            SAVE_END.duration_since(modified).unwrap_or_else(|e| e.duration()).as_secs() > 2
-                        } else {
-                            // it's ours if it's between save start and save end, give 2 secs of leeway
-                            let earlier = modified
-                                .checked_add(Duration::from_secs(2))
-                                .and_then(|t| t.duration_since(SAVE_START).ok())
-                                .is_none();
-                            let later = SAVE_END
-                                .checked_add(Duration::from_secs(2))
-                                .and_then(|t| t.duration_since(modified).ok())
-                                .is_none();
-                            earlier || later
-                        }
+    while let Some(event) = lock.1.try_recv().ok().filter(|event| match event {
+        DebouncedEvent::Chmod(_) | DebouncedEvent::Create(_) => false,
+        DebouncedEvent::NoticeWrite(p) | DebouncedEvent::Write(p) => {
+            if let Ok(modified) = p.metadata().and_then(|m| m.modified()) {
+                unsafe {
+                    if SAVE_START == SAVE_END {
+                        // from load, most likely not ours but give 2 seconds of leeway anyway
+                        SAVE_END.duration_since(modified).unwrap_or_else(|e| e.duration()).as_secs() > 2
+                    } else {
+                        // it's ours if it's between save start and save end, give 2 secs of leeway
+                        let earlier = modified
+                            .checked_add(Duration::from_secs(2))
+                            .and_then(|t| t.duration_since(SAVE_START).ok())
+                            .is_none();
+                        let later = SAVE_END
+                            .checked_add(Duration::from_secs(2))
+                            .and_then(|t| t.duration_since(modified).ok())
+                            .is_none();
+                        earlier || later
                     }
-                } else {
-                    true
                 }
-            },
-            _ => true,
-        })
-        .is_some()
-    {
+            } else {
+                true
+            }
+        },
+        _ => true,
+    }) {
         drop(lock);
         unwatch();
+        let event_string = match &event {
+            DebouncedEvent::Write(p) | DebouncedEvent::NoticeWrite(p) => {
+                format!("{:?} {:?}", event, p.metadata().and_then(|m| m.modified()).ok())
+            },
+            _ => format!("{:?}", event),
+        };
         unsafe {
-            let message = UStr::new(
+            let message = UStr::new(format!(
                 "Project files have been modified outside Game Maker. Reload project? \
                    Unsaved changes will be lost.\r\n\
-                   If you click \"No\", saving will overwrite any foreign changes.",
-            );
+                   If you click \"No\", saving will overwrite any foreign changes.\r\n\
+                   This feature is still in early days, so if you think this is a \
+                   false positive, please send Floogle this information:\r\nSTART {:?} END {:?} {}",
+                SAVE_START, SAVE_END, event_string
+            ));
             let mut answer: i32;
             asm! {
                 "push 0",  // HelpFileName
