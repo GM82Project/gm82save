@@ -50,6 +50,12 @@ impl<'a> GetAsset<String> for &'a [UStr] {
     }
 }
 
+impl<'a> GetAsset<f64> for &'a [f64] {
+    fn get_asset(&self, id: i32) -> f64 {
+        usize::try_from(id).ok().and_then(|id| self.get(id).copied()).unwrap_or_default()
+    }
+}
+
 fn filename_invalid(s: &str) -> Option<u8> {
     if s == "." || s == ".." || s.as_bytes().last().copied() == Some(b'.') {
         return Some(b'.')
@@ -129,6 +135,10 @@ unsafe fn save_stream(data: &delphi::TMemoryStream, path: &std::path::Path) -> R
     Ok(())
 }
 
+unsafe fn no_dependencies<T>(_: &T) -> bool {
+    false
+}
+
 unsafe fn save_sound(sound: &Sound, path: &mut PathBuf) -> Result<()> {
     let extension = sound.extension.try_decode()?;
     path.set_extension(extension.trim_matches('.'));
@@ -194,6 +204,10 @@ unsafe fn save_background(back: &Background, path: &mut PathBuf) -> Result<()> {
     Ok(())
 }
 
+unsafe fn path_needs_update(path: &Path) -> bool {
+    ide::get_room_timestamps().get_asset(path.path_editor_room_background) > LAST_SAVE
+}
+
 unsafe fn save_path(path: &Path, file_path: &mut PathBuf) -> Result<()> {
     create_dirs(&file_path)?;
     file_path.push("path.txt");
@@ -235,6 +249,37 @@ unsafe fn save_font(font: &Font, path: &mut PathBuf) -> Result<()> {
     writeln!(f, "range_end={}", font.range_end)?;
     f.flush()?;
     Ok(())
+}
+
+unsafe fn event_needs_update(ev: &Event) -> bool {
+    for action in ev.get_actions() {
+        let action = &**action;
+        if ide::get_object_timestamps().get_asset(action.applies_to) > LAST_SAVE {
+            return true
+        }
+        if action.action_kind == 0 {
+            for (ty, val) in action.param_types.iter().zip(&action.param_strings) {
+                unsafe fn parameter_get_timestamp(ty: u32, val: &UStr) -> Result<f64> {
+                    Ok(match ty {
+                        5 => ide::get_sprite_timestamps().get_asset(val.try_decode()?.parse()?),
+                        6 => ide::get_sound_timestamps().get_asset(val.try_decode()?.parse()?),
+                        7 => ide::get_background_timestamps().get_asset(val.try_decode()?.parse()?),
+                        8 => ide::get_path_timestamps().get_asset(val.try_decode()?.parse()?),
+                        9 => ide::get_script_timestamps().get_asset(val.try_decode()?.parse()?),
+                        10 => ide::get_object_timestamps().get_asset(val.try_decode()?.parse()?),
+                        11 => ide::get_room_timestamps().get_asset(val.try_decode()?.parse()?),
+                        12 => ide::get_font_timestamps().get_asset(val.try_decode()?.parse()?),
+                        14 => ide::get_timeline_timestamps().get_asset(val.try_decode()?.parse()?),
+                        _ => 0.0,
+                    })
+                }
+                if !matches!(parameter_get_timestamp(*ty, val).map(|t| t > LAST_SAVE), Ok(false)) {
+                    return true
+                }
+            }
+        }
+    }
+    return false
 }
 
 unsafe fn save_event<F: Write>(ev: &Event, name: &str, file: &mut F) -> Result<()> {
@@ -305,6 +350,10 @@ unsafe fn save_event<F: Write>(ev: &Event, name: &str, file: &mut F) -> Result<(
     Ok(())
 }
 
+unsafe fn timeline_needs_update(tl: &Timeline) -> bool {
+    tl.get_events().iter().any(|e| event_needs_update(&**e))
+}
+
 unsafe fn save_timeline(tl: &Timeline, path: &mut PathBuf) -> Result<()> {
     path.set_extension("gml");
     let mut f = open_file(path)?;
@@ -330,6 +379,18 @@ unsafe fn event_name(ev_type: usize, ev_numb: usize) -> String {
         ),
         _ => format!("{}_{}", events::EVENT_NAMES[ev_type], ev_numb),
     }
+}
+
+unsafe fn object_needs_update(obj: &Object) -> bool {
+    return ide::get_sprite_timestamps().get_asset(obj.sprite_index) > LAST_SAVE
+        || ide::get_sprite_timestamps().get_asset(obj.mask_index) > LAST_SAVE
+        || ide::get_object_timestamps().get_asset(obj.parent_index) > LAST_SAVE
+        || obj.events.iter().flatten().any(|e| event_needs_update(&**e))
+        || obj.events[events::EV_TRIGGER].is_empty() && *ide::TRIGGERS_UPDATED
+        || obj.events[events::EV_COLLISION]
+            .iter()
+            .enumerate()
+            .any(|(i, e)| (**e).action_count != 0 && ide::get_object_timestamps().get_asset(i as _) > LAST_SAVE)
 }
 
 unsafe fn save_object(obj: &Object, path: &mut PathBuf) -> Result<()> {
@@ -360,6 +421,13 @@ unsafe fn save_object(obj: &Object, path: &mut PathBuf) -> Result<()> {
         f.flush()?;
     }
     Ok(())
+}
+
+unsafe fn room_needs_update(room: &Room) -> bool {
+    return room.backgrounds.iter().any(|bg| ide::get_background_timestamps().get_asset(bg.source_bg) > LAST_SAVE)
+        || room.views.iter().any(|view| ide::get_object_timestamps().get_asset(view.following_target) > LAST_SAVE)
+        || room.get_instances().iter().any(|i| ide::get_object_timestamps().get_asset(i.object) > LAST_SAVE)
+        || room.get_tiles().iter().any(|t| ide::get_background_timestamps().get_asset(t.source_bg) > LAST_SAVE)
 }
 
 unsafe fn save_tiles(tiles: &[Tile], path: &mut PathBuf) -> Result<()> {
@@ -685,6 +753,7 @@ unsafe fn save_assets<'a, T: Sync>(
     tree: *const *const TTreeNode,
     save_func: unsafe fn(&T, &mut PathBuf) -> Result<()>,
     smart_save: bool,
+    dependency_check: unsafe fn(&T) -> bool,
     path: &mut PathBuf,
 ) -> Result<()> {
     path.push(name);
@@ -712,8 +781,8 @@ unsafe fn save_assets<'a, T: Sync>(
     }
     run_while_updating_bar(_bar_start, _bar_end, count, |tx| {
         (assets, names, timestamps).into_par_iter().try_for_each(|(asset, name, timestamp)| -> Result<()> {
-            if !smart_save || *timestamp > LAST_SAVE {
-                if let Some(asset) = asset {
+            if let Some(asset) = asset {
+                if !smart_save || *timestamp > LAST_SAVE || dependency_check(asset) {
                     let name = name.try_decode()?;
                     let mut p = path.join(name);
                     save_func(asset, &mut p)?;
@@ -954,6 +1023,7 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
             ide::RT_SOUNDS,
             save_sound,
             smart_save,
+            no_dependencies,
             path,
         )?;
     }
@@ -969,6 +1039,7 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
             ide::RT_SPRITES,
             save_sprite,
             smart_save,
+            no_dependencies,
             path,
         )?;
     }
@@ -984,24 +1055,24 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
             ide::RT_BACKGROUNDS,
             save_background,
             smart_save,
+            no_dependencies,
             path,
         )?;
     }
     advance_progress_form(65);
-    if !smart_save || *ide::PATHS_UPDATED {
-        save_assets(
-            65,
-            70,
-            "paths",
-            ide::get_paths(),
-            ide::get_path_names(),
-            ide::get_path_timestamps(),
-            ide::RT_PATHS,
-            save_path,
-            smart_save,
-            path,
-        )?;
-    }
+    save_assets(
+        65,
+        70,
+        "paths",
+        ide::get_paths(),
+        ide::get_path_names(),
+        ide::get_path_timestamps(),
+        ide::RT_PATHS,
+        save_path,
+        smart_save,
+        path_needs_update,
+        path,
+    )?;
     advance_progress_form(70);
     if !smart_save || *ide::SCRIPTS_UPDATED {
         save_assets(
@@ -1014,6 +1085,7 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
             ide::RT_SCRIPTS,
             save_script,
             smart_save,
+            no_dependencies,
             path,
         )?;
     }
@@ -1029,39 +1101,38 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
             ide::RT_FONTS,
             save_font,
             smart_save,
+            no_dependencies,
             path,
         )?;
     }
     advance_progress_form(80);
-    if !smart_save || *ide::TIMELINES_UPDATED {
-        save_assets(
-            80,
-            85,
-            "timelines",
-            ide::get_timelines(),
-            ide::get_timeline_names(),
-            ide::get_timeline_timestamps(),
-            ide::RT_TIMELINES,
-            save_timeline,
-            smart_save,
-            path,
-        )?;
-    }
+    save_assets(
+        80,
+        85,
+        "timelines",
+        ide::get_timelines(),
+        ide::get_timeline_names(),
+        ide::get_timeline_timestamps(),
+        ide::RT_TIMELINES,
+        save_timeline,
+        smart_save,
+        timeline_needs_update,
+        path,
+    )?;
     advance_progress_form(85);
-    if !smart_save || *ide::OBJECTS_UPDATED {
-        save_assets(
-            85,
-            90,
-            "objects",
-            ide::get_objects(),
-            ide::get_object_names(),
-            ide::get_object_timestamps(),
-            ide::RT_OBJECTS,
-            save_object,
-            smart_save,
-            path,
-        )?;
-    }
+    save_assets(
+        85,
+        90,
+        "objects",
+        ide::get_objects(),
+        ide::get_object_names(),
+        ide::get_object_timestamps(),
+        ide::RT_OBJECTS,
+        save_object,
+        smart_save,
+        object_needs_update,
+        path,
+    )?;
     advance_progress_form(90);
     // give instances ids if they don't already have one
     for (room, timestamp) in
@@ -1083,20 +1154,19 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
             }
         }
     }
-    if !smart_save || *ide::ROOMS_UPDATED {
-        save_assets(
-            90,
-            95,
-            "rooms",
-            ide::get_rooms(),
-            ide::get_room_names(),
-            ide::get_room_timestamps(),
-            ide::RT_ROOMS,
-            save_room,
-            smart_save,
-            path,
-        )?;
-    }
+    save_assets(
+        90,
+        95,
+        "rooms",
+        ide::get_rooms(),
+        ide::get_room_names(),
+        ide::get_room_timestamps(),
+        ide::RT_ROOMS,
+        save_room,
+        smart_save,
+        room_needs_update,
+        path,
+    )?;
     advance_progress_form(95);
     if !smart_save || *ide::INCLUDED_FILES_UPDATED {
         save_included_files(path, smart_save)?;
