@@ -53,9 +53,8 @@ extern "fastcall" fn on_notify() {
         })
         .is_some()
     {
-        unwatch();
-        lock.1.try_iter().for_each(|_| ()); // clear channel
         drop(lock);
+        unwatch();
         unsafe {
             let message = UStr::new(
                 "Project files have been modified outside Game Maker. Reload project? \
@@ -169,6 +168,7 @@ unsafe fn disable_timer() {
 }
 
 pub fn unwatch() {
+    WATCHER_CHANNEL.lock().1.try_iter().for_each(|_| ()); // clear channel
     unsafe {
         WATCHER = None;
         disable_timer();

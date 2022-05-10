@@ -906,6 +906,9 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
                 if success == 0 {
                     return 0
                 }
+            } else {
+                project_watcher::unwatch();
+                SAVE_START = SystemTime::now();
             }
             if room_path.exists() {
                 room_path.pop();
