@@ -127,20 +127,7 @@ impl Frame {
     }
 
     #[allow(non_snake_case)]
-    pub unsafe fn register_thumb(&self, bg_col: [u8; 3]) -> i32 {
-        let mut icon: [u8; 16 * 16 * 4] = std::mem::MaybeUninit::uninit().assume_init();
-        self.thumb(&mut icon, false, bg_col);
-        let mut mask: [u8; 16 * 16 / 8] = std::mem::MaybeUninit::uninit().assume_init();
-        for (dst, src) in mask.iter_mut().zip(icon.chunks_exact(8 * 4)) {
-            *dst = u8::from(src[3] == 0) << 7
-                | u8::from(src[3 + 4] == 0) << 6
-                | u8::from(src[3 + 4 * 2] == 0) << 5
-                | u8::from(src[3 + 4 * 3] == 0) << 4
-                | u8::from(src[3 + 4 * 4] == 0) << 3
-                | u8::from(src[3 + 4 * 5] == 0) << 2
-                | u8::from(src[3 + 4 * 6] == 0) << 1
-                | u8::from(src[3 + 4 * 7] == 0);
-        }
+    unsafe fn register_thumb_raw(icon: &[u8; 16 * 16 * 4], mask: &[u8; 16 * 16 / 8]) -> i32 {
         let CreateBitmap: extern "stdcall" fn(u32, u32, u32, u32, *const u8) -> usize = std::mem::transmute(0x40e008);
         let ImageList_Add: extern "stdcall" fn(usize, usize, usize) -> i32 = std::mem::transmute(0x40f8ec);
         let DeleteObject: extern "stdcall" fn(usize) -> bool = std::mem::transmute(0x40e098);
@@ -150,6 +137,29 @@ impl Frame {
         DeleteObject(bitmap);
         DeleteObject(mask_bitmap);
         thumb
+    }
+
+    pub fn register_blank_thumb() -> i32 {
+        unsafe { Self::register_thumb_raw(&[0; 16 * 16 * 4], &[0xff; 16 * 16 / 8]) }
+    }
+
+    pub fn register_thumb(&self, bg_col: [u8; 3]) -> i32 {
+        unsafe {
+            let mut icon: [u8; 16 * 16 * 4] = std::mem::MaybeUninit::uninit().assume_init();
+            self.thumb(&mut icon, false, bg_col);
+            let mut mask: [u8; 16 * 16 / 8] = std::mem::MaybeUninit::uninit().assume_init();
+            for (dst, src) in mask.iter_mut().zip(icon.chunks_exact(8 * 4)) {
+                *dst = u8::from(src[3] == 0) << 7
+                    | u8::from(src[3 + 4] == 0) << 6
+                    | u8::from(src[3 + 4 * 2] == 0) << 5
+                    | u8::from(src[3 + 4 * 3] == 0) << 4
+                    | u8::from(src[3 + 4 * 4] == 0) << 3
+                    | u8::from(src[3 + 4 * 5] == 0) << 2
+                    | u8::from(src[3 + 4 * 6] == 0) << 1
+                    | u8::from(src[3 + 4 * 7] == 0);
+            }
+            Self::register_thumb_raw(&icon, &mask)
+        }
     }
 }
 
@@ -188,6 +198,15 @@ impl Sprite {
     pub fn get_frames(&self) -> &[*mut Frame] {
         unsafe { self.frames.get_unchecked(..self.frame_count as usize) }
     }
+
+    pub unsafe fn register_thumb(&self, bg_col: [u8; 3]) -> i32 {
+        if let Some(frame) = self.get_frames().get(0).and_then(|f| f.as_ref()).filter(|f| f.width != 0 && f.height != 0)
+        {
+            frame.register_thumb(bg_col)
+        } else {
+            Frame::register_blank_thumb()
+        }
+    }
 }
 
 #[repr(C)]
@@ -210,6 +229,14 @@ impl Background {
 
     pub unsafe fn get_icon(&self) -> *const TBitmap {
         delphi_call!(0x62e5e8, self)
+    }
+
+    pub unsafe fn register_thumb(&self, bg_col: [u8; 3]) -> i32 {
+        if let Some(frame) = self.frame.as_ref().filter(|f| f.width != 0 && f.height != 0) {
+            frame.register_thumb(bg_col)
+        } else {
+            Frame::register_blank_thumb()
+        }
     }
 }
 

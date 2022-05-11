@@ -1229,16 +1229,12 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     let mut last_refresh = std::time::Instant::now();
     let sprites_len = ide::get_sprites().len();
     for (i, (sp, thumb)) in ide::get_sprites().iter().zip(ide::get_sprite_thumbs_mut()).enumerate() {
-        if let Some(frame) =
-            sp.and_then(|sp| sp.get_frames().get(0)).and_then(|f| f.as_ref()).filter(|f| f.width != 0 && f.height != 0)
-        {
-            *thumb = frame.register_thumb(bg_col);
+        if let Some(sp) = sp {
+            *thumb = sp.register_thumb(bg_col);
             if last_refresh.elapsed() > std::time::Duration::from_secs(1) {
                 advance_progress_form((i * 15 / sprites_len + 45) as u32);
                 last_refresh = std::time::Instant::now();
             }
-        } else {
-            *thumb = -1;
         }
     }
     advance_progress_form(60);
@@ -1246,14 +1242,12 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     let mut last_refresh = std::time::Instant::now();
     let bg_len = ide::get_backgrounds().len();
     for (i, (bg, thumb)) in ide::get_backgrounds().iter().zip(ide::get_background_thumbs_mut()).enumerate() {
-        if let Some(frame) = bg.and_then(|bg| bg.frame.as_ref()).filter(|f| f.width != 0 && f.height != 0) {
-            *thumb = frame.register_thumb(bg_col);
+        if let Some(bg) = bg {
+            *thumb = bg.register_thumb(bg_col);
             if last_refresh.elapsed() > std::time::Duration::from_secs(1) {
                 advance_progress_form((i * 5 / bg_len + 60) as u32);
                 last_refresh = std::time::Instant::now();
             }
-        } else {
-            *thumb = -1;
         }
     }
     // image list OnChange
