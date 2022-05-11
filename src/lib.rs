@@ -157,7 +157,6 @@ where
     }
 }
 
-static mut SAVE_START: SystemTime = SystemTime::UNIX_EPOCH;
 static mut SAVE_END: SystemTime = SystemTime::UNIX_EPOCH;
 static mut LAST_SAVE: f64 = 0.0;
 
@@ -909,7 +908,6 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
                 }
             } else {
                 project_watcher::unwatch();
-                SAVE_START = SystemTime::now();
             }
             // sort out running gm82room
             room_path.pop();

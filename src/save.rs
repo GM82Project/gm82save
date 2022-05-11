@@ -3,7 +3,7 @@ use crate::{
     delphi,
     delphi::{advance_progress_form, TTreeNode, UStr},
     events, ide, project_watcher, run_while_updating_bar, show_message, update_timestamp, Error, InstanceExtra, Result,
-    TileExtra, ACTION_TOKEN, EXTRA_DATA, LAST_SAVE, PATH_FORM_UPDATED, SAVE_START, SAW_APPLIES_TO_WARNING,
+    TileExtra, ACTION_TOKEN, EXTRA_DATA, LAST_SAVE, PATH_FORM_UPDATED, SAW_APPLIES_TO_WARNING,
 };
 use itertools::Itertools;
 use rayon::prelude::*;
@@ -14,7 +14,6 @@ use std::{
     io::{BufWriter, Write},
     path::PathBuf,
     slice, str,
-    time::SystemTime,
 };
 
 impl UStr {
@@ -972,7 +971,6 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
     let smart_save = project_watcher::watching() && LAST_SAVE != 0.0;
     project_watcher::unwatch();
     PATH_FORM_UPDATED = false;
-    SAVE_START = SystemTime::now();
     // always rewrite the .gm82 file so you can easily see the timestamp
     {
         create_dirs(path.parent().unwrap())?;

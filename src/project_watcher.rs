@@ -1,4 +1,4 @@
-use crate::{ide, show_message, UStr, SAVE_END, SAVE_START};
+use crate::{ide, show_message, UStr, SAVE_END};
 use notify::{watcher, DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use once_cell::unsync::Lazy;
 use parking_lot::Mutex;
@@ -25,21 +25,10 @@ extern "fastcall" fn on_notify() {
         DebouncedEvent::NoticeWrite(p) | DebouncedEvent::Write(p) => {
             if let Ok(modified) = p.metadata().and_then(|m| m.modified()) {
                 unsafe {
-                    if SAVE_START == SAVE_END {
-                        // from load, most likely not ours but give 2 seconds of leeway anyway
-                        SAVE_END.duration_since(modified).unwrap_or_else(|e| e.duration()).as_secs() > 2
-                    } else {
-                        // it's ours if it's between save start and save end, give 2 secs of leeway
-                        let earlier = modified
-                            .checked_add(Duration::from_secs(2))
-                            .and_then(|t| t.duration_since(SAVE_START).ok())
-                            .is_none();
-                        let later = SAVE_END
-                            .checked_add(Duration::from_secs(2))
-                            .and_then(|t| t.duration_since(modified).ok())
-                            .is_none();
-                        earlier || later
-                    }
+                    // it's foreign if modified time is after save end
+                    // if someone edited a file in notepad, we'll get one of these
+                    // if someone dragged in an older copy, we'll get a NoticeRemove instead
+                    SAVE_END < modified
                 }
             } else {
                 true
@@ -61,8 +50,8 @@ extern "fastcall" fn on_notify() {
                    Unsaved changes will be lost.\r\n\
                    If you click \"No\", saving will overwrite any foreign changes.\r\n\
                    This feature is still in early days, so if you think this is a \
-                   false positive, please send Floogle this information:\r\nSTART {:?} END {:?} {}",
-                SAVE_START, SAVE_END, event_string
+                   false positive, please send Floogle this information:\r\nSAVE {:?} {}",
+                SAVE_END, event_string
             ));
             let mut answer: i32;
             asm! {
