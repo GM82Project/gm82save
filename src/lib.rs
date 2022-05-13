@@ -532,10 +532,20 @@ unsafe extern "C" fn properly_update_object_timestamp() {
 #[naked]
 unsafe extern "C" fn properly_update_timeline_timestamp() {
     asm! {
-    "mov eax, [esi + 0x430]",
-    "mov ecx, 0x6fa7b0",
-    "call ecx",
-    options(noreturn),
+        "mov eax, [esi + 0x430]",
+        "mov ecx, 0x6fa7b0",
+        "call ecx",
+        options(noreturn),
+    }
+}
+
+#[naked]
+unsafe extern "C" fn update_sprite_mask_timestamp() {
+    asm! {
+        "mov eax, [ebx+0x42c]",
+        "mov ecx, 0x6f5ac8",
+        "jmp ecx",
+        options(noreturn),
     }
 }
 
@@ -1217,6 +1227,16 @@ unsafe fn injector() {
     // fix objects/timelines updating the wrong timestamp
     patch_call(0x6c73ef as _, properly_update_object_timestamp as _);
     patch_call(0x6f94c3 as _, properly_update_timeline_timestamp as _);
+
+    // update timestamp properly in mask form
+    unsafe fn patch_timestamp_mask(dest: *mut u8) {
+        patch(dest, &[0xe8, 0, 0, 0, 0, 0x90, 0x90, 0x90]);
+        patch_call(dest, update_sprite_mask_timestamp as _);
+    }
+    patch_timestamp_mask(0x6f3208 as _);
+    patch_timestamp_mask(0x6f33fa as _);
+    patch_timestamp_mask(0x6f34e8 as _);
+    patch_timestamp_mask(0x6f3555 as _);
 
     // check for time going backwards
     patch(0x4199fb as _, &[0xe9]);
