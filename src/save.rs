@@ -1010,7 +1010,7 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
         save_triggers(path)?;
     }
     advance_progress_form(15);
-    if !smart_save || *ide::SOUNDS_UPDATED {
+    if !smart_save || *ide::SOUNDS_UPDATED || *ide::RESOURCE_TREE_UPDATED {
         save_assets(
             15,
             30,
@@ -1026,7 +1026,7 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
         )?;
     }
     advance_progress_form(30);
-    if !smart_save || *ide::SPRITES_UPDATED {
+    if !smart_save || *ide::SPRITES_UPDATED || *ide::RESOURCE_TREE_UPDATED {
         save_assets(
             30,
             55,
@@ -1042,7 +1042,7 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
         )?;
     }
     advance_progress_form(55);
-    if !smart_save || *ide::BACKGROUNDS_UPDATED {
+    if !smart_save || *ide::BACKGROUNDS_UPDATED || *ide::RESOURCE_TREE_UPDATED {
         save_assets(
             55,
             65,
@@ -1088,7 +1088,7 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
         )?;
     }
     advance_progress_form(75);
-    if !smart_save || *ide::FONTS_UPDATED {
+    if !smart_save || *ide::FONTS_UPDATED || *ide::RESOURCE_TREE_UPDATED {
         save_assets(
             75,
             80,
