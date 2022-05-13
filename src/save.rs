@@ -204,7 +204,7 @@ unsafe fn save_background(back: &Background, path: &mut PathBuf) -> Result<()> {
 }
 
 unsafe fn path_needs_update(path: &Path) -> bool {
-    ide::get_room_timestamps().get_asset(path.path_editor_room_background) > LAST_SAVE
+    PATH_FORM_UPDATED || ide::get_room_timestamps().get_asset(path.path_editor_room_background) > LAST_SAVE
 }
 
 unsafe fn save_path(path: &Path, file_path: &mut PathBuf) -> Result<()> {
