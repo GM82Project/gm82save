@@ -204,7 +204,10 @@ unsafe fn save_background(back: &Background, path: &mut PathBuf) -> Result<()> {
 }
 
 unsafe fn path_needs_update(path: &Path) -> bool {
-    PATH_FORM_UPDATED || ide::get_room_timestamps().get_asset(path.path_editor_room_background) > LAST_SAVE
+    PATH_FORM_UPDATED
+        || path.path_editor_room_background >= 0
+            && (ide::get_rooms().get_asset(path.path_editor_room_background).is_none()
+                || ide::get_room_timestamps().get_asset(path.path_editor_room_background) > LAST_SAVE)
 }
 
 unsafe fn save_path(path: &Path, file_path: &mut PathBuf) -> Result<()> {
@@ -259,18 +262,69 @@ unsafe fn event_needs_update(ev: &Event) -> bool {
         if action.action_kind == 0 {
             for (ty, val) in action.param_types.iter().zip(&action.param_strings) {
                 unsafe fn parameter_get_timestamp(ty: u32, val: &UStr) -> Result<f64> {
-                    Ok(match ty {
-                        5 => ide::get_sprite_timestamps().get_asset(val.try_decode()?.parse()?),
-                        6 => ide::get_sound_timestamps().get_asset(val.try_decode()?.parse()?),
-                        7 => ide::get_background_timestamps().get_asset(val.try_decode()?.parse()?),
-                        8 => ide::get_path_timestamps().get_asset(val.try_decode()?.parse()?),
-                        9 => ide::get_script_timestamps().get_asset(val.try_decode()?.parse()?),
-                        10 => ide::get_object_timestamps().get_asset(val.try_decode()?.parse()?),
-                        11 => ide::get_room_timestamps().get_asset(val.try_decode()?.parse()?),
-                        12 => ide::get_font_timestamps().get_asset(val.try_decode()?.parse()?),
-                        14 => ide::get_timeline_timestamps().get_asset(val.try_decode()?.parse()?),
-                        _ => 0.0,
-                    })
+                    let val = val.try_decode()?.parse()?;
+                    if val < 0 {
+                        return Ok(0.0)
+                    }
+                    let time = match ty {
+                        5 => {
+                            if ide::get_sprites().get_asset(val).is_none() {
+                                return Ok(f64::MAX)
+                            }
+                            ide::get_sprite_timestamps().get_asset(val)
+                        },
+                        6 => {
+                            if ide::get_sounds().get_asset(val).is_none() {
+                                return Ok(f64::MAX)
+                            }
+                            ide::get_sound_timestamps().get_asset(val)
+                        },
+                        7 => {
+                            if ide::get_backgrounds().get_asset(val).is_none() {
+                                return Ok(f64::MAX)
+                            }
+                            ide::get_background_timestamps().get_asset(val)
+                        },
+                        8 => {
+                            if ide::get_paths().get_asset(val).is_none() {
+                                return Ok(f64::MAX)
+                            }
+                            ide::get_path_timestamps().get_asset(val)
+                        },
+                        9 => {
+                            if ide::get_scripts().get_asset(val).is_none() {
+                                return Ok(f64::MAX)
+                            }
+                            ide::get_script_timestamps().get_asset(val)
+                        },
+                        10 => {
+                            if ide::get_objects().get_asset(val).is_none() {
+                                return Ok(f64::MAX)
+                            }
+                            ide::get_object_timestamps().get_asset(val)
+                        },
+                        11 => {
+                            if ide::get_rooms().get_asset(val).is_none() {
+                                return Ok(f64::MAX)
+                            }
+                            ide::get_room_timestamps().get_asset(val)
+                        },
+                        12 => {
+                            if ide::get_fonts().get_asset(val).is_none() {
+                                return Ok(f64::MAX)
+                            }
+                            ide::get_font_timestamps().get_asset(val)
+                        },
+                        14 => {
+                            if ide::get_timelines().get_asset(val).is_none() {
+                                return Ok(f64::MAX)
+                            }
+                            ide::get_timeline_timestamps().get_asset(val)
+                        },
+                        _ => return Ok(0.0),
+                    };
+
+                    Ok(time)
                 }
                 if !matches!(parameter_get_timestamp(*ty, val).map(|t| t > LAST_SAVE), Ok(false)) {
                     return true
@@ -381,9 +435,15 @@ unsafe fn event_name(ev_type: usize, ev_numb: usize) -> String {
 }
 
 unsafe fn object_needs_update(obj: &Object) -> bool {
-    return ide::get_sprite_timestamps().get_asset(obj.sprite_index) > LAST_SAVE
-        || ide::get_sprite_timestamps().get_asset(obj.mask_index) > LAST_SAVE
-        || ide::get_object_timestamps().get_asset(obj.parent_index) > LAST_SAVE
+    return obj.sprite_index >= 0
+        && (ide::get_sprites().get_asset(obj.sprite_index).is_none()
+            || ide::get_sprite_timestamps().get_asset(obj.sprite_index) > LAST_SAVE)
+        || obj.mask_index >= 0
+            && (ide::get_sprites().get_asset(obj.mask_index).is_none()
+                || ide::get_sprite_timestamps().get_asset(obj.mask_index) > LAST_SAVE)
+        || obj.parent_index >= 0
+            && (ide::get_objects().get_asset(obj.parent_index).is_none()
+                || ide::get_object_timestamps().get_asset(obj.parent_index) > LAST_SAVE)
         || obj.events.iter().flatten().any(|e| event_needs_update(&**e))
         || obj.events[events::EV_TRIGGER].is_empty() && *ide::TRIGGERS_UPDATED
         || obj.events[events::EV_COLLISION]
@@ -423,10 +483,23 @@ unsafe fn save_object(obj: &Object, path: &mut PathBuf) -> Result<()> {
 }
 
 unsafe fn room_needs_update(room: &Room) -> bool {
-    return room.backgrounds.iter().any(|bg| ide::get_background_timestamps().get_asset(bg.source_bg) > LAST_SAVE)
-        || room.views.iter().any(|view| ide::get_object_timestamps().get_asset(view.following_target) > LAST_SAVE)
-        || room.get_instances().iter().any(|i| ide::get_object_timestamps().get_asset(i.object) > LAST_SAVE)
-        || room.get_tiles().iter().any(|t| ide::get_background_timestamps().get_asset(t.source_bg) > LAST_SAVE)
+    return room.backgrounds.iter().any(|bg| {
+        bg.source_bg >= 0
+            && (ide::get_backgrounds().get_asset(bg.source_bg).is_none()
+                || ide::get_background_timestamps().get_asset(bg.source_bg) > LAST_SAVE)
+    }) || room.views.iter().any(|view| {
+        view.following_target >= 0
+            && (ide::get_objects().get_asset(view.following_target).is_none()
+                || ide::get_object_timestamps().get_asset(view.following_target) > LAST_SAVE)
+    }) || room.get_instances().iter().any(|i| {
+        i.object >= 0
+            && (ide::get_objects().get_asset(i.object).is_none()
+                || ide::get_object_timestamps().get_asset(i.object) > LAST_SAVE)
+    }) || room.get_tiles().iter().any(|t| {
+        t.source_bg >= 0
+            && (ide::get_backgrounds().get_asset(t.source_bg).is_none()
+                || ide::get_background_timestamps().get_asset(t.source_bg) > LAST_SAVE)
+    })
 }
 
 unsafe fn save_tiles(tiles: &[Tile], path: &mut PathBuf) -> Result<()> {
