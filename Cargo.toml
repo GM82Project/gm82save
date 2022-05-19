@@ -36,4 +36,4 @@ sysinfo = "0.23.2"
 unicase = "2.6"
 
 [patch.crates-io]
-cmake = { git = "https://github.com/alexcrichton/cmake-rs" }
+cmake = { git = "https://github.com/rust-lang/cmake-rs" }
