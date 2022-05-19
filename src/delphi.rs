@@ -228,7 +228,7 @@ impl TMemoryStream {
     }
 
     pub unsafe fn get_slice(&self) -> &[u8] {
-        std::slice::from_raw_parts(self.memory, self.size)
+        slice::from_raw_parts(self.memory, self.size)
     }
 
     pub unsafe fn read(&self, buf: *mut u8, count: u32) {
@@ -326,7 +326,7 @@ impl UStr {
     pub const EMPTY: Self = Self(ptr::null_mut());
 
     pub fn new(s: impl AsRef<OsStr>) -> Self {
-        let mut out = UStr(std::ptr::null_mut());
+        let mut out = UStr(ptr::null_mut());
         let s = s.as_ref();
         // if it takes more than one WTF-16 u16, it will DEFINITELY take more than one WTF-8 u8
         let guess_len = s.len();

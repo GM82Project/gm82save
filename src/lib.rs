@@ -454,7 +454,7 @@ unsafe extern "C" fn reset_compression() {
 }
 
 unsafe extern "stdcall" fn duplicate_room(room: &mut asset::Room, old_id: usize, new_id: usize) {
-    let room_names: &[UStr] = ide::ROOMS.names();
+    let room_names = ide::ROOMS.names();
     fix_instances_when_renaming_room(
         room,
         room_names[old_id].to_os_string().to_str().unwrap(),
@@ -773,9 +773,8 @@ unsafe extern "fastcall" fn rename_room_inj() {
 }
 
 unsafe extern "fastcall" fn rename_room(room_id: usize, new_name: *const u16) -> *const UStr {
-    let rooms: &[Option<&asset::Room>] = ide::ROOMS.assets();
-    let room_names: &[UStr] = ide::ROOMS.names();
-    if let Some(room) = rooms[room_id] {
+    let room_names = ide::ROOMS.names();
+    if let Some(room) = ide::ROOMS.assets()[room_id] {
         let new_name = UStr::from_ptr(&new_name);
         let new_name_slice = new_name.as_slice();
         if new_name_slice.is_empty() {
@@ -852,7 +851,6 @@ unsafe extern "fastcall" fn show_instance_id_inj() {
 
 unsafe extern "fastcall" fn show_instance_id(id: usize, out: &mut UStr, room_id: usize) {
     if let Some((insts, _)) = EXTRA_DATA.as_mut() {
-        let room_names: &[UStr] = ide::ROOMS.names();
         let suffix = {
             let mut name = insts.entry(id).or_default().name;
             if name == 0 {
@@ -866,7 +864,7 @@ unsafe extern "fastcall" fn show_instance_id(id: usize, out: &mut UStr, room_id:
             }
             UStr::new(format!("_{:08X}", name))
         };
-        let _: u32 = delphi_call!(0x40839c, out, room_names[room_id].0, suffix.0);
+        let _: u32 = delphi_call!(0x40839c, out, ide::ROOMS.names()[room_id].0, suffix.0);
     } else {
         let _: u32 = delphi_call!(0x41666c, id, out);
     }
