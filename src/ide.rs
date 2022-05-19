@@ -10,8 +10,42 @@ type IntPtr = *mut usize;
 type GaplessList<T, const P: usize> = *mut DelphiList<&'static T, P>;
 type TypeInfoPtr = usize;
 
+macro_rules! get_member {
+    (pub $n:ident, $t:ty, $p:ident) => {
+        pub fn $n(&self) -> &[$t] {
+            unsafe { (*self.0).$p.get_unchecked(self.range()) }
+        }
+    };
+    ($n:ident, $t:ty, $p:ident) => {
+        fn $n(&self) -> &[$t] {
+            unsafe { (*self.0).$p.get_unchecked(self.range()) }
+        }
+    };
+}
+
+macro_rules! get_member_mut {
+    (pub $n:ident, $t:ty, $p:ident) => {
+        pub fn $n(&self) -> &'static mut [$t] {
+            unsafe { (*self.0).$p.get_unchecked_mut(self.range()) }
+        }
+    };
+    ($n:ident, $t:ty, $p:ident) => {
+        fn $n(&self) -> &'static mut [$t] {
+            unsafe { (*self.0).$p.get_unchecked_mut(self.range()) }
+        }
+    };
+}
+
+pub trait AssetListTrait<T>: Sync {
+    fn assets(&self) -> &[Option<&'static T>];
+    fn assets_mut(&self) -> &'static mut [Option<&'static T>];
+    fn names(&self) -> &[UStr];
+    fn names_mut(&self) -> &'static mut [UStr];
+    fn alloc(&self, count: usize);
+}
+
 #[repr(C)]
-struct AssetList<T: 'static, const P1: usize, const P2: usize, const P3: usize, const P4: usize> {
+struct AssetListInner<T: 'static, const P1: usize, const P2: usize, const P3: usize, const P4: usize> {
     pub assets: DelphiList<Option<&'static T>, P1>,
     pub forms: DelphiList<Form, P2>,
     pub names: DelphiList<UStr, P3>,
@@ -20,8 +54,14 @@ struct AssetList<T: 'static, const P1: usize, const P2: usize, const P3: usize, 
 }
 
 #[repr(C)]
-struct GraphicAssetList<T: 'static, const P1: usize, const P2: usize, const P3: usize, const P4: usize, const P5: usize>
-{
+struct GraphicAssetListInner<
+    T: 'static,
+    const P1: usize,
+    const P2: usize,
+    const P3: usize,
+    const P4: usize,
+    const P5: usize,
+> {
     pub assets: DelphiList<Option<&'static T>, P1>,
     pub forms: DelphiList<Form, P2>,
     pub names: DelphiList<UStr, P3>,
@@ -30,8 +70,106 @@ struct GraphicAssetList<T: 'static, const P1: usize, const P2: usize, const P3: 
     pub count: usize,
 }
 
-const TRIGGER_COUNT: IntPtr = 0x77f3f8 as _;
+pub struct AssetList<T: 'static, const P1: usize, const P2: usize, const P3: usize, const P4: usize>(
+    *mut AssetListInner<T, P1, P2, P3, P4>,
+);
+
+pub struct GraphicAssetList<
+    T: 'static,
+    const P1: usize,
+    const P2: usize,
+    const P3: usize,
+    const P4: usize,
+    const P5: usize,
+>(*mut GraphicAssetListInner<T, P1, P2, P3, P4, P5>);
+
+unsafe impl<T: 'static, const P1: usize, const P2: usize, const P3: usize, const P4: usize> Sync
+    for AssetList<T, P1, P2, P3, P4>
+{
+}
+
+unsafe impl<T, const P1: usize, const P2: usize, const P3: usize, const P4: usize, const P5: usize> Sync
+    for GraphicAssetList<T, P1, P2, P3, P4, P5>
+{
+}
+
+impl<T, const P1: usize, const P2: usize, const P3: usize, const P4: usize> AssetList<T, P1, P2, P3, P4> {
+    get_member!(pub forms, Form, forms);
+
+    get_member!(pub timestamps, f64, timestamps);
+
+    get_member_mut!(pub timestamps_mut, f64, timestamps);
+
+    unsafe fn range(&self) -> std::ops::RangeTo<usize> {
+        ..(*self.0).count
+    }
+}
+
+impl<T, const P1: usize, const P2: usize, const P3: usize, const P4: usize, const P5: usize>
+    GraphicAssetList<T, P1, P2, P3, P4, P5>
+{
+    get_member!(pub forms, Form, forms);
+
+    get_member!(pub forms_mut, Form, forms);
+
+    get_member!(pub timestamps, f64, timestamps);
+
+    get_member_mut!(pub timestamps_mut, f64, timestamps);
+
+    get_member_mut!(pub thumbs_mut, i32, thumbs);
+
+    unsafe fn range(&self) -> std::ops::RangeTo<usize> {
+        ..(*self.0).count
+    }
+}
+
+impl<T, const P1: usize, const P2: usize, const P3: usize, const P4: usize> AssetListTrait<T>
+    for AssetList<T, P1, P2, P3, P4>
+{
+    get_member!(assets, Option<&'static T>, assets);
+
+    get_member_mut!(assets_mut, Option<&'static T>, assets);
+
+    get_member!(names, UStr, names);
+
+    get_member_mut!(names_mut, UStr, names);
+
+    fn alloc(&self, count: usize) {
+        unsafe {
+            (*self.0).count = count;
+            (*self.0).assets.alloc(count);
+            (*self.0).forms.alloc(count);
+            (*self.0).names.alloc(count);
+            (*self.0).timestamps.alloc(count);
+        }
+    }
+}
+
+impl<T, const P1: usize, const P2: usize, const P3: usize, const P4: usize, const P5: usize> AssetListTrait<T>
+    for GraphicAssetList<T, P1, P2, P3, P4, P5>
+{
+    get_member!(assets, Option<&'static T>, assets);
+
+    get_member_mut!(assets_mut, Option<&'static T>, assets);
+
+    get_member!(names, UStr, names);
+
+    get_member_mut!(names_mut, UStr, names);
+
+    fn alloc(&self, count: usize) {
+        unsafe {
+            (*self.0).count = count;
+            (*self.0).assets.alloc(count);
+            (*self.0).forms.alloc(count);
+            (*self.0).names.alloc(count);
+            (*self.0).timestamps.alloc(count);
+            (*self.0).thumbs.alloc(count);
+        }
+    }
+}
+
 const TRIGGERS: *mut DelphiList<Option<&'static Trigger>, 0x6bc93c> = 0x77f3f4 as _;
+const TRIGGER_COUNT: IntPtr = 0x77f3f8 as _;
 pub const TRIGGERS_UPDATED: *const bool = 0x790058 as _;
 
 const CONSTANT_COUNT: IntPtr = 0x77f3c4 as _;
@@ -41,103 +179,103 @@ const CONSTANT_NAME_TYPE: TypeInfoPtr = 0x696594 as _;
 const CONSTANT_VALUE_TYPE: TypeInfoPtr = 0x6965c0 as _;
 pub const CONSTANTS_UPDATED: *mut bool = 0x78c154 as _;
 
-const SOUNDS: *mut AssetList<
+pub const SOUNDS: AssetList<
     Sound,
     SOUND_TYPEINFO,
     { SOUND_TYPEINFO + SOUND_TYPESIZE },
     { SOUND_TYPEINFO + SOUND_TYPESIZE * 2 },
     { SOUND_TYPEINFO + SOUND_TYPESIZE * 3 },
-> = 0x77f2b8 as _;
+> = AssetList(0x77f2b8 as _);
 const SOUND_TYPEINFO: TypeInfoPtr = 0x651ce0 as _;
 const SOUND_TYPESIZE: usize = 0x2c;
 pub const SOUNDS_UPDATED: *mut bool = 0x78a1b0 as _;
 
-const SPRITES: *mut GraphicAssetList<
+pub const SPRITES: GraphicAssetList<
     Sprite,
     SPRITE_TYPEINFO,
     { SPRITE_TYPEINFO + SPRITE_TYPESIZE },
     { SPRITE_TYPEINFO + SPRITE_TYPESIZE * 2 },
     { SPRITE_TYPEINFO + SPRITE_TYPESIZE * 3 },
     { SPRITE_TYPEINFO + SPRITE_TYPESIZE * 4 },
-> = 0x77f4c4 as _;
+> = GraphicAssetList(0x77f4c4 as _);
 const SPRITE_TYPEINFO: TypeInfoPtr = 0x6f522c as _;
 const SPRITE_TYPESIZE: usize = 0x2c;
 pub const SPRITES_UPDATED: *mut bool = 0x790170 as _;
 
-const BACKGROUNDS: *mut GraphicAssetList<
+pub const BACKGROUNDS: GraphicAssetList<
     Background,
     BACKGROUND_TYPEINFO,
     { BACKGROUND_TYPEINFO + BACKGROUND_TYPESIZE },
     { BACKGROUND_TYPEINFO + BACKGROUND_TYPESIZE * 2 },
     { BACKGROUND_TYPEINFO + BACKGROUND_TYPESIZE * 3 },
     { BACKGROUND_TYPEINFO + BACKGROUND_TYPESIZE * 4 },
-> = 0x77f1ac as _;
+> = GraphicAssetList(0x77f1ac as _);
 const BACKGROUND_TYPEINFO: TypeInfoPtr = 0x64d734 as _;
 const BACKGROUND_TYPESIZE: usize = 0x30;
 pub const BACKGROUNDS_UPDATED: *mut bool = 0x78a168 as _;
 
-const PATHS: *mut AssetList<
+pub const PATHS: AssetList<
     Path,
     PATH_TYPEINFO,
     { PATH_TYPEINFO + PATH_TYPESIZE },
     { PATH_TYPEINFO + PATH_TYPESIZE * 2 },
     { PATH_TYPEINFO + PATH_TYPESIZE * 3 },
-> = 0x77f608 as _;
+> = AssetList(0x77f608 as _);
 const PATH_TYPEINFO: TypeInfoPtr = 0x72207c as _;
 const PATH_TYPESIZE: usize = 0x28;
 pub const PATHS_UPDATED: *mut bool = 0x7a4658 as _;
 
-const SCRIPTS: *mut AssetList<
+pub const SCRIPTS: AssetList<
     Script,
     SCRIPT_TYPEINFO,
     { SCRIPT_TYPEINFO + SCRIPT_TYPESIZE },
     { SCRIPT_TYPEINFO + SCRIPT_TYPESIZE * 2 },
     { SCRIPT_TYPEINFO + SCRIPT_TYPESIZE * 3 },
-> = 0x77f2cc as _;
+> = AssetList(0x77f2cc as _);
 const SCRIPT_TYPEINFO: TypeInfoPtr = 0x6550a8 as _;
 const SCRIPT_TYPESIZE: usize = 0x2c;
 pub const SCRIPTS_UPDATED: *mut bool = 0x78a1b8 as _;
 
-const FONTS: *mut AssetList<
+pub const FONTS: AssetList<
     Font,
     FONT_TYPEINFO,
     { FONT_TYPEINFO + FONT_TYPESIZE },
     { FONT_TYPEINFO + FONT_TYPESIZE * 2 },
     { FONT_TYPEINFO + FONT_TYPESIZE * 3 },
-> = 0x77f4fc as _;
+> = AssetList(0x77f4fc as _);
 const FONT_TYPEINFO: TypeInfoPtr = 0x6fc680 as _;
 const FONT_TYPESIZE: usize = 0x28;
 pub const FONTS_UPDATED: *mut bool = 0x790190 as _;
 
-const TIMELINES: *mut AssetList<
+pub const TIMELINES: AssetList<
     Timeline,
     TIMELINE_TYPEINFO,
     { TIMELINE_TYPEINFO + TIMELINE_TYPESIZE },
     { TIMELINE_TYPEINFO + TIMELINE_TYPESIZE * 2 },
     { TIMELINE_TYPEINFO + TIMELINE_TYPESIZE * 3 },
-> = 0x77f4e4 as _;
+> = AssetList(0x77f4e4 as _);
 const TIMELINE_TYPEINFO: TypeInfoPtr = 0x6fa020 as _;
 const TIMELINE_TYPESIZE: usize = 0x2c;
 pub const TIMELINES_UPDATED: *mut bool = 0x790188 as _;
 
-const OBJECTS: *mut AssetList<
+pub const OBJECTS: AssetList<
     Object,
     OBJECT_TYPEINFO,
     { OBJECT_TYPEINFO + OBJECT_TYPESIZE },
     { OBJECT_TYPEINFO + OBJECT_TYPESIZE * 2 },
     { OBJECT_TYPEINFO + OBJECT_TYPESIZE * 3 },
-> = 0x77f0d0 as _;
+> = AssetList(0x77f0d0 as _);
 const OBJECT_TYPEINFO: TypeInfoPtr = 0x62c4a8 as _;
 const OBJECT_TYPESIZE: usize = 0x2c;
 pub const OBJECTS_UPDATED: *mut bool = 0x78a0d4 as _;
 
-const ROOMS: *mut AssetList<
+pub const ROOMS: AssetList<
     Room,
     ROOM_TYPEINFO,
     { ROOM_TYPEINFO + ROOM_TYPESIZE },
     { ROOM_TYPEINFO + ROOM_TYPESIZE * 2 },
     { ROOM_TYPEINFO + ROOM_TYPESIZE * 3 },
-> = 0x77f3a8 as _;
+> = AssetList(0x77f3a8 as _);
 const ROOM_TYPEINFO: TypeInfoPtr = 0x6928f8 as _;
 const ROOM_TYPESIZE: usize = 0x28;
 pub const ROOMS_UPDATED: *mut bool = 0x78a1f8 as _;
@@ -257,79 +395,31 @@ pub fn initialize_project() {
 }
 
 macro_rules! read_array {
-    ($n:ident, $t:ty, $p:expr, $c:expr) => {
+    ($n:ident, $nm:ident, $t:ty, $p:expr, $c:expr) => {
         pub fn $n<'a>() -> &'a [$t] {
             unsafe { $p.get_unchecked(..$c) }
         }
 
-        paste::paste! {
-            pub fn [<$n _mut>]<'a>() -> &'a mut [$t] {
-                unsafe { $p.get_unchecked_mut(..$c) }
-            }
+        pub fn $nm<'a>() -> &'a mut [$t] {
+            unsafe { $p.get_unchecked_mut(..$c) }
         }
     };
 }
 
-macro_rules! get_assets {
-    ($lo:ident, $t:ty, $assets_p:expr) => {
-        paste::paste! {
-            read_array!([<get_ $lo s>], Option<&'static $t>, (*$assets_p).assets, (*$assets_p).count);
-            read_array!([<get_ $lo _forms>], Form, (*$assets_p).forms, (*$assets_p).count);
-            read_array!([<get_ $lo _names>], UStr, (*$assets_p).names, (*$assets_p).count);
-            read_array!([<get_ $lo _timestamps>], f64, (*$assets_p).timestamps, (*$assets_p).count);
-            pub fn [<alloc_ $lo s>](count: usize) {
-                unsafe {
-                    (*$assets_p).count = count;
-                    (*$assets_p).assets.alloc(count);
-                    (*$assets_p).forms.alloc(count);
-                    (*$assets_p).names.alloc(count);
-                    (*$assets_p).timestamps.alloc(count);
-                }
-            }
-        }
-    };
-}
-macro_rules! get_graphics {
-    ($lo:ident, $t:ty, $assets_p:expr) => {
-        paste::paste! {
-            read_array!([<get_ $lo s>], Option<&'static $t>, (*$assets_p).assets, (*$assets_p).count);
-            read_array!([<get_ $lo _forms>], Form, (*$assets_p).forms, (*$assets_p).count);
-            read_array!([<get_ $lo _names>], UStr, (*$assets_p).names, (*$assets_p).count);
-            read_array!([<get_ $lo _timestamps>], f64, (*$assets_p).timestamps, (*$assets_p).count);
-            read_array!([<get_ $lo _thumbs>], i32, (*$assets_p).thumbs, (*$assets_p).count);
-            pub fn [<alloc_ $lo s>](count: usize) {
-                unsafe {
-                    (*$assets_p).count = count;
-                    (*$assets_p).assets.alloc(count);
-                    (*$assets_p).forms.alloc(count);
-                    (*$assets_p).names.alloc(count);
-                    (*$assets_p).timestamps.alloc(count);
-                    (*$assets_p).thumbs.alloc(count);
-                    [<get_ $lo _thumbs_mut>]().fill(-1);
-                }
-            }
-        }
-    };
-}
+read_array!(get_constant_names, get_constant_names_mut, UStr, *CONSTANT_NAMES, *CONSTANT_COUNT);
+read_array!(get_constants, get_constants_mut, UStr, *CONSTANT_VALUES, *CONSTANT_COUNT);
+read_array!(get_triggers, get_triggers_mut, Option<&'static Trigger>, *TRIGGERS, *TRIGGER_COUNT);
 
-get_assets!(sound, Sound, SOUNDS);
-get_graphics!(sprite, Sprite, SPRITES);
-get_graphics!(background, Background, BACKGROUNDS);
-get_assets!(path, Path, PATHS);
-get_assets!(script, Script, SCRIPTS);
-get_assets!(font, Font, FONTS);
-get_assets!(timeline, Timeline, TIMELINES);
-get_assets!(object, Object, OBJECTS);
-get_assets!(room, Room, ROOMS);
-
-read_array!(get_constant_names, UStr, *CONSTANT_NAMES, *CONSTANT_COUNT);
-read_array!(get_constants, UStr, *CONSTANT_VALUES, *CONSTANT_COUNT);
-read_array!(get_triggers, Option<&'static Trigger>, *TRIGGERS, *TRIGGER_COUNT);
-
-read_array!(get_included_files, &'static IncludedFile, *INCLUDED_FILES, *INCLUDED_FILE_COUNT);
-read_array!(get_included_file_timestamps, f64, *INCLUDED_FILE_TIMESTAMPS, *INCLUDED_FILE_COUNT);
-read_array!(get_extensions, &'static Extension, *EXTENSIONS, *EXTENSION_COUNT);
-read_array!(get_extensions_loaded, bool, *EXTENSIONS_LOADED, *EXTENSION_COUNT);
+read_array!(get_included_files, get_included_files_mut, &'static IncludedFile, *INCLUDED_FILES, *INCLUDED_FILE_COUNT);
+read_array!(
+    get_included_file_timestamps,
+    get_included_file_timestamps_mut,
+    f64,
+    *INCLUDED_FILE_TIMESTAMPS,
+    *INCLUDED_FILE_COUNT
+);
+read_array!(get_extensions, get_extensions_mut, &'static Extension, *EXTENSIONS, *EXTENSION_COUNT);
+read_array!(get_extensions_loaded, get_extensions_loaded_mut, bool, *EXTENSIONS_LOADED, *EXTENSION_COUNT);
 
 pub fn get_action_libraries<'a>() -> &'a [&'a ActionLibrary] {
     unsafe { slice::from_raw_parts(ACTION_LIBRARIES, ACTION_LIBRARY_COUNT.read()) }

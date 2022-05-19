@@ -2,8 +2,10 @@ use crate::{
     asset::*,
     delphi,
     delphi::{advance_progress_form, UStr},
-    events, ide, project_watcher, run_while_updating_bar, show_message, update_timestamp, Error, InstanceExtra, Result,
-    TileExtra, ACTION_TOKEN, EXTRA_DATA, PATH_FORM_UPDATED,
+    events, ide,
+    ide::AssetListTrait,
+    project_watcher, run_while_updating_bar, show_message, update_timestamp, Error, InstanceExtra, Result, TileExtra,
+    ACTION_TOKEN, EXTRA_DATA, PATH_FORM_UPDATED,
 };
 use itertools::izip;
 use parking_lot::Mutex;
@@ -1085,12 +1087,10 @@ fn load_index(name: &str, path: &mut PathBuf) -> Result<Assets> {
     Ok(Assets { index, map })
 }
 
-unsafe fn load_assets<'a, T: Sync>(
+unsafe fn load_assets<'a, T: 'static + Sync, AL: AssetListTrait<T> + Sync>(
     name: &str,
     load_asset: unsafe fn(&mut PathBuf, &AssetMaps) -> Result<*const T>,
-    get_assets: fn() -> &'a mut [Option<&'a T>],
-    get_names: fn() -> &'a mut [UStr],
-    alloc: fn(usize),
+    the_assets: &AL,
     assets: &Assets,
     bar_start: u32,
     bar_end: u32,
@@ -1099,28 +1099,32 @@ unsafe fn load_assets<'a, T: Sync>(
 ) -> Result<()> {
     path.push(name);
     let names = &assets.index;
-    alloc(names.len());
+    the_assets.alloc(names.len());
     if name != "rooms" {
         run_while_updating_bar(bar_start, bar_end, names.len() as u32, |tx| {
-            names.par_iter().zip(get_assets()).zip(get_names()).try_for_each(|((name, asset), name_p)| -> Result<()> {
-                if !name.is_empty() {
-                    *name_p = UStr::new(name);
-                    *asset = load_asset(&mut path.join(name), asset_maps)?.as_ref();
-                }
-                let _ = tx.send(());
-                Ok(())
-            })
+            names.par_iter().zip(the_assets.assets_mut()).zip(the_assets.names_mut()).try_for_each(
+                |((name, asset), name_p)| -> Result<()> {
+                    if !name.is_empty() {
+                        *name_p = UStr::new(name);
+                        *asset = load_asset(&mut path.join(name), asset_maps)?.as_ref();
+                    }
+                    let _ = tx.send(());
+                    Ok(())
+                },
+            )
         })?;
     } else {
         run_while_updating_bar(bar_start, bar_end, names.len() as u32, |tx| {
-            names.iter().zip(get_assets()).zip(get_names()).try_for_each(|((name, asset), name_p)| -> Result<()> {
-                if !name.is_empty() {
-                    *name_p = UStr::new(name);
-                    *asset = load_asset(&mut path.join(name), asset_maps)?.as_ref();
-                }
-                let _ = tx.send(());
-                Ok(())
-            })
+            names.iter().zip(the_assets.assets_mut()).zip(the_assets.names_mut()).try_for_each(
+                |((name, asset), name_p)| -> Result<()> {
+                    if !name.is_empty() {
+                        *name_p = UStr::new(name);
+                        *asset = load_asset(&mut path.join(name), asset_maps)?.as_ref();
+                    }
+                    let _ = tx.send(());
+                    Ok(())
+                },
+            )
         })?;
     }
     path.pop();
@@ -1185,38 +1189,14 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     advance_progress_form(15);
     load_triggers(&asset_maps, &mut path)?;
     advance_progress_form(20);
-    load_assets(
-        "sounds",
-        load_sound,
-        ide::get_sounds_mut,
-        ide::get_sound_names_mut,
-        ide::alloc_sounds,
-        &asset_maps.sounds,
-        20,
-        30,
-        &mut path,
-        &asset_maps,
-    )?;
+    load_assets("sounds", load_sound, &ide::SOUNDS, &asset_maps.sounds, 20, 30, &mut path, &asset_maps)?;
     advance_progress_form(30);
-    load_assets(
-        "sprites",
-        load_sprite,
-        ide::get_sprites_mut,
-        ide::get_sprite_names_mut,
-        ide::alloc_sprites,
-        &asset_maps.sprites,
-        30,
-        40,
-        &mut path,
-        &asset_maps,
-    )?;
+    load_assets("sprites", load_sprite, &ide::SPRITES, &asset_maps.sprites, 30, 40, &mut path, &asset_maps)?;
     advance_progress_form(40);
     load_assets(
         "backgrounds",
         load_background,
-        ide::get_backgrounds_mut,
-        ide::get_background_names_mut,
-        ide::alloc_backgrounds,
+        &ide::BACKGROUNDS,
         &asset_maps.backgrounds,
         40,
         45,
@@ -1227,8 +1207,8 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     // register sprite icons
     let bg_col = (*ide::RESOURCE_TREE.read()).color;
     let mut last_refresh = std::time::Instant::now();
-    let sprites_len = ide::get_sprites().len();
-    for (i, (sp, thumb)) in ide::get_sprites().iter().zip(ide::get_sprite_thumbs_mut()).enumerate() {
+    let sprites_len = ide::SPRITES.assets().len();
+    for (i, (sp, thumb)) in ide::SPRITES.assets().iter().zip(ide::SPRITES.thumbs_mut()).enumerate() {
         if let Some(sp) = sp {
             *thumb = sp.register_thumb(bg_col);
             if last_refresh.elapsed() > std::time::Duration::from_secs(1) {
@@ -1240,8 +1220,8 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     advance_progress_form(60);
     // register background icons
     let mut last_refresh = std::time::Instant::now();
-    let bg_len = ide::get_backgrounds().len();
-    for (i, (bg, thumb)) in ide::get_backgrounds().iter().zip(ide::get_background_thumbs_mut()).enumerate() {
+    let bg_len = ide::BACKGROUNDS.assets().len();
+    for (i, (bg, thumb)) in ide::BACKGROUNDS.assets().iter().zip(ide::BACKGROUNDS.thumbs_mut()).enumerate() {
         if let Some(bg) = bg {
             *thumb = bg.register_thumb(bg_col);
             if last_refresh.elapsed() > std::time::Duration::from_secs(1) {
@@ -1253,83 +1233,17 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     // image list OnChange
     let _: u32 = delphi_call!(0x5081b8, *(0x789b38 as *const usize));
     advance_progress_form(65);
-    load_assets(
-        "paths",
-        load_path,
-        ide::get_paths_mut,
-        ide::get_path_names_mut,
-        ide::alloc_paths,
-        &asset_maps.paths,
-        65,
-        70,
-        &mut path,
-        &asset_maps,
-    )?;
+    load_assets("paths", load_path, &ide::PATHS, &asset_maps.paths, 65, 70, &mut path, &asset_maps)?;
     advance_progress_form(70);
-    load_assets(
-        "scripts",
-        load_script,
-        ide::get_scripts_mut,
-        ide::get_script_names_mut,
-        ide::alloc_scripts,
-        &asset_maps.scripts,
-        70,
-        75,
-        &mut path,
-        &asset_maps,
-    )?;
+    load_assets("scripts", load_script, &ide::SCRIPTS, &asset_maps.scripts, 70, 75, &mut path, &asset_maps)?;
     advance_progress_form(75);
-    load_assets(
-        "fonts",
-        load_font,
-        ide::get_fonts_mut,
-        ide::get_font_names_mut,
-        ide::alloc_fonts,
-        &asset_maps.fonts,
-        75,
-        80,
-        &mut path,
-        &asset_maps,
-    )?;
+    load_assets("fonts", load_font, &ide::FONTS, &asset_maps.fonts, 75, 80, &mut path, &asset_maps)?;
     advance_progress_form(80);
-    load_assets(
-        "timelines",
-        load_timeline,
-        ide::get_timelines_mut,
-        ide::get_timeline_names_mut,
-        ide::alloc_timelines,
-        &asset_maps.timelines,
-        80,
-        85,
-        &mut path,
-        &asset_maps,
-    )?;
+    load_assets("timelines", load_timeline, &ide::TIMELINES, &asset_maps.timelines, 80, 85, &mut path, &asset_maps)?;
     advance_progress_form(85);
-    load_assets(
-        "objects",
-        load_object,
-        ide::get_objects_mut,
-        ide::get_object_names_mut,
-        ide::alloc_objects,
-        &asset_maps.objects,
-        85,
-        90,
-        &mut path,
-        &asset_maps,
-    )?;
+    load_assets("objects", load_object, &ide::OBJECTS, &asset_maps.objects, 85, 90, &mut path, &asset_maps)?;
     advance_progress_form(90);
-    load_assets(
-        "rooms",
-        load_room,
-        ide::get_rooms_mut,
-        ide::get_room_names_mut,
-        ide::alloc_rooms,
-        &asset_maps.rooms,
-        90,
-        95,
-        &mut path,
-        &asset_maps,
-    )?;
+    load_assets("rooms", load_room, &ide::ROOMS, &asset_maps.rooms, 90, 95, &mut path, &asset_maps)?;
     advance_progress_form(95);
     load_included_files(&mut path)?;
 

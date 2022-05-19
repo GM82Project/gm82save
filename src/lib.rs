@@ -16,6 +16,7 @@ mod save;
 mod stub;
 
 use crate::delphi::{TTreeNode, UStr};
+use ide::AssetListTrait;
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::{
@@ -222,7 +223,7 @@ unsafe extern "fastcall" fn reset_extra_data_and_insert_blank_object_inj() {
     EXTRA_DATA = None;
     let _: u32 = delphi_call!(0x62c554); // reset objects (what this overwrote)
     // insert a blank object
-    ide::alloc_objects(1);
+    ide::OBJECTS.alloc(1);
 }
 
 static mut EXTRA_DATA: Option<(HashMap<usize, InstanceExtra>, HashMap<usize, TileExtra>)> = None;
@@ -453,7 +454,7 @@ unsafe extern "C" fn reset_compression() {
 }
 
 unsafe extern "stdcall" fn duplicate_room(room: &mut asset::Room, old_id: usize, new_id: usize) {
-    let room_names: &[UStr] = ide::get_room_names();
+    let room_names: &[UStr] = ide::ROOMS.names();
     fix_instances_when_renaming_room(
         room,
         room_names[old_id].to_os_string().to_str().unwrap(),
@@ -772,8 +773,8 @@ unsafe extern "fastcall" fn rename_room_inj() {
 }
 
 unsafe extern "fastcall" fn rename_room(room_id: usize, new_name: *const u16) -> *const UStr {
-    let rooms: &[Option<&asset::Room>] = ide::get_rooms();
-    let room_names: &[UStr] = ide::get_room_names();
+    let rooms: &[Option<&asset::Room>] = ide::ROOMS.assets();
+    let room_names: &[UStr] = ide::ROOMS.names();
     if let Some(room) = rooms[room_id] {
         let new_name = UStr::from_ptr(&new_name);
         let new_name_slice = new_name.as_slice();
@@ -851,7 +852,7 @@ unsafe extern "fastcall" fn show_instance_id_inj() {
 
 unsafe extern "fastcall" fn show_instance_id(id: usize, out: &mut UStr, room_id: usize) {
     if let Some((insts, _)) = EXTRA_DATA.as_mut() {
-        let room_names: &[UStr] = ide::get_room_names();
+        let room_names: &[UStr] = ide::ROOMS.names();
         let suffix = {
             let mut name = insts.entry(id).or_default().name;
             if name == 0 {
@@ -895,7 +896,8 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
                 let mut instance_ids = HashSet::new();
                 let mut tile_ids = HashSet::new();
                 // making rooms mutable would lead to weirdness so i guess i'm not
-                for room in ide::get_rooms_mut()
+                for room in ide::ROOMS
+                    .assets_mut()
                     .iter_mut()
                     .map(|r| std::mem::transmute::<Option<&asset::Room>, Option<&mut asset::Room>>(*r))
                     .flatten()
@@ -908,7 +910,7 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
                     }
                 }
                 // force-save all open rooms just in case
-                for form in ide::get_room_forms().iter().map(|&f| f as *mut *const u8) {
+                for form in ide::ROOMS.forms().iter().map(|&f| f as *mut *const u8) {
                     if !form.is_null() {
                         let room = *form.add(0x61c / 4);
                         let saveroom = *form.add(0x620 / 4);
@@ -943,12 +945,12 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
             room_path.pop();
             let mut asset_maps_path = room_path.clone();
             room_path.push("rooms");
-            room_path.push(ide::get_room_names()[room_id].to_os_string());
+            room_path.push(ide::ROOMS.names()[room_id].to_os_string());
             let _: u32 = delphi_call!(0x51acd0, *(0x790100 as *const u32)); // hide main form
             let _ = std::process::Command::new(editor_path).arg(&room_path).spawn().and_then(|mut c| c.wait());
             let _: u32 = delphi_call!(0x51acd8, *(0x790100 as *const u32)); // show main form
             {
-                let room = ide::get_rooms()[room_id].unwrap();
+                let room = ide::ROOMS.assets()[room_id].unwrap();
                 // remove this room's ids from the global thing
                 if let Some((extra_inst, extra_tile)) = EXTRA_DATA.as_mut() {
                     for inst in room.get_instances() {
@@ -961,7 +963,7 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
                 let _: u32 = delphi_call!(0x405a7c, room); // delete room
             }
             // reload room
-            ide::get_rooms_mut()[room_id] = load::load_asset_maps(&mut asset_maps_path)
+            ide::ROOMS.assets_mut()[room_id] = load::load_asset_maps(&mut asset_maps_path)
                 .and_then(|asset_maps| load::load_room(&mut room_path, &asset_maps))
                 .map_err(|e| e.to_string())
                 .expect("loading the updated room failed")

@@ -1,5 +1,5 @@
 use super::{patch, patch_call, InstanceExtra, TileExtra, EXTRA_DATA};
-use crate::{asset, asset::Room, ide, UStr};
+use crate::{ide, ide::AssetListTrait, UStr};
 use lazy_static::lazy_static;
 use rayon::prelude::*;
 use regex::Regex;
@@ -27,24 +27,19 @@ unsafe extern "fastcall" fn compile_constants(stream: usize) -> bool {
 
     let constant_names = ide::get_constant_names();
     let constant_values = ide::get_constants();
-    // these are just so my ide will give me autocomplete
+    // this is just so my ide will give me autocomplete
     let re = &INSTANCE_ID_REGEX;
-    let rooms: &[Option<&Room>] = ide::get_rooms();
-    let room_names: &[UStr] = ide::get_room_names();
-    let objects: &[Option<&asset::Object>] = ide::get_objects();
-    let timelines: &[Option<&asset::Timeline>] = ide::get_timelines();
-    let scripts: &[Option<&asset::Script>] = ide::get_scripts();
 
     // we want to collect instance names that are actually used
     // iterate over all code
     let cnv = |s: &UStr| s.to_os_string().into_string().unwrap_or_else(|s| s.to_string_lossy().into_owned());
-    let room_iter = rooms.into_par_iter().flatten().flat_map(|room| {
+    let room_iter = ide::ROOMS.assets().into_par_iter().flatten().flat_map(|room| {
         room.get_instances()
             .into_par_iter()
             .map(|i| cnv(&i.creation_code))
             .chain(rayon::iter::once(cnv(&room.creation_code)))
     });
-    let object_iter = objects.into_par_iter().flatten().flat_map_iter(|o| {
+    let object_iter = ide::OBJECTS.assets().into_par_iter().flatten().flat_map_iter(|o| {
         o.events
             .iter()
             .flatten()
@@ -54,7 +49,7 @@ unsafe extern "fastcall" fn compile_constants(stream: usize) -> bool {
             .flat_map(|a| &a.param_strings)
             .map(cnv)
     });
-    let timeline_iter = timelines.into_par_iter().flatten().flat_map_iter(|t| {
+    let timeline_iter = ide::TIMELINES.assets().into_par_iter().flatten().flat_map_iter(|t| {
         t.get_events()
             .iter()
             .filter_map(|e| e.as_ref())
@@ -63,7 +58,7 @@ unsafe extern "fastcall" fn compile_constants(stream: usize) -> bool {
             .flat_map(|a| &a.param_strings)
             .map(cnv)
     });
-    let script_iter = scripts.into_par_iter().flatten().map(|s| cnv(&s.source));
+    let script_iter = ide::SCRIPTS.assets().into_par_iter().flatten().map(|s| cnv(&s.source));
     let trigger_iter = ide::get_triggers().into_par_iter().flatten().map(|t| cnv(&t.condition));
     let constant_iter = constant_values.par_iter().map(cnv);
 
@@ -84,9 +79,10 @@ unsafe extern "fastcall" fn compile_constants(stream: usize) -> bool {
         .collect();
 
     // collect data for referenced instances
-    let instances = rooms
+    let instances = ide::ROOMS
+        .assets()
         .into_par_iter()
-        .zip(room_names)
+        .zip(ide::ROOMS.names())
         .filter_map(|(&room, name)| Some((room?, name)))
         .flat_map(|(room, name)| {
             let instance_names = &instance_names;
