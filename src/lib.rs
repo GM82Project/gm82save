@@ -525,7 +525,7 @@ unsafe extern "C" fn properly_update_object_timestamp() {
     asm! {
         "mov eax, [esi + 0x46c]",
         "mov ecx, 0x62cd2c",
-        "call ecx",
+        "jmp ecx",
         options(noreturn),
     }
 }
@@ -535,7 +535,7 @@ unsafe extern "C" fn properly_update_timeline_timestamp() {
     asm! {
         "mov eax, [esi + 0x430]",
         "mov ecx, 0x6fa7b0",
-        "call ecx",
+        "jmp ecx",
         options(noreturn),
     }
 }
