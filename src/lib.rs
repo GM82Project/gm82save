@@ -24,6 +24,7 @@ use std::{
     collections::{HashMap, HashSet},
     ffi::{c_void, OsStr},
     io::Write,
+    os::windows::process::CommandExt,
     path::PathBuf,
     ptr,
     time::SystemTime,
@@ -692,6 +693,36 @@ unsafe extern "C" fn code_editor_middle_click() {
     }
 }
 
+static mut SEEN_ERROR: bool = false;
+
+unsafe extern "fastcall" fn patch_error_box(caption: *const u16, text: *const u16, _flags: u32) {
+    if SEEN_ERROR {
+        return
+    }
+    SEEN_ERROR = true;
+    let mut message = UStr::from_ptr(&text).clone();
+    let extra_text = UStr::new(
+        "\r\nGame Maker will continue to run, but may be unstable. Enjoy!\r\n\r\n\
+        In the meantime, please send Floogle your TraceIDE.log file. It should be next to \
+        GameMaker.exe. Would you like to open the relevant folder now?",
+    );
+    // UStrCat
+    let _: u32 = delphi_call!(0x4082dc, &mut message, extra_text.0);
+    // TApplication.MessageBox
+    let answer: u32 = delphi_call!(0x51fbdc, *(0x7882ec as *const u32), message.0, caption, 0x14);
+    if answer == 6 {
+        let path = std::env::current_exe()
+            .ok()
+            .and_then(|mut p| {
+                p.pop();
+                p.push("TraceIDE.log");
+                p.into_os_string().into_string().ok()
+            })
+            .unwrap_or_default();
+        let _ = std::process::Command::new("explorer.exe").raw_arg(format!("/select,\"{path}\"")).spawn();
+    }
+}
+
 #[naked]
 unsafe extern "C" fn room_form_inj() {
     asm! {
@@ -1014,8 +1045,11 @@ unsafe fn injector() {
         extern "system" {
             fn MessageBoxW(hWnd: usize, lpText: *const u16, lpCaption: *const u16, uType: u32) -> i32;
         }
-        let msg = info.to_string().encode_utf16().chain(std::iter::once(0)).collect::<Vec<_>>();
-        MessageBoxW(0, msg.as_ptr(), std::ptr::null(), 0);
+        let msg = (info.to_string() + "\r\n\r\nPlease send a screenshot of this error message to Floogle.")
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect::<Vec<_>>();
+        MessageBoxW(0, msg.as_ptr(), std::ptr::null(), 0x10);
 
         std::process::exit(-1);
     }));
@@ -1209,6 +1243,9 @@ unsafe fn injector() {
     // check for other processes before setting MakerRunning to false
     patch(0x71af15 as _, &[0xb9]);
     patch_call(0x71af15 as _, check_gm_processes as _);
+
+    // error box only shows once and has custom message
+    patch_call(0x51fe33 as _, patch_error_box as _);
 
     // update timestamps when setting name
     unsafe fn patch_timestamps(dest: *mut u8) {
