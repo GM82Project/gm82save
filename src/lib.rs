@@ -600,6 +600,23 @@ unsafe extern "C" fn free_image_editor_bitmap() {
 }
 
 #[naked]
+unsafe extern "C" fn dont_show_action_tooltip_if_event_is_null() {
+    asm! {
+        // if eax is not null, call CEvent.GetAction
+        "mov ecx, 0x5a502c",
+        "test eax, eax",
+        "jz 2f",
+        "jmp ecx",
+        // otherwise, skip to the end of that code block
+        // there's a function that updates the tooltip or something in there
+        // so skip it, so that the tooltip doesn't just stick around
+        "2: add dword ptr [esp], 0x25",
+        "ret",
+        options(noreturn),
+    }
+}
+
+#[naked]
 unsafe extern "C" fn path_form_mouse_wheel_inj() {
     asm! {
         // call TPathForm.Create
@@ -1105,6 +1122,10 @@ unsafe fn injector() {
 
     // fix memory leak in image editor
     patch_call(0x643bd0 as _, free_image_editor_bitmap as _);
+
+    // fix access violation when closing object/timeline window while mousing over action
+    patch_call(0x6c6f6f as _, dont_show_action_tooltip_if_event_is_null as _);
+    patch_call(0x6f9043 as _, dont_show_action_tooltip_if_event_is_null as _);
 
     // add scrolling to path form
     patch_call(0x71fdcb as _, path_form_mouse_wheel_inj as _);
