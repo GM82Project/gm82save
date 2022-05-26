@@ -257,6 +257,7 @@ unsafe extern "C" fn save_inj() {
 // set the high byte to nonzero if YYD save code was used
 // set the low byte to nonzero on success
 unsafe extern "fastcall" fn save(proj_path: &UStr, stream_ptr: *mut u32) -> u16 {
+    SEEN_ERROR = false;
     const IS_YYD: u16 = 0x100;
     let mut path: PathBuf = proj_path.to_os_string().into();
     // filename ".gm82" works in the ui but rust doesn't get it so check for that specifically
@@ -304,6 +305,7 @@ unsafe extern "C" fn load_inj() {
 }
 
 unsafe extern "fastcall" fn load(proj_path: &UStr, stream_ptr: *mut u32, result_ptr: *mut bool) -> bool {
+    SEEN_ERROR = false;
     SAW_APPLIES_TO_WARNING = false;
     project_watcher::unwatch();
     let path: PathBuf = proj_path.to_os_string().into();
