@@ -761,6 +761,51 @@ unsafe extern "fastcall" fn completion_script_args(script_id: usize, out: &mut U
     *out = UStr(0x6baf10 as _);
 }
 
+#[naked]
+unsafe extern "C" fn write_number_on_actions() {
+    asm! {
+        // call original function
+        "mov ecx, 0x45b498",
+        "call ecx",
+        // move existing string to top of stack
+        "mov eax, [ebp-4]",
+        "push eax",
+        "mov dword ptr [ebp-4], 0",
+        // get action index from outer function (same for object and form)
+        "mov eax, [ebp]",
+        "mov eax, [eax-4]",
+        "inc eax",
+        // convert to int and put in original string
+        "lea edx, [ebp-4]",
+        "mov ecx, 0x41666c",
+        "call ecx",
+        // append ". "
+        "lea eax, [ebp-4]",
+        "lea edx, 2f",
+        "mov ecx, 0x4082dc",
+        "call ecx",
+        // append original string
+        "lea eax, [ebp-4]",
+        "mov edx, [esp]",
+        "mov ecx, 0x4082dc",
+        "call ecx",
+        // free original string
+        "lea eax, [esp]",
+        "mov ecx, 0x407ea8",
+        "call ecx",
+        // cleanup and return
+        "add esp, 4",
+        "ret",
+        // define the ". "
+        ".align 4",
+        ".short 1200, 2",
+        ".long -1, 2",
+        "2:",
+        ".short '.', ' ', 0",
+        options(noreturn),
+    }
+}
+
 static mut SEEN_ERROR: bool = false;
 
 unsafe extern "fastcall" fn patch_error_box(caption: *const u16, text: *const u16, _flags: u32) {
@@ -1246,6 +1291,9 @@ unsafe fn injector() {
         0x90, 0x90, // nops
     ]);
     patch(0x6baa41 as _, &[0xb0]);
+
+    // show number on code actions
+    patch_call(0x7002fe as _, write_number_on_actions as _);
 
     // default room editor settings
     patch(0x657852 as _, &[0xe8, 0, 0, 0, 0, 0x90, 0x90]);
