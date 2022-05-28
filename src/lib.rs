@@ -712,6 +712,55 @@ unsafe extern "C" fn code_editor_middle_click() {
     }
 }
 
+unsafe extern "fastcall" fn code_editor_script_hint(name: *const u16, out: &mut UStr) {
+    // get script from name
+    let script_id: i32 = delphi_call!(0x655c2c, name);
+    if script_id >= 0 {
+        if let Some(Some(script)) = ide::SCRIPTS.assets().get(script_id as usize) {
+            if script.source.as_slice().get(..3) == Some(&[b'/' as u16; 3]) {
+                let count =
+                    script.source.as_slice().iter().position(|&c| c == b'\r' as u16).unwrap_or(script.source.len()) - 3;
+                let mut untrimmed = UStr::default();
+                // @UStrCopy
+                let _: u32 = delphi_call!(0x4086a8, script.source.0, 4, count, &mut untrimmed.0);
+                // Trim
+                let _: u32 = delphi_call!(0x415dd0, untrimmed.0, &mut out.0);
+            }
+        }
+    }
+}
+
+#[naked]
+unsafe extern "C" fn completion_script_args_inj() {
+    asm! {
+        "mov ecx, eax",
+        "call {}",
+        // copy output of this to the argument on the stack
+        "mov eax, dword ptr [ebp-0x5c]",
+        "mov dword ptr [esp+8], eax",
+        "ret",
+        sym completion_script_args,
+        options(noreturn),
+    }
+}
+
+unsafe extern "fastcall" fn completion_script_args(script_id: usize, out: &mut UStr) {
+    let script = ide::SCRIPTS.assets().get_unchecked(script_id).unwrap_unchecked();
+    if script.source.as_slice().get(..3) == Some(&[b'/' as u16; 3]) {
+        if let Some(paren_pos) = script.source.as_slice().iter().position(|&c| c == b'(' as u16) {
+            let count = script.source.as_slice().iter().position(|&c| c == b'\r' as u16).unwrap_or(script.source.len())
+                - paren_pos;
+            let mut untrimmed = UStr::default();
+            // @UStrCopy
+            let _: u32 = delphi_call!(0x4086a8, script.source.0, paren_pos + 1, count, &mut untrimmed.0);
+            // Trim
+            let _: u32 = delphi_call!(0x415dd0, untrimmed.0, &mut out.0);
+            return
+        }
+    }
+    *out = UStr(0x6baf10 as _);
+}
+
 static mut SEEN_ERROR: bool = false;
 
 unsafe extern "fastcall" fn patch_error_box(caption: *const u16, text: *const u16, _flags: u32) {
@@ -1166,6 +1215,37 @@ unsafe fn injector() {
     patch(0x6b7182 as _, &[0x90, 0x90, 0x90, 0x90, 0x90, 0x90]);
     // inject second check
     patch_call(0x6b721b as _, code_editor_middle_click as _);
+
+    // code hint: faster extension function search and add script hints
+    patch(0x71364e as _, &[0xae, 0x22]);
+    #[rustfmt::skip]
+    patch(0x6bb12e as _, &[
+        // prior line: mov eax, [ebp-4]
+        0x8b, 0x55, 0xf8, // mov edx, [ebp-8]
+        0xe8, 0xde, 0x84, 0x05, 0x00, // call extension_get_helpline_from_function_name
+        0x8b, 0x55, 0xf8, // mov edx, [ebp-8]
+        0x8b, 0x02, // mov eax, [edx]
+        0x85, 0xc0, // test eax, eax
+        0x75, 0x10, // jnz to function end
+        0x8b, 0x4d, 0xfc, // mov ecx, [ebp-4]
+        0xe8, 0, 0, 0, 0, // call code_editor_script_hint
+        0xeb, 0x06, // jmp to function end
+    ]);
+    patch_call(0x6bb142 as _, code_editor_script_hint as _);
+
+    // script args in code completion
+    patch_call(0x6baa91 as _, completion_script_args_inj as _);
+    patch(0x6baa98 as _, &[0xa8]); // get previous script name result
+
+    // fix triggers in code completion
+    patch(0x6baa1c as _, &[0x98, 0x23]); // get trigger const instead of name
+    patch(0x6baa2e as _, &[
+        0x6a, 0x00, // push 0
+        0x6a, 0x04, // push 4
+        0x8d, 0x54, 0x24, 0x4, // lea edx, [esp+4]
+        0x90, 0x90, // nops
+    ]);
+    patch(0x6baa41 as _, &[0xb0]);
 
     // default room editor settings
     patch(0x657852 as _, &[0xe8, 0, 0, 0, 0, 0x90, 0x90]);
