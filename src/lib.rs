@@ -13,6 +13,7 @@ mod list;
 mod load;
 mod project_watcher;
 mod save;
+mod save_exe;
 mod stub;
 
 use crate::delphi::{TTreeNode, UStr};
@@ -1429,4 +1430,10 @@ unsafe fn injector() {
     // check for time going backwards
     patch(0x4199fb as _, &[0xe9]);
     patch_call(0x4199fb as _, reset_if_time_went_backwards as _);
+
+    patch_call(0x6cd943 as _, save_exe::save_assets_inj::<asset::Sprite> as usize);
+    patch_call(0x6cd95e as _, save_exe::save_assets_inj::<asset::Background> as usize);
+    patch_call(0x06cd979 as _, save_exe::save_assets_inj::<asset::Path> as usize);
+    patch_call(0x6cd994 as _, save_exe::save_assets_inj::<asset::Script> as usize);
+    patch_call(0x6cd9f8 as _, save_exe::save_assets_inj::<asset::Room> as usize);
 }

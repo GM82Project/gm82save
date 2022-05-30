@@ -307,7 +307,19 @@ pub struct Font {
     pub charset: u32,
     /// This is 1 less than what you'll see saved in .gmk or .exe or .gm81 or whatever
     pub aa_level: u32,
+    pub s_x: [u32; 256],
+    pub s_y: [u32; 256],
+    pub s_w: [u32; 256],
+    pub s_h: [u32; 256],
+    pub s_shift: [u32; 256],
+    pub s_offset: [u32; 256],
+    pub s_chr: [u32; 256],
+    pub s_bw: u32,
+    pub s_bh: u32,
+    pub s_bytes: *mut u8,
 }
+
+unsafe impl Sync for Font {}
 
 impl Font {
     pub unsafe fn new() -> *mut Self {
