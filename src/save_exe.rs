@@ -193,8 +193,14 @@ impl GetAssetList for asset::Script {
     }
 }
 
+static mut OLD_DPI: u32 = 96;
+
 impl GetAssetList for asset::Font {
     fn get_asset_list() -> &'static dyn AssetListTrait<Self> {
+        unsafe {
+            OLD_DPI = *delphi::DPI;
+            *delphi::DPI = 96;
+        }
         &ide::FONTS
     }
 
@@ -226,6 +232,12 @@ impl GetAssetList for asset::Font {
                 out.write_all(slice::from_raw_parts(self.s_bytes, (self.s_bw * self.s_bh) as usize)).unwrap();
                 delphi::DynArraySetLength((&self.s_bytes) as *const *mut u8 as *mut *mut u8, 0x5a65a4 as _, 1, 0);
             }
+        }
+    }
+
+    fn write_additional(_stream: usize) {
+        unsafe {
+            *delphi::DPI = OLD_DPI;
         }
     }
 }

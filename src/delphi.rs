@@ -255,6 +255,8 @@ impl std::io::Write for TMemoryStream {
     }
 }
 
+pub const DPI: *mut u32 = 0x78810c as _;
+
 #[repr(C)]
 pub struct THelpForm {
     padding: [u8; 0x388],

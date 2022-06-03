@@ -1435,5 +1435,6 @@ unsafe fn injector() {
     patch_call(0x6cd95e as _, save_exe::save_assets_inj::<asset::Background> as usize);
     patch_call(0x06cd979 as _, save_exe::save_assets_inj::<asset::Path> as usize);
     patch_call(0x6cd994 as _, save_exe::save_assets_inj::<asset::Script> as usize);
+    patch_call(0x6cd9af as _, save_exe::save_assets_inj::<asset::Font> as usize);
     patch_call(0x6cd9f8 as _, save_exe::save_assets_inj::<asset::Room> as usize);
 }
