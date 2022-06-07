@@ -604,6 +604,19 @@ unsafe extern "C" fn free_image_editor_bitmap() {
 }
 
 #[naked]
+unsafe extern "C" fn copy_origin_on_new() {
+    asm! {
+        "mov ecx, [eax+0xc]",
+        "mov [esi+0xc], ecx",
+        "mov ecx, [eax+0x10]",
+        "mov [esi+0x10], ecx",
+        "mov ecx, 0x6ee2f8",
+        "call ecx",
+        options(noreturn),
+    }
+}
+
+#[naked]
 unsafe extern "C" fn floor_st0() {
     asm! {
         // move the return address and put st0 on the stack before it so it's like an argument
@@ -1235,6 +1248,9 @@ unsafe fn injector() {
 
     // fix memory leak in image editor
     patch_call(0x643bd0 as _, free_image_editor_bitmap as _);
+
+    // copy origin when New
+    patch_call(0x6ee2f8 as _, copy_origin_on_new as _);
 
     // fix grid snap
     patch_call(0x64612b as _, floor_st0 as _);
