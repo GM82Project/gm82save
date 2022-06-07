@@ -836,6 +836,31 @@ unsafe extern "C" fn write_number_on_actions() {
     }
 }
 
+unsafe extern "C" fn regen_temp_folder_when_making_file() {
+    asm! {
+        "mov ecx, 0x407660",
+        "call ecx",
+        // ForceDirectories the temp directory
+        "mov eax, [0x788974]",
+        "mov ecx, 0x416eac",
+        "jmp ecx",
+        options(noreturn),
+    }
+}
+
+unsafe extern "C" fn get_temp_folder_but_also_regen_it() {
+    asm! {
+        //UStrAsg temp_diretory to the output
+        "mov edx, [0x788974]",
+        "mov ecx, 0x407eb8",
+        "call ecx",
+        // ForceDirectories the temp directory
+        "mov eax, [0x788974]",
+        "mov ecx, 0x416eac",
+        "jmp ecx",
+    }
+}
+
 static mut SEEN_ERROR: bool = false;
 
 unsafe extern "fastcall" fn patch_error_box(caption: *const u16, text: *const u16, _flags: u32) {
@@ -1436,6 +1461,10 @@ unsafe fn injector() {
 
     // error box only shows once and has custom message
     patch_call(0x51fe33 as _, patch_error_box as _);
+
+    // regenerate temp directory if it doesn't exist
+    patch_call(0x5342e8 as _, regen_temp_folder_when_making_file as _);
+    patch_call(0x6ce82b as _, get_temp_folder_but_also_regen_it as _);
 
     // update timestamps when setting name
     unsafe fn patch_timestamps(dest: *mut u8) {
