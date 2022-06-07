@@ -603,6 +603,21 @@ unsafe extern "C" fn free_image_editor_bitmap() {
 }
 
 #[naked]
+unsafe extern "C" fn floor_st0() {
+    asm! {
+        // move the return address and put st0 on the stack before it so it's like an argument
+        "mov eax, [esp]",
+        "sub esp, 8",
+        // can't fucking say "fstp tword ptr [esp]" apparently so i guess i'm doing this
+        ".byte 0xdb, 0x3c, 0x24",
+        "push eax",
+        "mov eax, 0x410538",
+        "jmp eax",
+        options(noreturn),
+    }
+}
+
+#[naked]
 unsafe extern "C" fn dont_show_action_tooltip_if_event_is_null() {
     asm! {
         // if eax is not null, call CEvent.GetAction
@@ -1219,6 +1234,12 @@ unsafe fn injector() {
 
     // fix memory leak in image editor
     patch_call(0x643bd0 as _, free_image_editor_bitmap as _);
+
+    // fix grid snap
+    patch_call(0x64612b as _, floor_st0 as _);
+    patch_call(0x646164 as _, floor_st0 as _);
+    patch_call(0x64639e as _, floor_st0 as _);
+    patch_call(0x6463d7 as _, floor_st0 as _);
 
     // fix access violation when closing object/timeline window while mousing over action
     patch_call(0x6c6f6f as _, dont_show_action_tooltip_if_event_is_null as _);
