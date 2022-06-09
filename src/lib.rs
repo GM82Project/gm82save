@@ -648,8 +648,8 @@ unsafe extern "C" fn copy_origin_on_new() {
         "mov [esi+0xc], ecx",
         "mov ecx, [eax+0x10]",
         "mov [esi+0x10], ecx",
-        "mov ecx, 0x6ee2f8",
-        "call ecx",
+        "mov ecx, 0x405a7c",
+        "jmp ecx",
         options(noreturn),
     }
 }
