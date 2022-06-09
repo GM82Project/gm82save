@@ -930,6 +930,89 @@ unsafe extern "fastcall" fn patch_error_box(caption: *const u16, text: *const u1
 }
 
 #[naked]
+unsafe extern "C" fn get_treenode_count_and_preserve_resource_type() {
+    asm! {
+        "mov ecx, 0x4ad490",
+        "call ecx",
+        "push edi",
+        "mov ecx, 0x71c6a5",
+        "jmp ecx",
+        options(noreturn),
+    }
+}
+
+#[naked]
+unsafe extern "C" fn add_three_newest_inj() {
+    asm! {
+        // add a line
+        "mov eax, [esi + 0x38]",
+        "mov ecx, 0x4dd244",
+        "call ecx",
+        // add the three items
+        "pop edx", // resource type
+        "push ebp",
+        "mov ecx, [esi + 0x38]", // menu items
+        "call {}",
+        // cleanup
+        "xor eax, eax",
+        "pop edx",
+        "pop ecx",
+        "pop ecx",
+        "mov ecx, 0x71c6e2",
+        "jmp ecx",
+        sym add_three_newest,
+        options(noreturn),
+    }
+}
+
+unsafe extern "fastcall" fn add_three_newest(items: usize, ty: u32, ebp: *const u8) {
+    unsafe fn inner<T: 'static, AL: AssetListTrait<T>>(items: usize, ty: u32, ebp: *const u8, asset_list: &AL) {
+        let ids = asset_list
+            .assets()
+            .iter()
+            .enumerate()
+            .rev()
+            .filter(|(_, o)| o.is_some())
+            .map(|(i, _)| i)
+            .take(3)
+            .collect::<Vec<_>>();
+        for &id in ids.iter().rev() {
+            // create fake tree node for this asset
+            let tree_node: usize = delphi_call!(0x71cb48, asset_list.names()[id].0, 3, ty, id);
+            // make a menu item out of it and add it to the list
+            asm! {
+                "push dword ptr [{base} + 0x1c]",
+                "push dword ptr [{base} + 0x18]",
+                "push dword ptr [{base} + 0x14]",
+                "push dword ptr [{base} + 0x10]",
+                "push dword ptr [{base} + 0xc]",
+                "push dword ptr [{base} + 0x8]",
+                "call {func}",
+                base = in(reg) ebp,
+                func = in(reg) 0x71c3fc,
+                inlateout("eax") items => _,
+                inlateout("edx") tree_node => _,
+                inlateout("ecx") ebp.sub(5).read() as u32 => _,
+            }
+            // free the tree node
+            let _: u32 = delphi_call!(0x405a7c, tree_node);
+        }
+    }
+    match ty {
+        1 => inner(items, ty, ebp, &ide::OBJECTS),
+        2 => inner(items, ty, ebp, &ide::SPRITES),
+        3 => inner(items, ty, ebp, &ide::SOUNDS),
+        4 => inner(items, ty, ebp, &ide::ROOMS),
+        6 => inner(items, ty, ebp, &ide::BACKGROUNDS),
+        7 => inner(items, ty, ebp, &ide::SCRIPTS),
+        8 => inner(items, ty, ebp, &ide::PATHS),
+        9 => inner(items, ty, ebp, &ide::FONTS),
+        12 => inner(items, ty, ebp, &ide::TIMELINES),
+        _ => return,
+    };
+}
+
+#[naked]
 unsafe extern "C" fn room_form_inj() {
     asm! {
         "mov ecx, eax",
@@ -1503,6 +1586,11 @@ unsafe fn injector() {
     // regenerate temp directory if it doesn't exist
     patch_call(0x5342e8 as _, regen_temp_folder_when_making_file as _);
     patch_call(0x6ce82b as _, get_temp_folder_but_also_regen_it as _);
+
+    // add three newest resources to popup menus
+    patch_call(0x71c6a0 as _, get_treenode_count_and_preserve_resource_type as _);
+    patch(0x71c6dd as _, &[0xe9]);
+    patch_call(0x71c6dd as _, add_three_newest_inj as _);
 
     // update timestamps when setting name
     unsafe fn patch_timestamps(dest: *mut u8) {
