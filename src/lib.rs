@@ -526,7 +526,7 @@ unsafe extern "fastcall" fn setup_unicode_parse(version: i32) {
 }
 
 #[naked]
-unsafe extern "C" fn properly_update_object_timestamp() {
+unsafe extern "C" fn properly_update_object_timestamp_drag_drop() {
     asm! {
         "mov eax, [esi + 0x46c]",
         "mov ecx, 0x62cd2c",
@@ -536,11 +536,49 @@ unsafe extern "C" fn properly_update_object_timestamp() {
 }
 
 #[naked]
-unsafe extern "C" fn properly_update_timeline_timestamp() {
+unsafe extern "C" fn properly_update_timeline_timestamp_drag_drop() {
     asm! {
         "mov eax, [esi + 0x430]",
         "mov ecx, 0x6fa7b0",
         "jmp ecx",
+        options(noreturn),
+    }
+}
+
+#[naked]
+unsafe extern "C" fn properly_update_object_timestamp_right_click() {
+    asm! {
+        // show action modal
+        "mov ecx, 0x6ff4dc",
+        "call ecx",
+        // if it returned false, return false
+        "test al, al",
+        "jz 2f",
+        // update timestamp and return 1
+        "mov eax, [esi + 0x46c]",
+        "mov ecx, 0x62cd2c",
+        "call ecx",
+        "mov al, 1",
+        "2: ret",
+        options(noreturn),
+    }
+}
+
+#[naked]
+unsafe extern "C" fn properly_update_timeline_timestamp_right_click() {
+    asm! {
+        // show action modal
+        "mov ecx, 0x6ff4dc",
+        "call ecx",
+        // if it returned false, return false
+        "test al, al",
+        "jz 2f",
+        // update timestamp and return 1
+        "mov eax, [esi + 0x430]",
+        "mov ecx, 0x6fa7b0",
+        "call ecx",
+        "mov al, 1",
+        "2: ret",
         options(noreturn),
     }
 }
@@ -1481,8 +1519,10 @@ unsafe fn injector() {
     patch_timestamps(0x6fa6c9 as _); // timelines
 
     // fix objects/timelines updating the wrong timestamp
-    patch_call(0x6c73ef as _, properly_update_object_timestamp as _);
-    patch_call(0x6f94c3 as _, properly_update_timeline_timestamp as _);
+    patch_call(0x6c73ef as _, properly_update_object_timestamp_drag_drop as _);
+    patch_call(0x6f94c3 as _, properly_update_timeline_timestamp_drag_drop as _);
+    patch_call(0x6c7512 as _, properly_update_object_timestamp_right_click as _);
+    patch_call(0x6f95e6 as _, properly_update_timeline_timestamp_right_click as _);
 
     // update timestamp properly in mask form
     unsafe fn patch_timestamp_mask(dest: *mut u8) {
