@@ -119,7 +119,7 @@ impl TTreeNode {
     }
 
     pub unsafe fn free(&self) {
-        delphi_call!(0x405a7c, self)
+        let _: u32 = delphi_call!(0x405a7c, self);
     }
 }
 
@@ -142,6 +142,44 @@ pub struct TTreeView {
     pub color: [u8; 3],
     padding2: [u8; 0x269],
     pub nodes: *const TTreeNodes,
+}
+
+pub struct TMenuItem {}
+
+impl TMenuItem {
+    pub fn add_from_tree_node(&self, tree_node: &TTreeNode, custom_events: Option<&[u32; 6]>) {
+        const BLANK_EVENTS: [u32; 6] = [0; 6];
+        unsafe {
+            asm! {
+                "push dword ptr [{base} + 0x1c]",
+                "push dword ptr [{base} + 0x18]",
+                "push dword ptr [{base} + 0x14]",
+                "push dword ptr [{base} + 0x10]",
+                "push dword ptr [{base} + 0xc]",
+                "push dword ptr [{base} + 0x8]",
+                "call {func}",
+                base = in(reg) custom_events.unwrap_or(&BLANK_EVENTS),
+                func = in(reg) 0x71c3fc,
+                inlateout("eax") self => _,
+                inlateout("edx") tree_node => _,
+                inlateout("ecx") u32::from(custom_events.is_some()) => _,
+            }
+        }
+    }
+
+    pub fn add_with_fake_tree_node(
+        &self,
+        name: &UStr,
+        rtype: u32,
+        kind: u32,
+        index: usize,
+        custom_events: Option<&[u32; 6]>,
+    ) {
+        // very bad and evil
+        let data = TreeNodeData { unknown: 0, rtype, kind, index };
+        let node = TTreeNode { unknown: 0x49614c, name: name.clone(), data: &data };
+        self.add_from_tree_node(&node, custom_events);
+    }
 }
 
 pub struct TBitmap {}

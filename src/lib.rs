@@ -16,7 +16,7 @@ mod save;
 mod save_exe;
 mod stub;
 
-use crate::delphi::{TTreeNode, UStr};
+use crate::delphi::{TMenuItem, TTreeNode, UStr};
 use ide::AssetListTrait;
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -965,8 +965,8 @@ unsafe extern "C" fn add_three_newest_inj() {
     }
 }
 
-unsafe extern "fastcall" fn add_three_newest(items: usize, ty: u32, ebp: *const u8) {
-    unsafe fn inner<T: 'static, AL: AssetListTrait<T>>(items: usize, ty: u32, ebp: *const u8, asset_list: &AL) {
+unsafe extern "fastcall" fn add_three_newest(items: &TMenuItem, ty: u32, ebp: *const u8) {
+    unsafe fn inner<T: 'static, AL: AssetListTrait<T>>(items: &TMenuItem, ty: u32, ebp: *const u8, asset_list: &AL) {
         let ids = asset_list
             .assets()
             .iter()
@@ -977,25 +977,13 @@ unsafe extern "fastcall" fn add_three_newest(items: usize, ty: u32, ebp: *const 
             .take(3)
             .collect::<Vec<_>>();
         for &id in ids.iter().rev() {
-            // create fake tree node for this asset
-            let tree_node = TTreeNode::new(&asset_list.names()[id], 3, ty, id);
-            // make a menu item out of it and add it to the list
-            asm! {
-                "push dword ptr [{base} + 0x1c]",
-                "push dword ptr [{base} + 0x18]",
-                "push dword ptr [{base} + 0x14]",
-                "push dword ptr [{base} + 0x10]",
-                "push dword ptr [{base} + 0xc]",
-                "push dword ptr [{base} + 0x8]",
-                "call {func}",
-                base = in(reg) ebp,
-                func = in(reg) 0x71c3fc,
-                inlateout("eax") items => _,
-                inlateout("edx") tree_node => _,
-                inlateout("ecx") ebp.sub(5).read() as u32 => _,
-            }
-            // free the tree node
-            tree_node.free();
+            items.add_with_fake_tree_node(
+                &asset_list.names()[id],
+                3,
+                ty,
+                id,
+                ebp.sub(5).cast::<bool>().read().then(|| &*ebp.cast::<[u32; 6]>()),
+            );
         }
     }
     match ty {
