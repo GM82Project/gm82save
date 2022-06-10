@@ -113,6 +113,14 @@ impl TTreeNode {
     pub unsafe fn SetImageIndex(&self, index: i32) {
         let _: u32 = delphi_call!(0x4acb64, self, index);
     }
+
+    pub unsafe fn new(name: &UStr, rtype: u32, kind: u32, index: usize) -> *const TTreeNode {
+        delphi_call!(0x71cb48, name.0, rtype, kind, index)
+    }
+
+    pub unsafe fn free(&self) {
+        delphi_call!(0x405a7c, self)
+    }
 }
 
 #[repr(C)]

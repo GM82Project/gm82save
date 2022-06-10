@@ -978,7 +978,7 @@ unsafe extern "fastcall" fn add_three_newest(items: usize, ty: u32, ebp: *const 
             .collect::<Vec<_>>();
         for &id in ids.iter().rev() {
             // create fake tree node for this asset
-            let tree_node: usize = delphi_call!(0x71cb48, asset_list.names()[id].0, 3, ty, id);
+            let tree_node = TTreeNode::new(&asset_list.names()[id], 3, ty, id);
             // make a menu item out of it and add it to the list
             asm! {
                 "push dword ptr [{base} + 0x1c]",
@@ -995,7 +995,7 @@ unsafe extern "fastcall" fn add_three_newest(items: usize, ty: u32, ebp: *const 
                 inlateout("ecx") ebp.sub(5).read() as u32 => _,
             }
             // free the tree node
-            let _: u32 = delphi_call!(0x405a7c, tree_node);
+            tree_node.free();
         }
     }
     match ty {
