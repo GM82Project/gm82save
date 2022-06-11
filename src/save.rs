@@ -142,7 +142,7 @@ unsafe fn save_stream(data: &delphi::TMemoryStream, path: &std::path::Path) -> R
     Ok(())
 }
 
-unsafe fn no_dependencies<T>(_: &T) -> bool {
+fn no_dependencies<T>(_: &T) -> bool {
     false
 }
 
@@ -218,7 +218,7 @@ unsafe fn path_needs_update(path: &Path) -> bool {
                 || ide::ROOMS.timestamps().get_asset(path.path_editor_room_background) > LAST_SAVE)
 }
 
-unsafe fn save_path(path: &Path, file_path: &mut PathBuf) -> Result<()> {
+fn save_path(path: &Path, file_path: &mut PathBuf) -> Result<()> {
     create_dirs(&file_path)?;
     file_path.push("path.txt");
     let mut f = open_file(&file_path)?;
@@ -240,13 +240,13 @@ unsafe fn save_path(path: &Path, file_path: &mut PathBuf) -> Result<()> {
     Ok(())
 }
 
-unsafe fn save_script(script: &Script, path: &mut PathBuf) -> Result<()> {
+fn save_script(script: &Script, path: &mut PathBuf) -> Result<()> {
     path.set_extension("gml");
     save_gml(&path, &script.source)?;
     Ok(())
 }
 
-unsafe fn save_font(font: &Font, path: &mut PathBuf) -> Result<()> {
+fn save_font(font: &Font, path: &mut PathBuf) -> Result<()> {
     path.set_extension("txt");
     let mut f = open_file(path)?;
     writeln!(f, "name={}", font.sys_name.try_decode()?)?;
@@ -268,7 +268,7 @@ unsafe fn event_needs_update(ev: &Event) -> bool {
         }
         if action.action_kind == 0 {
             for (ty, val) in action.param_types.iter().zip(&action.param_strings) {
-                unsafe fn parameter_get_timestamp(ty: u32, val: &UStr) -> Result<f64> {
+                fn parameter_get_timestamp(ty: u32, val: &UStr) -> Result<f64> {
                     let val = val.try_decode()?.parse()?;
                     if val < 0 {
                         return Ok(0.0)
@@ -425,7 +425,7 @@ unsafe fn save_timeline(tl: &Timeline, path: &mut PathBuf) -> Result<()> {
     Ok(())
 }
 
-unsafe fn event_name(ev_type: usize, ev_numb: usize) -> String {
+fn event_name(ev_type: usize, ev_numb: usize) -> String {
     match ev_type {
         events::EV_COLLISION => {
             format!("{}_{}", events::EVENT_NAMES[ev_type], ide::OBJECTS.names().get_asset(ev_numb as _))
@@ -663,7 +663,7 @@ unsafe fn save_room(room: &Room, path: &mut PathBuf) -> Result<()> {
     Ok(())
 }
 
-unsafe fn save_constants(path: &mut PathBuf) -> Result<()> {
+fn save_constants(path: &mut PathBuf) -> Result<()> {
     path.push("constants.txt");
     let mut f = open_file(&path)?;
     path.pop();
@@ -774,7 +774,7 @@ unsafe fn save_settings(path: &mut PathBuf, smart_save: bool) -> Result<()> {
     Ok(())
 }
 
-unsafe fn save_triggers(path: &mut PathBuf) -> Result<()> {
+fn save_triggers(path: &mut PathBuf) -> Result<()> {
     path.push("triggers");
     create_dirs(&path)?;
     let triggers = ide::get_triggers();
