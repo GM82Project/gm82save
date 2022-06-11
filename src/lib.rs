@@ -521,8 +521,8 @@ unsafe extern "fastcall" fn setup_unicode_parse(version: i32) {
     // this just patches CStream.ReadString to read with the active code page instead of UTF-8
     // (and reverts that change after loading so nothing else breaks)
     let cp = if version < 810 { [0, 0] } else { [0xe9, 0xfd] };
-    patch(0x52f0a2 as _, &cp);
-    patch(0x52f0c5 as _, &cp);
+    patch(0x52f0a2, &cp);
+    patch(0x52f0c5, &cp);
 }
 
 #[naked]
@@ -1279,7 +1279,7 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
     delphi_call!(0x6884c8, room_id) // the default
 }
 
-unsafe fn patch(dest: *mut u8, source: &[u8]) {
+unsafe fn patch(dest: usize, source: &[u8]) {
     // the only winapi imports in the whole project, no need for crates
     #[allow(non_camel_case_types)]
     type PAGE_TYPE = u32;
@@ -1299,14 +1299,15 @@ unsafe fn patch(dest: *mut u8, source: &[u8]) {
     }
 
     let mut old_protect = 0;
+    let dest = dest as *mut u8;
     VirtualProtect(dest.cast(), source.len(), PAGE_READWRITE, &mut old_protect);
     dest.copy_from(source.as_ptr(), source.len());
     VirtualProtect(dest.cast(), source.len(), old_protect, &mut old_protect);
     FlushInstructionCache(GetCurrentProcess(), dest.cast(), source.len());
 }
 
-unsafe fn patch_call(instr: *mut u8, proc: usize) {
-    patch(instr.add(1), &(proc - (instr as usize + 5)).to_le_bytes());
+unsafe fn patch_call(instr: usize, proc: usize) {
+    patch(instr + 1, &(proc - (instr as usize + 5)).to_le_bytes());
 }
 
 #[cfg_attr(not(test), ctor::ctor)]
@@ -1328,14 +1329,14 @@ unsafe fn injector() {
 
     // about dialog
     #[rustfmt::skip]
-    patch(0x71be58 as _, &[
+    patch(0x71be58, &[
         0x8b, 0xc8, // mov ecx, eax
         0xe9, // jmp [nothing yet]
     ]);
-    patch_call(0x71be5a as _, about_inj as _);
+    patch_call(0x71be5a, about_inj as _);
 
     // call save() instead of CStream.Create and the "save gmk" function
-    let save_dest = 0x705cbd as *mut u8;
+    let save_dest = 0x705cbd;
     #[rustfmt::skip]
     let mut save_patch = [
         0xe8, 0x00, 0x00, 0x00, 0x00, // call save (my save)
@@ -1345,94 +1346,94 @@ unsafe fn injector() {
         0x74, 0x25, // je 0x705cef (after save fail)
         0xe9, 0x7e, 0x01, 0x00, 0x00, // jmp 0x705e4d (after save success)
     ];
-    save_patch[1..5].copy_from_slice(&(save_inj as u32 - (save_dest as u32 + 5)).to_le_bytes());
+    save_patch[1..5].copy_from_slice(&(save_inj as usize - (save_dest + 5)).to_le_bytes());
     patch(save_dest, &save_patch);
 
     // call load() instead of CStream.Create
     // and insert a JZ to the post-load code (0x705af3)
-    let load_dest = 0x705a42 as *mut u8;
+    let load_dest = 0x705a42;
     #[rustfmt::skip]
     let mut load_patch = [
         0xe8, 0x00, 0x00, 0x00, 0x00, // call load (my load)
         0x84, 0xc0, // test al,al
         0x0f, 0x85, 0xa4, 0x00, 0x00, 0x00, // jne 0x705af3 (after load)
     ];
-    load_patch[1..5].copy_from_slice(&(load_inj as u32 - (load_dest as u32 + 5)).to_le_bytes());
+    load_patch[1..5].copy_from_slice(&(load_inj as usize - (load_dest + 5)).to_le_bytes());
     patch(load_dest, &load_patch);
 
     // check for .gm82 as well as .gm81 when dragging file onto game maker
-    patch_call(0x6df7e2 as _, gm81_or_gm82_inj as _);
+    patch_call(0x6df7e2, gm81_or_gm82_inj as _);
     // check for .gm82 as well as .gm81 in open file dialog
-    patch_call(0x6e02ed as _, gm81_or_gm82_inj as _);
+    patch_call(0x6e02ed, gm81_or_gm82_inj as _);
     // check for .gm82 as well as .gm81 in "rename if using an old file extension" code
-    patch_call(0x6e0574 as _, gm81_or_gm82_inj as _);
+    patch_call(0x6e0574, gm81_or_gm82_inj as _);
     // replace now-unused .gm81 with .gm82
-    patch(0x6dfbec as _, &[b'2']);
+    patch(0x6dfbec, &[b'2']);
     // save new .gm82 projects to subfolder when using "save as" dialog
-    patch_call(0x6e06b3 as _, make_new_folder as _);
+    patch_call(0x6e06b3, make_new_folder as _);
 
     // fix stupid null pointer error
-    patch(0x68ef02 as _, &[0xe9]);
-    patch_call(0x68ef02 as _, fix_tile_null_pointer as _);
+    patch(0x68ef02, &[0xe9]);
+    patch_call(0x68ef02, fix_tile_null_pointer as _);
 
     // fix memory leak in image editor
-    patch_call(0x643bd0 as _, free_image_editor_bitmap as _);
+    patch_call(0x643bd0, free_image_editor_bitmap as _);
 
     // copy origin when New
-    patch_call(0x6ee2f8 as _, copy_origin_on_new as _);
+    patch_call(0x6ee2f8, copy_origin_on_new as _);
 
     // fix grid snap
-    patch_call(0x64612b as _, floor_st0 as _);
-    patch_call(0x646164 as _, floor_st0 as _);
-    patch_call(0x64639e as _, floor_st0 as _);
-    patch_call(0x6463d7 as _, floor_st0 as _);
+    patch_call(0x64612b, floor_st0 as _);
+    patch_call(0x646164, floor_st0 as _);
+    patch_call(0x64639e, floor_st0 as _);
+    patch_call(0x6463d7, floor_st0 as _);
 
     // fix access violation when closing object/timeline window while mousing over action
-    patch_call(0x6c6f6f as _, dont_show_action_tooltip_if_event_is_null as _);
-    patch_call(0x6f9043 as _, dont_show_action_tooltip_if_event_is_null as _);
+    patch_call(0x6c6f6f, dont_show_action_tooltip_if_event_is_null as _);
+    patch_call(0x6f9043, dont_show_action_tooltip_if_event_is_null as _);
 
     // add scrolling to path form
-    patch_call(0x71fdcb as _, path_form_mouse_wheel_inj as _);
+    patch_call(0x71fdcb, path_form_mouse_wheel_inj as _);
 
     // changing room in path form counts as a change
-    patch_call(0x7211ff as _, path_room_change_forces_room_editor_save as _);
+    patch_call(0x7211ff, path_room_change_forces_room_editor_save as _);
 
     // use zlib-ng for compression
-    patch(0x52f34c as _, &[0xe9]);
-    patch_call(0x52f34c as _, deflate_inj as _);
-    patch(0x52f2e4 as _, &[0xe9]);
-    patch_call(0x52f2e4 as _, inflate_inj as _);
+    patch(0x52f34c, &[0xe9]);
+    patch_call(0x52f34c, deflate_inj as _);
+    patch(0x52f2e4, &[0xe9]);
+    patch_call(0x52f2e4, inflate_inj as _);
     // build fast when making test build
-    patch_call(0x6ce8a2 as _, build_fast as _);
-    patch_call(0x6ce8cb as _, reset_compression as _);
+    patch_call(0x6ce8a2, build_fast as _);
+    patch_call(0x6ce8cb, reset_compression as _);
     // build small when making release
-    patch_call(0x6ce775 as _, build_small as _);
-    patch_call(0x6ce78f as _, reset_compression as _);
+    patch_call(0x6ce775, build_small as _);
+    patch_call(0x6ce78f, reset_compression as _);
 
     // compiler injections
     compiler::inject();
     // reset extra data, unwatch project folder, and add a blank object when loading a new project
-    patch_call(0x70598c as _, stuff_to_do_on_project_init as _);
+    patch_call(0x70598c, stuff_to_do_on_project_init as _);
 
     // read text as ANSI on pre-8.1
-    patch(0x70537b as _, &[0xe8]);
-    patch_call(0x70537b as _, setup_unicode_parse_inj as _);
+    patch(0x70537b, &[0xe8]);
+    patch_call(0x70537b, setup_unicode_parse_inj as _);
     // reset above
-    patch_call(0x705acc as _, teardown_unicode_parse_inj as _);
+    patch_call(0x705acc, teardown_unicode_parse_inj as _);
 
     // .gm82 file associations
-    patch_call(0x6ddacd as _, gm82_file_association_inj as _);
+    patch_call(0x6ddacd, gm82_file_association_inj as _);
 
     // middle click in code editor shows resource
     // remove first check
-    patch(0x6b7182 as _, &[0x90, 0x90, 0x90, 0x90, 0x90, 0x90]);
+    patch(0x6b7182, &[0x90, 0x90, 0x90, 0x90, 0x90, 0x90]);
     // inject second check
-    patch_call(0x6b721b as _, code_editor_middle_click as _);
+    patch_call(0x6b721b, code_editor_middle_click as _);
 
     // code hint: faster extension function search and add script hints
-    patch(0x71364e as _, &[0xae, 0x22]);
+    patch(0x71364e, &[0xae, 0x22]);
     #[rustfmt::skip]
-    patch(0x6bb12e as _, &[
+    patch(0x6bb12e, &[
         // prior line: mov eax, [ebp-4]
         0x8b, 0x55, 0xf8, // mov edx, [ebp-8]
         0xe8, 0xde, 0x84, 0x05, 0x00, // call extension_get_helpline_from_function_name
@@ -1444,45 +1445,45 @@ unsafe fn injector() {
         0xe8, 0, 0, 0, 0, // call code_editor_script_hint
         0xeb, 0x06, // jmp to function end
     ]);
-    patch_call(0x6bb142 as _, code_editor_script_hint as _);
+    patch_call(0x6bb142, code_editor_script_hint as _);
 
     // script args in code completion
-    patch_call(0x6baa91 as _, completion_script_args_inj as _);
-    patch(0x6baa98 as _, &[0xa8]); // get previous script name result
+    patch_call(0x6baa91, completion_script_args_inj as _);
+    patch(0x6baa98, &[0xa8]); // get previous script name result
 
     // fix triggers in code completion
-    patch(0x6baa1c as _, &[0x98, 0x23]); // get trigger const instead of name
-    patch(0x6baa2e as _, &[
+    patch(0x6baa1c, &[0x98, 0x23]); // get trigger const instead of name
+    patch(0x6baa2e, &[
         0x6a, 0x00, // push 0
         0x6a, 0x04, // push 4
         0x8d, 0x54, 0x24, 0x4, // lea edx, [esp+4]
         0x90, 0x90, // nops
     ]);
-    patch(0x6baa41 as _, &[0xb0]);
+    patch(0x6baa41, &[0xb0]);
 
     // show number on code actions
-    patch_call(0x7002fe as _, write_number_on_actions as _);
+    patch_call(0x7002fe, write_number_on_actions as _);
 
     // default room editor settings
-    patch(0x657852 as _, &[0xe8, 0, 0, 0, 0, 0x90, 0x90]);
-    patch_call(0x657852 as _, room_size as _);
+    patch(0x657852, &[0xe8, 0, 0, 0, 0, 0x90, 0x90]);
+    patch_call(0x657852, room_size as _);
 
     // nop out room view size stuff
-    patch(0x657904 as _, &[0x90; 14]);
-    patch(0x65791c as _, &[0x90; 14]);
+    patch(0x657904, &[0x90; 14]);
+    patch(0x65791c, &[0x90; 14]);
 
     // fix instance references in creation code when renaming room
     #[rustfmt::skip]
-    patch(0x692fbb as _, &[
+    patch(0x692fbb, &[
         0xe8, 0, 0, 0, 0, // call rename_room_inj
         0x74, 0x2a, // jz to end of function
         0x90, // nop
     ]);
-    patch_call(0x692fbb as _, rename_room_inj as _);
+    patch_call(0x692fbb, rename_room_inj as _);
 
     // replace ids in new room when duplicating
     #[rustfmt::skip]
-    patch(0x692e72 as _, &[
+    patch(0x692e72, &[
         0x8b, 0x14, 0x98, // mov edx, [eax+ebx*4]
         0x8b, 0x04, 0xb0, // mov eax, [eax+esi*4]
         0x56, // push esi (new id)
@@ -1492,127 +1493,127 @@ unsafe fn injector() {
         0xe8, 0x00, 0x00, 0x00, 0x00, // call freshen_room_ids
         0x90, 0x90, 0x90, // nop padding
     ]);
-    patch_call(0x692e80 as _, duplicate_room as _);
+    patch_call(0x692e80, duplicate_room as _);
 
     // show instance id in old room editor
-    patch_call(0x68fbc9 as _, show_instance_id_inj as _);
+    patch_call(0x68fbc9, show_instance_id_inj as _);
 
     // funky room editor shit
-    patch_call(0x69319c as _, room_form_inj as _);
+    patch_call(0x69319c, room_form_inj as _);
     // disable news (replace function with a ret)
-    patch(0x62c224 as _, &[0xc3]);
+    patch(0x62c224, &[0xc3]);
     // don't open gm82room when creating/duplicating a new room
-    patch_call(0x6e2f86 as _, dont_make_room_form_inj as _);
-    patch_call(0x6e2f5c as _, dont_make_room_form_inj as _);
-    patch_call(0x6e169e as _, dont_make_room_form_inj as _);
+    patch_call(0x6e2f86, dont_make_room_form_inj as _);
+    patch_call(0x6e2f5c, dont_make_room_form_inj as _);
+    patch_call(0x6e169e, dont_make_room_form_inj as _);
 
     // configs for default room editor settings
     // force progress bar (replace check with nops)
-    patch(0x6ca266 as _, &[0x90, 0x90]);
+    patch(0x6ca266, &[0x90, 0x90]);
     // replace ShowProgress with DefRoomW
-    patch(0x717cbc as _, b"\x08\0\0\0D\0e\0f\0R\0o\0o\0m\0W\0\0\0");
-    patch(0x719350 as _, b"\x08\0\0\0D\0e\0f\0R\0o\0o\0m\0W\0\0\0");
+    patch(0x717cbc, b"\x08\0\0\0D\0e\0f\0R\0o\0o\0m\0W\0\0\0");
+    patch(0x719350, b"\x08\0\0\0D\0e\0f\0R\0o\0o\0m\0W\0\0\0");
     // replace NoWebsite with DefRoomH
-    patch(0x7189e8 as _, b"\x08\0\0\0D\0e\0f\0R\0o\0o\0m\0H\0\0\0");
-    patch(0x719e0c as _, b"\x08\0\0\0D\0e\0f\0R\0o\0o\0m\0H\0\0\0");
+    patch(0x7189e8, b"\x08\0\0\0D\0e\0f\0R\0o\0o\0m\0H\0\0\0");
+    patch(0x719e0c, b"\x08\0\0\0D\0e\0f\0R\0o\0o\0m\0H\0\0\0");
     // replace NewsBrowser with DefRoomS
-    patch(0x718a24 as _, b"\x08\0\0\0D\0e\0f\0R\0o\0o\0m\0S\0\0\0");
-    patch(0x719e48 as _, b"\x08\0\0\0D\0e\0f\0R\0o\0o\0m\0S\0\0\0");
+    patch(0x718a24, b"\x08\0\0\0D\0e\0f\0R\0o\0o\0m\0S\0\0\0");
+    patch(0x719e48, b"\x08\0\0\0D\0e\0f\0R\0o\0o\0m\0S\0\0\0");
     // read ShowProgress from reg as int
-    patch(0x7170f7 as _, &[0x33, 0xd2]);
-    patch(0x7170fe as _, &[0xe8, 0xcd, 0xfc, 0xff, 0xff, 0xa3]);
-    patch(0x717104 as _, &(&DEFAULT_ROOM_WIDTH as *const u32 as usize as u32).to_le_bytes());
+    patch(0x7170f7, &[0x33, 0xd2]);
+    patch(0x7170fe, &[0xe8, 0xcd, 0xfc, 0xff, 0xff, 0xa3]);
+    patch(0x717104, &(&DEFAULT_ROOM_WIDTH as *const u32 as usize as u32).to_le_bytes());
     // read NoWebsite from reg as int
-    patch(0x71799d as _, &[0xe8, 0x2e, 0xf4, 0xff, 0xff, 0xa3]);
-    patch(0x7179a3 as _, &(&DEFAULT_ROOM_HEIGHT as *const u32 as usize as u32).to_le_bytes());
+    patch(0x71799d, &[0xe8, 0x2e, 0xf4, 0xff, 0xff, 0xa3]);
+    patch(0x7179a3, &(&DEFAULT_ROOM_HEIGHT as *const u32 as usize as u32).to_le_bytes());
     // read NewsBrowser from reg as int
-    patch(0x7179bf as _, &[0xe8, 0x0c, 0xf4, 0xff, 0xff, 0xe8]);
-    patch_call(0x7179c4 as _, fix_broken_room_size as _);
+    patch(0x7179bf, &[0xe8, 0x0c, 0xf4, 0xff, 0xff, 0xe8]);
+    patch_call(0x7179c4, fix_broken_room_size as _);
     // write ShowProgress to reg as int
-    patch(0x718bac as _, &[0x8b, 0x15, 0x2c, 0xa8, 0x79, 0x00, 0x90]);
-    patch(0x718bb9 as _, &[0x43, 0xe0]);
-    patch(0x718bae as _, &(&DEFAULT_ROOM_WIDTH as *const u32 as usize as u32).to_le_bytes());
+    patch(0x718bac, &[0x8b, 0x15, 0x2c, 0xa8, 0x79, 0x00, 0x90]);
+    patch(0x718bb9, &[0x43, 0xe0]);
+    patch(0x718bae, &(&DEFAULT_ROOM_WIDTH as *const u32 as usize as u32).to_le_bytes());
     // write NoWebsite to reg as int
-    patch(0x71908e as _, &[0x8b, 0x15, 0x81, 0xa9, 0x79, 0x00, 0x90]);
-    patch(0x71909b as _, &[0x61, 0xdb]);
-    patch(0x719090 as _, &(&DEFAULT_ROOM_HEIGHT as *const u32 as usize as u32).to_le_bytes());
+    patch(0x71908e, &[0x8b, 0x15, 0x81, 0xa9, 0x79, 0x00, 0x90]);
+    patch(0x71909b, &[0x61, 0xdb]);
+    patch(0x719090, &(&DEFAULT_ROOM_HEIGHT as *const u32 as usize as u32).to_le_bytes());
     // write NewsBrowser to reg as int
-    patch(0x7190b0 as _, &[0x8b, 0x15, 0x83, 0xa9, 0x79, 0x00, 0x90]);
-    patch(0x7190bd as _, &[0x3f, 0xdb]);
-    patch(0x7190b2 as _, &(&DEFAULT_ROOM_SPEED as *const u32 as usize as u32).to_le_bytes());
+    patch(0x7190b0, &[0x8b, 0x15, 0x83, 0xa9, 0x79, 0x00, 0x90]);
+    patch(0x7190bd, &[0x3f, 0xdb]);
+    patch(0x7190b2, &(&DEFAULT_ROOM_SPEED as *const u32 as usize as u32).to_le_bytes());
     // write ShowProgress to form as ValueEdit
-    patch(0x71a272 as _, &[0x8b, 0x15, 0x2c, 0xa8, 0x79, 0x00, 0xe8, 0xe3, 0x64, 0xe1, 0xff, 0x90, 0x90, 0x90, 0x90]);
-    patch(0x71a274 as _, &(&DEFAULT_ROOM_WIDTH as *const u32 as usize as u32).to_le_bytes());
+    patch(0x71a272, &[0x8b, 0x15, 0x2c, 0xa8, 0x79, 0x00, 0xe8, 0xe3, 0x64, 0xe1, 0xff, 0x90, 0x90, 0x90, 0x90]);
+    patch(0x71a274, &(&DEFAULT_ROOM_WIDTH as *const u32 as usize as u32).to_le_bytes());
     // write NoWebsite to form as ValueEdit
-    patch(0x71a4ec as _, &[0x8b, 0x15, 0x81, 0xa9, 0x79, 0x00, 0xe8, 0x69, 0x62, 0xe1, 0xff, 0x90, 0x90, 0x90, 0x90]);
-    patch(0x71a4ee as _, &(&DEFAULT_ROOM_HEIGHT as *const u32 as usize as u32).to_le_bytes());
+    patch(0x71a4ec, &[0x8b, 0x15, 0x81, 0xa9, 0x79, 0x00, 0xe8, 0x69, 0x62, 0xe1, 0xff, 0x90, 0x90, 0x90, 0x90]);
+    patch(0x71a4ee, &(&DEFAULT_ROOM_HEIGHT as *const u32 as usize as u32).to_le_bytes());
     // write NewsBrowser to form as ValueEdit
-    patch(0x71a51d as _, &[0x8b, 0x15, 0x83, 0xa9, 0x79, 0x00, 0xe8, 0x38, 0x62, 0xe1, 0xff, 0x90, 0x90, 0x90, 0x90]);
-    patch(0x71a51f as _, &(&DEFAULT_ROOM_SPEED as *const u32 as usize as u32).to_le_bytes());
+    patch(0x71a51d, &[0x8b, 0x15, 0x83, 0xa9, 0x79, 0x00, 0xe8, 0x38, 0x62, 0xe1, 0xff, 0x90, 0x90, 0x90, 0x90]);
+    patch(0x71a51f, &(&DEFAULT_ROOM_SPEED as *const u32 as usize as u32).to_le_bytes());
     // read ShowProgress from form as ValueEdit
-    patch(0x71a777 as _, &[0x8b, 0x80, 0xa0, 0x02, 0x00, 0x00, 0xa3, 0x2c, 0xa8, 0x79, 0x00, 0x90, 0x90]);
-    patch(0x71a77e as _, &(&DEFAULT_ROOM_WIDTH as *const u32 as usize as u32).to_le_bytes());
+    patch(0x71a777, &[0x8b, 0x80, 0xa0, 0x02, 0x00, 0x00, 0xa3, 0x2c, 0xa8, 0x79, 0x00, 0x90, 0x90]);
+    patch(0x71a77e, &(&DEFAULT_ROOM_WIDTH as *const u32 as usize as u32).to_le_bytes());
     // read NoWebsite from form as ValueEdit
-    patch(0x71a93f as _, &[0x8b, 0x80, 0xa0, 0x02, 0x00, 0x00, 0xa3, 0x81, 0xa9, 0x79, 0x00, 0x90, 0x90]);
-    patch(0x71a946 as _, &(&DEFAULT_ROOM_HEIGHT as *const u32 as usize as u32).to_le_bytes());
+    patch(0x71a93f, &[0x8b, 0x80, 0xa0, 0x02, 0x00, 0x00, 0xa3, 0x81, 0xa9, 0x79, 0x00, 0x90, 0x90]);
+    patch(0x71a946, &(&DEFAULT_ROOM_HEIGHT as *const u32 as usize as u32).to_le_bytes());
     // read NewsBrowser from form as ValueEdit
-    patch(0x71a96b as _, &[0x8b, 0x80, 0xa0, 0x02, 0x00, 0x00, 0xa3, 0x83, 0xa9, 0x79, 0x00, 0x90, 0x90]);
-    patch(0x71a972 as _, &(&DEFAULT_ROOM_SPEED as *const u32 as usize as u32).to_le_bytes());
+    patch(0x71a96b, &[0x8b, 0x80, 0xa0, 0x02, 0x00, 0x00, 0xa3, 0x83, 0xa9, 0x79, 0x00, 0x90, 0x90]);
+    patch(0x71a972, &(&DEFAULT_ROOM_SPEED as *const u32 as usize as u32).to_le_bytes());
 
     // check for other processes before setting MakerRunning to false
-    patch(0x71af15 as _, &[0xb9]);
-    patch_call(0x71af15 as _, check_gm_processes as _);
+    patch(0x71af15, &[0xb9]);
+    patch_call(0x71af15, check_gm_processes as _);
 
     // error box only shows once and has custom message
-    patch_call(0x51fe33 as _, patch_error_box as _);
+    patch_call(0x51fe33, patch_error_box as _);
 
     // regenerate temp directory if it doesn't exist
-    patch_call(0x5342e8 as _, regen_temp_folder_when_making_file as _);
-    patch_call(0x6ce82b as _, get_temp_folder_but_also_regen_it as _);
+    patch_call(0x5342e8, regen_temp_folder_when_making_file as _);
+    patch_call(0x6ce82b, get_temp_folder_but_also_regen_it as _);
 
     // add three newest resources to popup menus
-    patch_call(0x71c6a0 as _, get_treenode_count_and_preserve_resource_type as _);
-    patch(0x71c6dd as _, &[0xe9]);
-    patch_call(0x71c6dd as _, add_three_newest_inj as _);
+    patch_call(0x71c6a0, get_treenode_count_and_preserve_resource_type as _);
+    patch(0x71c6dd, &[0xe9]);
+    patch_call(0x71c6dd, add_three_newest_inj as _);
 
     // update timestamps when setting name
-    unsafe fn patch_timestamps(dest: *mut u8) {
+    unsafe fn patch_timestamps(dest: usize) {
         patch(dest, &[0x8b, 0xc3, 0xe8, 0xe0, 0x00, 0x00, 0x00]);
     }
-    patch(0x62cbe9 as _, &[0x8b, 0xc3, 0xe8, 0x3c, 0x01, 0x00, 0x00]); // objects
-    patch_timestamps(0x6f59e1 as _); // sprites
-    patch_timestamps(0x652381 as _); // sounds
-    patch_timestamps(0x692fe5 as _); // rooms
-    patch_timestamps(0x64def9 as _); // backgrounds
-    patch_timestamps(0x655c01 as _); // scripts
-    patch_timestamps(0x722901 as _); // paths
-    patch_timestamps(0x6fcd19 as _); // fonts
-    patch_timestamps(0x6fa6c9 as _); // timelines
+    patch(0x62cbe9, &[0x8b, 0xc3, 0xe8, 0x3c, 0x01, 0x00, 0x00]); // objects
+    patch_timestamps(0x6f59e1); // sprites
+    patch_timestamps(0x652381); // sounds
+    patch_timestamps(0x692fe5); // rooms
+    patch_timestamps(0x64def9); // backgrounds
+    patch_timestamps(0x655c01); // scripts
+    patch_timestamps(0x722901); // paths
+    patch_timestamps(0x6fcd19); // fonts
+    patch_timestamps(0x6fa6c9); // timelines
 
     // fix objects/timelines updating the wrong timestamp
-    patch_call(0x6c73ef as _, properly_update_object_timestamp_drag_drop as _);
-    patch_call(0x6f94c3 as _, properly_update_timeline_timestamp_drag_drop as _);
-    patch_call(0x6c7512 as _, properly_update_object_timestamp_right_click as _);
-    patch_call(0x6f95e6 as _, properly_update_timeline_timestamp_right_click as _);
+    patch_call(0x6c73ef, properly_update_object_timestamp_drag_drop as _);
+    patch_call(0x6f94c3, properly_update_timeline_timestamp_drag_drop as _);
+    patch_call(0x6c7512, properly_update_object_timestamp_right_click as _);
+    patch_call(0x6f95e6, properly_update_timeline_timestamp_right_click as _);
 
     // update timestamp properly in mask form
-    unsafe fn patch_timestamp_mask(dest: *mut u8) {
+    unsafe fn patch_timestamp_mask(dest: usize) {
         patch(dest, &[0xe8, 0, 0, 0, 0, 0x90, 0x90, 0x90]);
         patch_call(dest, update_sprite_mask_timestamp as _);
     }
-    patch_timestamp_mask(0x6f3208 as _);
-    patch_timestamp_mask(0x6f33fa as _);
-    patch_timestamp_mask(0x6f34e8 as _);
-    patch_timestamp_mask(0x6f3555 as _);
+    patch_timestamp_mask(0x6f3208);
+    patch_timestamp_mask(0x6f33fa);
+    patch_timestamp_mask(0x6f34e8);
+    patch_timestamp_mask(0x6f3555);
 
     // check for time going backwards
-    patch(0x4199fb as _, &[0xe9]);
-    patch_call(0x4199fb as _, reset_if_time_went_backwards as _);
+    patch(0x4199fb, &[0xe9]);
+    patch_call(0x4199fb, reset_if_time_went_backwards as _);
 
-    patch_call(0x6cd943 as _, save_exe::save_assets_inj::<asset::Sprite> as usize);
-    patch_call(0x6cd95e as _, save_exe::save_assets_inj::<asset::Background> as usize);
-    patch_call(0x06cd979 as _, save_exe::save_assets_inj::<asset::Path> as usize);
-    patch_call(0x6cd994 as _, save_exe::save_assets_inj::<asset::Script> as usize);
-    patch_call(0x6cd9af as _, save_exe::save_assets_inj::<asset::Font> as usize);
-    patch_call(0x6cd9f8 as _, save_exe::save_assets_inj::<asset::Room> as usize);
+    patch_call(0x6cd943, save_exe::save_assets_inj::<asset::Sprite> as usize);
+    patch_call(0x6cd95e, save_exe::save_assets_inj::<asset::Background> as usize);
+    patch_call(0x06cd979, save_exe::save_assets_inj::<asset::Path> as usize);
+    patch_call(0x6cd994, save_exe::save_assets_inj::<asset::Script> as usize);
+    patch_call(0x6cd9af, save_exe::save_assets_inj::<asset::Font> as usize);
+    patch_call(0x6cd9f8, save_exe::save_assets_inj::<asset::Room> as usize);
 }
