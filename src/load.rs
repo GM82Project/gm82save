@@ -1,7 +1,7 @@
 use crate::{
     asset::*,
     delphi,
-    delphi::{advance_progress_form, UStr},
+    delphi::{advance_progress_form, DelphiBox, UStr},
     events, ide,
     ide::AssetListTrait,
     project_watcher, run_while_updating_bar, show_message, update_timestamp, Error, InstanceExtra, Result, TileExtra,
@@ -180,8 +180,8 @@ fn verify_path(path: &std::path::Path) -> Result<()> {
     }
 }
 
-unsafe fn load_sound(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*const Sound> {
-    let snd = &mut *Sound::new();
+unsafe fn load_sound(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<DelphiBox<Sound>> {
+    let mut snd = Sound::new();
     path.set_extension("txt");
     let mut extension = String::new();
     let mut exists = false;
@@ -285,8 +285,8 @@ unsafe fn load_frame(path: &std::path::Path, frame: &mut Frame) -> Result<()> {
     Ok(())
 }
 
-unsafe fn load_background(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*const Background> {
-    let bg = &mut *Background::new();
+unsafe fn load_background(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<DelphiBox<Background>> {
+    let mut bg = Background::new();
     path.set_extension("txt");
     let mut bg_exists = false;
     read_txt(path, |k, v| {
@@ -310,8 +310,8 @@ unsafe fn load_background(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result
     Ok(bg)
 }
 
-unsafe fn load_sprite(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*const Sprite> {
-    let sp = &mut *Sprite::new();
+unsafe fn load_sprite(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<DelphiBox<Sprite>> {
+    let mut sp = Sprite::new();
     path.push("sprite.txt");
     read_txt(&path, |k, v| {
         match k {
@@ -331,7 +331,8 @@ unsafe fn load_sprite(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*co
         Ok(())
     })?;
     path.pop();
-    for (i, f) in sp.alloc_frames(sp.frame_count as usize).iter_mut().enumerate() {
+    let frame_count = sp.frame_count as usize;
+    for (i, f) in sp.alloc_frames(frame_count).iter_mut().enumerate() {
         path.push(format!("{}.png", i));
         *f = Frame::new();
         load_frame(&path, &mut **f)?;
@@ -340,15 +341,15 @@ unsafe fn load_sprite(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*co
     Ok(sp)
 }
 
-unsafe fn load_script(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*const Script> {
+unsafe fn load_script(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<DelphiBox<Script>> {
     path.set_extension("gml");
-    let s = Script::new();
-    (*s).source = load_gml(&read_file(path)?);
+    let mut s = Script::new();
+    s.source = load_gml(&read_file(path)?);
     Ok(s)
 }
 
-unsafe fn load_font(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<*const Font> {
-    let f = &mut *Font::new();
+unsafe fn load_font(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<DelphiBox<Font>> {
+    let mut f = Font::new();
     path.set_extension("txt");
     read_txt(path, |k, v| {
         match k {
@@ -481,10 +482,10 @@ unsafe fn load_event(
     Ok(())
 }
 
-unsafe fn load_object(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const Object> {
+unsafe fn load_object(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<DelphiBox<Object>> {
     path.set_extension("txt");
     let object_name = path.file_stem().map(OsStr::to_string_lossy).unwrap_or_default();
-    let obj = &mut *Object::new();
+    let mut obj = Object::new();
     let sprite_map = &asset_maps.sprites.map;
     let object_map = &asset_maps.objects.map;
     let trigger_map = &asset_maps.triggers.map;
@@ -554,8 +555,8 @@ unsafe fn load_object(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*con
     Ok(obj)
 }
 
-unsafe fn load_timeline(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const Timeline> {
-    let tl = &mut *Timeline::new();
+unsafe fn load_timeline(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<DelphiBox<Timeline>> {
+    let mut tl = Timeline::new();
     path.set_extension("gml");
     let code = read_file(&path)?;
     let iter = code.trim_start_matches("#define ").split("\n#define ");
@@ -577,8 +578,8 @@ unsafe fn load_timeline(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*c
     Ok(tl)
 }
 
-unsafe fn load_path(file_path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const Path> {
-    let path = &mut *Path::new();
+unsafe fn load_path(file_path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<DelphiBox<Path>> {
+    let mut path = Path::new();
     file_path.push("path.txt");
     let path_name =
         file_path.parent().and_then(std::path::Path::file_name).map(OsStr::to_string_lossy).unwrap_or_default();
@@ -766,8 +767,8 @@ unsafe fn load_tiles(path: &mut PathBuf, bgs: &HashMap<String, usize>) -> Result
     Ok(tiles)
 }
 
-pub unsafe fn load_room(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*const Room> {
-    let room = &mut *Room::new();
+pub unsafe fn load_room(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<DelphiBox<Room>> {
+    let mut room = Room::new();
     path.push("room.txt");
     let room_name = path.parent().and_then(std::path::Path::file_name).map(OsStr::to_string_lossy).unwrap_or_default();
     read_txt(&path, |k, v| {
@@ -864,7 +865,7 @@ pub unsafe fn load_room(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<*c
     path.push("code.gml");
     room.creation_code = load_gml(&read_file(&path)?);
     path.pop();
-    load_instances(room, path, &asset_maps.objects.map)?;
+    load_instances(&mut room, path, &asset_maps.objects.map)?;
     room.put_tiles(load_tiles(path, &asset_maps.backgrounds.map)?);
     room.calc_extents();
     Ok(room)
@@ -1089,7 +1090,7 @@ fn load_index(name: &str, path: &mut PathBuf) -> Result<Assets> {
 
 unsafe fn load_assets<'a, T: 'static + Sync, AL: AssetListTrait<T> + Sync>(
     name: &str,
-    load_asset: unsafe fn(&mut PathBuf, &AssetMaps) -> Result<*const T>,
+    load_asset: unsafe fn(&mut PathBuf, &AssetMaps) -> Result<DelphiBox<T>>,
     the_assets: &AL,
     assets: &Assets,
     bar_start: u32,
@@ -1106,7 +1107,7 @@ unsafe fn load_assets<'a, T: 'static + Sync, AL: AssetListTrait<T> + Sync>(
                 |((name, asset), name_p)| -> Result<()> {
                     if !name.is_empty() {
                         *name_p = UStr::new(name);
-                        *asset = load_asset(&mut path.join(name), asset_maps)?.as_ref();
+                        *asset = Some(load_asset(&mut path.join(name), asset_maps)?);
                     }
                     let _ = tx.send(());
                     Ok(())
@@ -1119,7 +1120,7 @@ unsafe fn load_assets<'a, T: 'static + Sync, AL: AssetListTrait<T> + Sync>(
                 |((name, asset), name_p)| -> Result<()> {
                     if !name.is_empty() {
                         *name_p = UStr::new(name);
-                        *asset = load_asset(&mut path.join(name), asset_maps)?.as_ref();
+                        *asset = Some(load_asset(&mut path.join(name), asset_maps)?);
                     }
                     let _ = tx.send(());
                     Ok(())

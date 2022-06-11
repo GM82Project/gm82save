@@ -813,7 +813,7 @@ unsafe extern "C" fn completion_script_args_inj() {
 }
 
 unsafe extern "fastcall" fn completion_script_args(script_id: usize, out: &mut UStr) {
-    let script = ide::SCRIPTS.assets().get_unchecked(script_id).unwrap_unchecked();
+    let script = ide::SCRIPTS.assets().get_unchecked(script_id).as_deref().unwrap_unchecked();
     if script.source.as_slice().get(..3) == Some(&[b'/' as u16; 3]) {
         if let Some(paren_pos) = script.source.as_slice().iter().position(|&c| c == b'(' as u16) {
             let count = script.source.as_slice().iter().position(|&c| c == b'\r' as u16).unwrap_or(script.source.len())
@@ -1082,7 +1082,7 @@ unsafe extern "fastcall" fn rename_room_inj() {
 
 unsafe extern "fastcall" fn rename_room(room_id: usize, new_name: *const u16) -> *const UStr {
     let room_names = ide::ROOMS.names();
-    if let Some(room) = ide::ROOMS.assets()[room_id] {
+    if let Some(room) = ide::ROOMS.assets_mut()[room_id].as_deref_mut() {
         let new_name = UStr::from_ptr(&new_name);
         let new_name_slice = new_name.as_slice();
         if new_name_slice.is_empty() {
@@ -1095,7 +1095,7 @@ unsafe extern "fastcall" fn rename_room(room_id: usize, new_name: *const u16) ->
         }
         let old_name = room_names[room_id].to_os_string().into_string().unwrap();
         let new_name = new_name.to_os_string().into_string().unwrap();
-        fix_instances_when_renaming_room(&mut *(room as *const asset::Room as *mut asset::Room), &old_name, &new_name);
+        fix_instances_when_renaming_room(room, &old_name, &new_name);
     }
     &room_names[room_id]
 }
@@ -1201,13 +1201,7 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
                 EXTRA_DATA = Some(Default::default());
                 let mut instance_ids = HashSet::new();
                 let mut tile_ids = HashSet::new();
-                // making rooms mutable would lead to weirdness so i guess i'm not
-                for room in ide::ROOMS
-                    .assets_mut()
-                    .iter_mut()
-                    .map(|r| std::mem::transmute::<Option<&asset::Room>, Option<&mut asset::Room>>(*r))
-                    .flatten()
-                {
+                for room in ide::ROOMS.assets_mut().iter_mut().map(|r| r.as_deref_mut()).flatten() {
                     // check if all ids are unique, and if not, update *all* the ids for consistency
                     let instances_ok = room.get_instances().iter().all(|inst| instance_ids.insert(inst.id));
                     let tiles_ok = room.get_tiles().iter().all(|tile| tile_ids.insert(tile.id));
@@ -1256,7 +1250,7 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
             let _ = std::process::Command::new(editor_path).arg(&room_path).spawn().and_then(|mut c| c.wait());
             let _: u32 = delphi_call!(0x51acd8, *(0x790100 as *const u32)); // show main form
             {
-                let room = ide::ROOMS.assets()[room_id].unwrap();
+                let room = ide::ROOMS.assets()[room_id].as_deref().unwrap();
                 // remove this room's ids from the global thing
                 if let Some((extra_inst, extra_tile)) = EXTRA_DATA.as_mut() {
                     for inst in room.get_instances() {
@@ -1269,11 +1263,12 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
                 let _: u32 = delphi_call!(0x405a7c, room); // delete room
             }
             // reload room
-            ide::ROOMS.assets_mut()[room_id] = load::load_asset_maps(&mut asset_maps_path)
-                .and_then(|asset_maps| load::load_room(&mut room_path, &asset_maps))
-                .map_err(|e| e.to_string())
-                .expect("loading the updated room failed")
-                .as_ref();
+            ide::ROOMS.assets_mut()[room_id] = Some(
+                load::load_asset_maps(&mut asset_maps_path)
+                    .and_then(|asset_maps| load::load_room(&mut room_path, &asset_maps))
+                    .map_err(|e| e.to_string())
+                    .expect("loading the updated room failed"),
+            );
             room_path.pop();
             room_path.pop();
             update_timestamp();

@@ -83,7 +83,7 @@ unsafe extern "fastcall" fn compile_constants(stream: usize) -> bool {
         .assets()
         .into_par_iter()
         .zip(ide::ROOMS.names())
-        .filter_map(|(&room, name)| Some((room?, name)))
+        .filter_map(|(room, name)| Some((room.as_ref()?, name)))
         .flat_map(|(room, name)| {
             let instance_names = &instance_names;
             room.get_instances().par_iter().filter_map(move |inst| {

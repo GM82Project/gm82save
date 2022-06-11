@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
 use crate::{
-    delphi::{TBitmap, TMemoryStream, UStr},
-    delphi_call,
+    delphi::{DelphiBox, TBitmap, TMemoryStream, UStr},
+    delphi_box, delphi_call,
     list::DelphiList,
 };
 use std::slice;
@@ -37,8 +37,8 @@ pub struct Sound {
 }
 
 impl Sound {
-    pub unsafe fn new() -> *mut Self {
-        delphi_call!(0x64fb70, 0x64f674, 1)
+    pub fn new() -> DelphiBox<Self> {
+        unsafe { delphi_box!(0x64fb70, 0x64f674) }
     }
 }
 
@@ -181,8 +181,8 @@ pub struct Sprite {
 }
 
 impl Sprite {
-    pub unsafe fn new() -> *mut Sprite {
-        delphi_call!(0x5b325c, 0x5b27dc, 1)
+    pub fn new() -> DelphiBox<Self> {
+        unsafe { delphi_box!(0x5b325c, 0x5b27dc) }
     }
 
     pub unsafe fn get_icon(&self) -> *const TBitmap {
@@ -223,8 +223,8 @@ pub struct Background {
 }
 
 impl Background {
-    pub unsafe fn new() -> *mut Background {
-        delphi_call!(0x062dba4, 0x62d408, 1)
+    pub fn new() -> DelphiBox<Self> {
+        unsafe { delphi_box!(0x062dba4, 0x62d408) }
     }
 
     pub unsafe fn get_icon(&self) -> *const TBitmap {
@@ -264,8 +264,8 @@ pub struct Path {
 }
 
 impl Path {
-    pub unsafe fn new() -> *mut Self {
-        delphi_call!(0x5357b0, 0x534924, 1)
+    pub fn new() -> DelphiBox<Self> {
+        unsafe { delphi_box!(0x5357b0, 0x534924) }
     }
 
     pub unsafe fn commit(&mut self) {
@@ -290,8 +290,8 @@ pub struct Script {
 }
 
 impl Script {
-    pub unsafe fn new() -> *mut Self {
-        delphi_call!(0x652860, 0x65267c, 1)
+    pub fn new() -> DelphiBox<Self> {
+        unsafe { delphi_box!(0x652860, 0x65267c) }
     }
 }
 
@@ -322,8 +322,8 @@ pub struct Font {
 unsafe impl Sync for Font {}
 
 impl Font {
-    pub unsafe fn new() -> *mut Self {
-        delphi_call!(0x5a8760, 0x5a6628, 1)
+    pub fn new() -> DelphiBox<Self> {
+        unsafe { delphi_box!(0x5a8760, 0x5a6628) }
     }
 }
 
@@ -383,8 +383,8 @@ pub struct Timeline {
 }
 
 impl Timeline {
-    pub unsafe fn new() -> *mut Self {
-        delphi_call!(0x5adf3c, 0x5ad98c, 1)
+    pub fn new() -> DelphiBox<Self> {
+        unsafe { delphi_box!(0x5adf3c, 0x5ad98c) }
     }
 
     pub unsafe fn alloc(&mut self, count: usize) -> (&mut [*mut Event], &mut [u32]) {
@@ -417,8 +417,8 @@ pub struct Object {
 }
 
 impl Object {
-    pub unsafe fn new() -> *mut Object {
-        delphi_call!(0x7049a8, 0x704428, 1)
+    pub fn new() -> DelphiBox<Self> {
+        unsafe { delphi_box!(0x7049a8, 0x704428) }
     }
 
     pub unsafe fn get_event(&mut self, ev_type: usize, ev_numb: usize) -> *mut Event {
@@ -522,8 +522,8 @@ pub struct Room {
 }
 
 impl Room {
-    pub unsafe fn new() -> *mut Self {
-        delphi_call!(0x6577b8, 0x6564cc, 1)
+    pub fn new() -> DelphiBox<Self> {
+        unsafe { delphi_box!(0x6577b8, 0x6564cc) }
     }
 
     pub unsafe fn calc_extents(&mut self) {

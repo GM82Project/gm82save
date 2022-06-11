@@ -1,7 +1,7 @@
 use crate::{
     asset::*,
     delphi,
-    delphi::{advance_progress_form, TTreeNode, UStr},
+    delphi::{advance_progress_form, DelphiBox, TTreeNode, UStr},
     events, ide,
     ide::AssetListTrait,
     project_watcher, run_while_updating_bar, show_message, update_timestamp, Error, InstanceExtra, Result, TileExtra,
@@ -36,6 +36,12 @@ impl UStr {
 
 trait GetAsset<T> {
     fn get_asset(&self, id: i32) -> T;
+}
+
+impl<'a, T> GetAsset<Option<&'a T>> for &'a [Option<DelphiBox<T>>] {
+    fn get_asset(&self, id: i32) -> Option<&'a T> {
+        self.get(usize::try_from(id).ok()?)?.as_deref()
+    }
 }
 
 impl<'a, T> GetAsset<Option<&'a T>> for &'a [Option<&'a T>] {
@@ -821,7 +827,7 @@ unsafe fn save_assets<'a, T: Sync>(
     _bar_start: u32,
     _bar_end: u32,
     name: &str,
-    assets: &[Option<&'a T>],
+    assets: &[Option<DelphiBox<T>>],
     names: &[UStr],
     timestamps: &[f64],
     tree: *const *const TTreeNode,
@@ -1018,7 +1024,7 @@ unsafe fn save_icon_cache(path: &mut PathBuf, smart_save: bool) -> Result<()> {
     create_dirs(path)?;
     (ide::SPRITES.assets(), ide::SPRITES.names(), ide::SPRITES.timestamps()).into_par_iter().try_for_each(
         |(sprite, name, timestamp)| -> Result<()> {
-            if let Some(&frame) = sprite.and_then(|s| s.get_frames().get(0)) {
+            if let Some(&frame) = sprite.as_deref().and_then(|s| s.get_frames().get(0)) {
                 save_frame(&*frame, name, path, smart_save && *timestamp < LAST_SAVE)?;
             }
             Ok(())
@@ -1209,7 +1215,7 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
     advance_progress_form(90);
     // give instances ids if they don't already have one
     for (room, timestamp) in
-        ide::ROOMS.assets().iter().zip(ide::ROOMS.timestamps_mut()).filter_map(|(&r, t)| Some((r?, t)))
+        ide::ROOMS.assets().iter().zip(ide::ROOMS.timestamps_mut()).filter_map(|(r, t)| Some((r.as_deref()?, t)))
     {
         let extra_data = &mut EXTRA_DATA.get_or_insert_with(Default::default).0;
         for id in room.get_instances().iter().map(|i| i.id) {

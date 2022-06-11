@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use crate::{
     asset::*,
-    delphi::{TTreeNode, TTreeView, UStr},
+    delphi::{DelphiBox, TTreeNode, TTreeView, UStr},
     list::DelphiList,
 };
 use std::slice;
@@ -37,8 +37,8 @@ macro_rules! get_member_mut {
 }
 
 pub trait AssetListTrait<T>: Sync {
-    fn assets(&self) -> &[Option<&'static T>];
-    fn assets_mut(&self) -> &'static mut [Option<&'static T>];
+    fn assets(&self) -> &[Option<DelphiBox<T>>];
+    fn assets_mut(&self) -> &'static mut [Option<DelphiBox<T>>];
     fn names(&self) -> &[UStr];
     fn names_mut(&self) -> &'static mut [UStr];
     fn timestamps(&self) -> &[f64];
@@ -47,7 +47,7 @@ pub trait AssetListTrait<T>: Sync {
 
 #[repr(C)]
 struct AssetListInner<T: 'static, const P1: usize, const P2: usize, const P3: usize, const P4: usize> {
-    pub assets: DelphiList<Option<&'static T>, P1>,
+    pub assets: DelphiList<Option<DelphiBox<T>>, P1>,
     pub forms: DelphiList<Form, P2>,
     pub names: DelphiList<UStr, P3>,
     pub timestamps: DelphiList<f64, P4>,
@@ -63,7 +63,7 @@ struct GraphicAssetListInner<
     const P4: usize,
     const P5: usize,
 > {
-    pub assets: DelphiList<Option<&'static T>, P1>,
+    pub assets: DelphiList<Option<DelphiBox<T>>, P1>,
     pub forms: DelphiList<Form, P2>,
     pub names: DelphiList<UStr, P3>,
     pub timestamps: DelphiList<f64, P4>,
@@ -123,9 +123,9 @@ impl<T, const P1: usize, const P2: usize, const P3: usize, const P4: usize, cons
 impl<T, const P1: usize, const P2: usize, const P3: usize, const P4: usize> AssetListTrait<T>
     for AssetList<T, P1, P2, P3, P4>
 {
-    get_member!(assets, Option<&'static T>, assets);
+    get_member!(assets, Option<DelphiBox<T>>, assets);
 
-    get_member_mut!(assets_mut, Option<&'static T>, assets);
+    get_member_mut!(assets_mut, Option<DelphiBox<T>>, assets);
 
     get_member!(names, UStr, names);
 
@@ -147,9 +147,9 @@ impl<T, const P1: usize, const P2: usize, const P3: usize, const P4: usize> Asse
 impl<T, const P1: usize, const P2: usize, const P3: usize, const P4: usize, const P5: usize> AssetListTrait<T>
     for GraphicAssetList<T, P1, P2, P3, P4, P5>
 {
-    get_member!(assets, Option<&'static T>, assets);
+    get_member!(assets, Option<DelphiBox<T>>, assets);
 
-    get_member_mut!(assets_mut, Option<&'static T>, assets);
+    get_member_mut!(assets_mut, Option<DelphiBox<T>>, assets);
 
     get_member!(names, UStr, names);
 

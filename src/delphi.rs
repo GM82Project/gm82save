@@ -68,6 +68,54 @@ macro_rules! delphi_call {
     }};
 }
 
+#[macro_export]
+macro_rules! delphi_box {
+    ($call: literal, $vmt: literal) => {{
+        DelphiBox::from_ptr(delphi_call!($call, $vmt, 1))
+    }};
+    ($call: literal, $vmt: literal, $($x:expr),*) => {{
+        DelphiBox::from_ptr(delphi_call!($call, $vmt, 1, $($x),*))
+    }};
+}
+
+#[repr(transparent)]
+pub struct DelphiBox<T>(ptr::NonNull<T>);
+
+unsafe impl<T> Send for DelphiBox<T> {}
+unsafe impl<T> Sync for DelphiBox<T> {}
+
+impl<T> DelphiBox<T> {
+    pub fn from_ptr(ptr: *mut T) -> Self {
+        unsafe { Self(ptr::NonNull::new_unchecked(ptr)) }
+    }
+
+    pub fn as_ptr(&self) -> *const T {
+        self.0.as_ptr()
+    }
+}
+
+impl<T> Drop for DelphiBox<T> {
+    fn drop(&mut self) {
+        unsafe {
+            let _: u32 = delphi_call!(0x405a7c, self.0.as_ref());
+        }
+    }
+}
+
+impl<T> std::ops::Deref for DelphiBox<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { self.0.as_ref() }
+    }
+}
+
+impl<T> std::ops::DerefMut for DelphiBox<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { self.0.as_mut() }
+    }
+}
+
 // this is really game maker specific but i left it here for simplicity
 #[repr(C)]
 pub struct TreeNodeData {
