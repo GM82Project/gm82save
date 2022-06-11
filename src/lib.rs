@@ -1250,7 +1250,8 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
             let _ = std::process::Command::new(editor_path).arg(&room_path).spawn().and_then(|mut c| c.wait());
             let _: u32 = delphi_call!(0x51acd8, *(0x790100 as *const u32)); // show main form
             {
-                let room = ide::ROOMS.assets()[room_id].as_deref().unwrap();
+                let room_opt = &mut ide::ROOMS.assets_mut()[room_id];
+                let room = room_opt.as_mut().unwrap();
                 // remove this room's ids from the global thing
                 if let Some((extra_inst, extra_tile)) = EXTRA_DATA.as_mut() {
                     for inst in room.get_instances() {
@@ -1260,7 +1261,8 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
                         extra_tile.remove(&tile.id);
                     }
                 }
-                let _: u32 = delphi_call!(0x405a7c, room); // delete room
+
+                *room_opt = None; // delete room
             }
             // reload room
             ide::ROOMS.assets_mut()[room_id] = Some(
