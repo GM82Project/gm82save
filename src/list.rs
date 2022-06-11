@@ -50,6 +50,16 @@ impl<T, const P: usize> DelphiList<T, P> {
             DynArraySetLength(&mut self.0, P as _, 1, len);
         }
     }
+
+    pub fn alloc_fill(&mut self, len: usize, f: impl Fn() -> T) {
+        self.alloc(len);
+        unsafe {
+            for dst in self.get_unchecked_mut(..len) {
+                let dst = dst as *mut T;
+                dst.write(f());
+            }
+        }
+    }
 }
 
 unsafe impl<T, const P: usize> Sync for DelphiList<T, P> {}

@@ -40,24 +40,12 @@ unsafe extern "fastcall" fn compile_constants(stream: usize) -> bool {
             .chain(rayon::iter::once(cnv(&room.creation_code)))
     });
     let object_iter = ide::OBJECTS.assets().into_par_iter().flatten().flat_map_iter(|o| {
-        o.events
-            .iter()
-            .flatten()
-            .filter_map(|e| e.as_ref())
-            .flat_map(|e| e.get_actions())
-            .filter_map(|a| a.as_ref())
-            .flat_map(|a| &a.param_strings)
-            .map(cnv)
+        o.events.iter().flatten().flat_map(|e| e.get_actions()).flat_map(|a| &a.param_strings).map(cnv)
     });
-    let timeline_iter = ide::TIMELINES.assets().into_par_iter().flatten().flat_map_iter(|t| {
-        t.get_events()
-            .iter()
-            .filter_map(|e| e.as_ref())
-            .flat_map(|e| e.get_actions())
-            .filter_map(|a| a.as_ref())
-            .flat_map(|a| &a.param_strings)
-            .map(cnv)
-    });
+    let timeline_iter =
+        ide::TIMELINES.assets().into_par_iter().flatten().flat_map_iter(|t| {
+            t.get_events().iter().flat_map(|e| e.get_actions()).flat_map(|a| &a.param_strings).map(cnv)
+        });
     let script_iter = ide::SCRIPTS.assets().into_par_iter().flatten().map(|s| cnv(&s.source));
     let trigger_iter = ide::get_triggers().into_par_iter().flatten().map(|t| cnv(&t.condition));
     let constant_iter = constant_values.par_iter().map(cnv);

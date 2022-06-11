@@ -143,7 +143,7 @@ unsafe fn read_resource_tree(
     Ok(())
 }
 
-unsafe fn load_triggers(maps: &AssetMaps, path: &mut PathBuf) -> Result<()> {
+fn load_triggers(maps: &AssetMaps, path: &mut PathBuf) -> Result<()> {
     path.push("triggers");
     let names = &maps.triggers.index;
     ide::alloc_triggers(names.len());
@@ -151,7 +151,7 @@ unsafe fn load_triggers(maps: &AssetMaps, path: &mut PathBuf) -> Result<()> {
         if name.is_empty() {
             continue
         }
-        let trig = &mut *Trigger::new();
+        let mut trig = Trigger::new();
         trig.name = UStr::new(name);
         path.push(name);
         path.set_extension("txt");
@@ -305,7 +305,7 @@ unsafe fn load_background(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result
     })?;
     if bg_exists {
         path.set_extension("png");
-        load_frame(path, &mut *bg.frame)?;
+        load_frame(path, &mut bg.frame)?;
     }
     Ok(bg)
 }
@@ -334,21 +334,20 @@ unsafe fn load_sprite(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<Del
     let frame_count = sp.frame_count as usize;
     for (i, f) in sp.alloc_frames(frame_count).iter_mut().enumerate() {
         path.push(format!("{}.png", i));
-        *f = Frame::new();
-        load_frame(&path, &mut **f)?;
+        load_frame(&path, f)?;
         path.pop();
     }
     Ok(sp)
 }
 
-unsafe fn load_script(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<DelphiBox<Script>> {
+fn load_script(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<DelphiBox<Script>> {
     path.set_extension("gml");
     let mut s = Script::new();
     s.source = load_gml(&read_file(path)?);
     Ok(s)
 }
 
-unsafe fn load_font(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<DelphiBox<Font>> {
+fn load_font(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<DelphiBox<Font>> {
     let mut f = Font::new();
     path.set_extension("txt");
     read_txt(path, |k, v| {
@@ -380,7 +379,7 @@ unsafe fn load_event(
             continue
         }
         let (params, code) = action_code.split_once("*/").ok_or_else(|| Error::SyntaxError(path.to_path_buf()))?;
-        let action = &mut *event.add_action(0, 0);
+        let action = event.add_action(0, 0);
         let mut lib_id_set = false;
         let mut act_id_set = false;
         for line in params.lines() {
@@ -549,7 +548,7 @@ unsafe fn load_object(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<Delp
             events::EV_TRIGGER => *trigger_map.get(ev_numb_s).ok_or_else(err)?,
             _ => ev_numb_s.parse()?,
         };
-        let event = &mut *obj.get_event(ev_type, ev_numb);
+        let event = obj.get_event(ev_type, ev_numb);
         load_event(&path, event, actions, asset_maps)?;
     }
     Ok(obj)
@@ -561,7 +560,7 @@ unsafe fn load_timeline(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<De
     let code = read_file(&path)?;
     let iter = code.trim_start_matches("#define ").split("\n#define ");
     let (events, times) = tl.alloc(iter.clone().count());
-    for (code, time_p, event_p) in izip!(iter, times, events) {
+    for (code, time_p, event) in izip!(iter, times, events) {
         if code.trim().is_empty() {
             continue
         }
@@ -571,14 +570,12 @@ unsafe fn load_timeline(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<De
             None => return Err(Error::SyntaxError(path.to_path_buf())),
         };
         *time_p = name.trim().parse()?;
-        let event = Event::new();
-        load_event(&path, &mut *event, actions, asset_maps)?;
-        *event_p = event;
+        load_event(&path, event, actions, asset_maps)?;
     }
     Ok(tl)
 }
 
-unsafe fn load_path(file_path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<DelphiBox<Path>> {
+fn load_path(file_path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<DelphiBox<Path>> {
     let mut path = Path::new();
     file_path.push("path.txt");
     let path_name =
@@ -894,8 +891,7 @@ unsafe fn load_included_files(path: &mut PathBuf) -> Result<()> {
     path.pop();
     let files: Vec<_> = index.par_lines().collect();
     ide::alloc_included_files(files.len());
-    for (fname, file_p) in files.iter().zip(ide::get_included_files_mut()) {
-        let file = &mut *IncludedFile::new();
+    for (fname, file) in files.iter().zip(ide::get_included_files_mut()) {
         file.file_name = UStr::new(fname);
         path.push(fname.to_string() + ".txt");
         read_txt(&path, |k, v| {
@@ -926,7 +922,6 @@ unsafe fn load_included_files(path: &mut PathBuf) -> Result<()> {
         }
         path.pop();
         path.pop();
-        *file_p = file;
     }
     path.pop();
     Ok(())

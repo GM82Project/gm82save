@@ -193,7 +193,7 @@ unsafe fn save_sprite(sprite: &Sprite, path: &mut PathBuf) -> Result<()> {
 
 unsafe fn save_background(back: &Background, path: &mut PathBuf) -> Result<()> {
     path.set_extension("png");
-    let frame = &*back.frame;
+    let frame = &back.frame;
     if frame.width != 0 && frame.height != 0 {
         save_frame(frame, &path)?;
     }
@@ -263,7 +263,6 @@ unsafe fn save_font(font: &Font, path: &mut PathBuf) -> Result<()> {
 
 unsafe fn event_needs_update(ev: &Event) -> bool {
     for action in ev.get_actions() {
-        let action = &**action;
         if ide::OBJECTS.timestamps().get_asset(action.applies_to) > LAST_SAVE {
             return true
         }
@@ -346,7 +345,6 @@ unsafe fn event_needs_update(ev: &Event) -> bool {
 unsafe fn save_event<F: Write>(ev: &Event, name: &str, file: &mut F) -> Result<()> {
     writeln!(file, "#define {}", name)?;
     for action in ev.get_actions() {
-        let action = &**action;
         writeln!(file, "{}", ACTION_TOKEN)?;
         writeln!(file, "lib_id={}", action.lib_id)?;
         writeln!(file, "action_id={}", action.id)?;
@@ -412,14 +410,13 @@ unsafe fn save_event<F: Write>(ev: &Event, name: &str, file: &mut F) -> Result<(
 }
 
 unsafe fn timeline_needs_update(tl: &Timeline) -> bool {
-    tl.get_events().iter().any(|e| event_needs_update(&**e))
+    tl.get_events().iter().any(|e| event_needs_update(e))
 }
 
 unsafe fn save_timeline(tl: &Timeline, path: &mut PathBuf) -> Result<()> {
     path.set_extension("gml");
     let mut f = open_file(path)?;
     for (time, event) in tl.get_times().iter().zip(tl.get_events()) {
-        let event = &**event;
         if event.action_count != 0 {
             save_event(event, &time.to_string(), &mut f)?;
         }
@@ -452,12 +449,12 @@ unsafe fn object_needs_update(obj: &Object) -> bool {
         || obj.parent_index >= 0
             && (ide::OBJECTS.assets().get_asset(obj.parent_index).is_none()
                 || ide::OBJECTS.timestamps().get_asset(obj.parent_index) > LAST_SAVE)
-        || obj.events.iter().flatten().any(|e| event_needs_update(&**e))
+        || obj.events.iter().flatten().any(|e| event_needs_update(e))
         || obj.events[events::EV_TRIGGER].is_empty() && *ide::TRIGGERS_UPDATED
         || obj.events[events::EV_COLLISION]
             .iter()
             .enumerate()
-            .any(|(i, e)| (**e).action_count != 0 && ide::OBJECTS.timestamps().get_asset(i as _) > LAST_SAVE)
+            .any(|(i, e)| e.action_count != 0 && ide::OBJECTS.timestamps().get_asset(i as _) > LAST_SAVE)
 }
 
 unsafe fn save_object(obj: &Object, path: &mut PathBuf) -> Result<()> {
@@ -478,7 +475,6 @@ unsafe fn save_object(obj: &Object, path: &mut PathBuf) -> Result<()> {
         let mut f = open_file(&path)?;
         for (ev_type, event_group) in obj.events.iter().enumerate() {
             for (ev_numb, ev) in event_group.iter().enumerate() {
-                let ev = &**ev; // all events in the array are non-null
                 if ev.action_count != 0 {
                     let name = event_name(ev_type, ev_numb);
                     save_event(ev, &name, &mut f)?;
@@ -764,7 +760,7 @@ unsafe fn save_settings(path: &mut PathBuf, smart_save: bool) -> Result<()> {
             let mut f = open_file(&path)?;
             for (extension, &loaded) in extensions.iter().zip(extensions_loaded) {
                 if loaded {
-                    writeln!(f, "{}", &(**extension).name.try_decode()?)?;
+                    writeln!(f, "{}", extension.name.try_decode()?)?;
                 }
             }
             f.flush()?;
@@ -1024,8 +1020,8 @@ unsafe fn save_icon_cache(path: &mut PathBuf, smart_save: bool) -> Result<()> {
     create_dirs(path)?;
     (ide::SPRITES.assets(), ide::SPRITES.names(), ide::SPRITES.timestamps()).into_par_iter().try_for_each(
         |(sprite, name, timestamp)| -> Result<()> {
-            if let Some(&frame) = sprite.as_deref().and_then(|s| s.get_frames().get(0)) {
-                save_frame(&*frame, name, path, smart_save && *timestamp < LAST_SAVE)?;
+            if let Some(frame) = sprite.as_deref().and_then(|s| s.get_frames().get(0)) {
+                save_frame(frame, name, path, smart_save && *timestamp < LAST_SAVE)?;
             }
             Ok(())
         },
@@ -1036,7 +1032,7 @@ unsafe fn save_icon_cache(path: &mut PathBuf, smart_save: bool) -> Result<()> {
     (ide::BACKGROUNDS.assets(), ide::BACKGROUNDS.names(), ide::BACKGROUNDS.timestamps()).into_par_iter().try_for_each(
         |(bg, name, timestamp)| -> Result<()> {
             if let Some(bg) = bg {
-                save_frame(&*bg.frame, name, path, smart_save && *timestamp < LAST_SAVE)?;
+                save_frame(&bg.frame, name, path, smart_save && *timestamp < LAST_SAVE)?;
             }
             Ok(())
         },

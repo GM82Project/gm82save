@@ -165,10 +165,6 @@ impl TTreeNode {
     pub unsafe fn new(name: &UStr, rtype: u32, kind: u32, index: usize) -> *const TTreeNode {
         delphi_call!(0x71cb48, name.0, rtype, kind, index)
     }
-
-    pub unsafe fn free(&self) {
-        let _: u32 = delphi_call!(0x405a7c, self);
-    }
 }
 
 #[repr(C)]
@@ -495,10 +491,6 @@ pub fn close_progress_form() {
     unsafe {
         let _: u32 = delphi_call!(0x6ca2cc);
     }
-}
-
-pub unsafe fn Free<T>(a: *const T) {
-    let _: u32 = delphi_call!(0x405a7c, a);
 }
 
 pub unsafe fn DynArrayClear<T, U>(a: *mut T, type_info: *const U) {

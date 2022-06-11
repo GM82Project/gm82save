@@ -7,7 +7,7 @@ use crate::{
 use std::slice;
 
 type IntPtr = *mut usize;
-type GaplessList<T, const P: usize> = *mut DelphiList<&'static T, P>;
+type GaplessList<T, const P: usize> = *mut DelphiList<DelphiBox<T>, P>;
 type TypeInfoPtr = usize;
 
 macro_rules! get_member {
@@ -169,7 +169,7 @@ impl<T, const P1: usize, const P2: usize, const P3: usize, const P4: usize, cons
     }
 }
 
-const TRIGGERS: *mut DelphiList<Option<&'static Trigger>, 0x6bc93c> = 0x77f3f4 as _;
+const TRIGGERS: *mut DelphiList<Option<DelphiBox<Trigger>>, 0x6bc93c> = 0x77f3f4 as _;
 const TRIGGER_COUNT: IntPtr = 0x77f3f8 as _;
 pub const TRIGGERS_UPDATED: *const bool = 0x790058 as _;
 
@@ -409,9 +409,9 @@ macro_rules! read_array {
 
 read_array!(get_constant_names, get_constant_names_mut, UStr, *CONSTANT_NAMES, *CONSTANT_COUNT);
 read_array!(get_constants, get_constants_mut, UStr, *CONSTANT_VALUES, *CONSTANT_COUNT);
-read_array!(get_triggers, get_triggers_mut, Option<&'static Trigger>, *TRIGGERS, *TRIGGER_COUNT);
+read_array!(get_triggers, get_triggers_mut, Option<DelphiBox<Trigger>>, *TRIGGERS, *TRIGGER_COUNT);
 
-read_array!(get_included_files, get_included_files_mut, &'static IncludedFile, *INCLUDED_FILES, *INCLUDED_FILE_COUNT);
+read_array!(get_included_files, get_included_files_mut, DelphiBox<IncludedFile>, *INCLUDED_FILES, *INCLUDED_FILE_COUNT);
 read_array!(
     get_included_file_timestamps,
     get_included_file_timestamps_mut,
@@ -419,7 +419,7 @@ read_array!(
     *INCLUDED_FILE_TIMESTAMPS,
     *INCLUDED_FILE_COUNT
 );
-read_array!(get_extensions, get_extensions_mut, &'static Extension, *EXTENSIONS, *EXTENSION_COUNT);
+read_array!(get_extensions, get_extensions_mut, DelphiBox<Extension>, *EXTENSIONS, *EXTENSION_COUNT);
 read_array!(get_extensions_loaded, get_extensions_loaded_mut, bool, *EXTENSIONS_LOADED, *EXTENSION_COUNT);
 
 pub fn get_action_libraries<'a>() -> &'a [&'a ActionLibrary] {
@@ -444,7 +444,7 @@ pub fn alloc_triggers(count: usize) {
 pub fn alloc_included_files(count: usize) {
     unsafe {
         INCLUDED_FILE_COUNT.write(count);
-        (*INCLUDED_FILES).alloc(count);
+        (*INCLUDED_FILES).alloc_fill(count, IncludedFile::new);
         (*INCLUDED_FILE_TIMESTAMPS).alloc(count);
     }
 }

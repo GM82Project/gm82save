@@ -19,16 +19,13 @@ impl GetAssetList for asset::Sprite {
         out.write_all(&self.origin_x.to_le_bytes()).unwrap();
         out.write_all(&self.origin_y.to_le_bytes()).unwrap();
         out.write_all(&self.frame_count.to_le_bytes()).unwrap();
-        for frame in self.get_frames().iter().filter_map(|f| unsafe { f.as_ref() }) {
+        for frame in self.get_frames() {
             if !exe {
                 save_frame(frame, &mut out);
             } else {
-                unsafe {
-                    let f: *mut asset::Frame = delphi_call!(0x701cf4, 0x700d94, 1, frame);
-                    let _: u32 = delphi_call!(0x5b0c74, f);
-                    save_frame(&*frame, &mut out);
-                    let _: u32 = delphi_call!(0x405a7c, f);
-                }
+                let mut f = frame.duplicate();
+                f.prepare_for_export();
+                save_frame(&f, &mut out);
             }
         }
         if !exe {
@@ -69,6 +66,7 @@ impl GetAssetList for asset::Sprite {
                 // TODO speed up
                 if !self.per_frame_colliders {
                     // create mask
+                    let f: &asset::Frame = &self.get_frames()[0];
                     let mut mask: *const Mask;
                     asm! {
                         "push dword ptr [{sprite}+0x1c]",
@@ -81,10 +79,11 @@ impl GetAssetList for asset::Sprite {
                         bbox = in(reg) &self.bbox_left,
                         inlateout("eax") 0x5ae848 => mask,
                         inlateout("edx") 1 => _,
-                        inlateout("ecx") self.get_frames()[0] => _,
+                        inlateout("ecx") f => _,
                     }
                     // merge mask
-                    for &f in &self.get_frames()[1..] {
+                    for f in &self.get_frames()[1..] {
+                        let f: &asset::Frame = f;
                         asm! {
                             "push {frame}",
                             "push dword ptr [{sprite}+0x10]",
@@ -104,6 +103,7 @@ impl GetAssetList for asset::Sprite {
                 } else {
                     // TODO
                     for f in self.get_frames() {
+                        let f: &asset::Frame = f;
                         // create mask
                         let mut mask: *const Mask;
                         asm! {
@@ -119,7 +119,7 @@ impl GetAssetList for asset::Sprite {
                             call = in(reg) 0x5aecac,
                             inlateout("eax") 0x5ae848 => mask,
                             inlateout("edx") 1 => _,
-                            inlateout("ecx") *f => _,
+                            inlateout("ecx") f => _,
                         }
                         write_mask(&*mask, &mut out);
                         // free mask
@@ -146,14 +146,11 @@ impl GetAssetList for asset::Background {
             out.write_all(&self.v_offset.to_le_bytes()).unwrap();
             out.write_all(&self.h_sep.to_le_bytes()).unwrap();
             out.write_all(&self.v_sep.to_le_bytes()).unwrap();
-            unsafe { save_frame(&*self.frame, out) };
+            save_frame(&self.frame, out);
         } else {
-            unsafe {
-                let f: *const asset::Frame = delphi_call!(0x701cf4, 0x700d94, 1, self.frame);
-                let _: u32 = delphi_call!(0x5b0c74, f);
-                save_frame(&*f, out);
-                let _: u32 = delphi_call!(0x405a7c, f);
-            }
+            let mut f = self.frame.duplicate();
+            f.prepare_for_export();
+            save_frame(&f, out);
         }
     }
 }

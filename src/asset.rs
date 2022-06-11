@@ -17,8 +17,8 @@ pub struct Trigger {
 }
 
 impl Trigger {
-    pub unsafe fn new() -> *mut Self {
-        delphi_call!(0x62d200, 0x62cf48, 1)
+    pub fn new() -> DelphiBox<Self> {
+        unsafe { delphi_box!(0x62d200, 0x62cf48) }
     }
 }
 
@@ -53,8 +53,8 @@ pub struct Frame {
 }
 
 impl Frame {
-    pub unsafe fn new() -> *mut Self {
-        delphi_call!(0x701bf8, 0x700d94, 1)
+    pub fn new() -> DelphiBox<Self> {
+        unsafe { delphi_box!(0x701bf8, 0x700d94) }
     }
 
     pub unsafe fn load_from_file(&mut self, file: &UStr) {
@@ -161,12 +161,22 @@ impl Frame {
             Self::register_thumb_raw(&icon, &mask)
         }
     }
+
+    pub fn duplicate(&self) -> DelphiBox<Self> {
+        unsafe { delphi_box!(0x701cf4, 0x700d94, self) }
+    }
+
+    pub fn prepare_for_export(&mut self) {
+        unsafe {
+            let _: u32 = delphi_call!(0x5b0c74, self);
+        }
+    }
 }
 
 #[repr(C)]
 pub struct Sprite {
     vmt: u32,
-    pub frame_count: u32,
+    pub frame_count: usize,
     pub origin_x: i32,
     pub origin_y: i32,
     pub collision_shape: u32,
@@ -177,7 +187,7 @@ pub struct Sprite {
     pub bbox_top: i32,
     pub bbox_right: i32,
     pub bbox_bottom: i32,
-    frames: DelphiList<*mut Frame, 0x5b2754>,
+    frames: DelphiList<DelphiBox<Frame>, 0x5b2754>,
 }
 
 impl Sprite {
@@ -189,19 +199,18 @@ impl Sprite {
         delphi_call!(0x5b401c, self)
     }
 
-    pub fn alloc_frames(&mut self, count: usize) -> &mut [*mut Frame] {
-        self.frames.alloc(count);
-        self.frame_count = count as u32;
-        unsafe { self.frames.get_unchecked_mut(..self.frame_count as usize) }
+    pub fn alloc_frames(&mut self, count: usize) -> &mut [DelphiBox<Frame>] {
+        self.frames.alloc_fill(count, Frame::new);
+        self.frame_count = count;
+        unsafe { self.frames.get_unchecked_mut(..self.frame_count) }
     }
 
-    pub fn get_frames(&self) -> &[*mut Frame] {
+    pub fn get_frames(&self) -> &[DelphiBox<Frame>] {
         unsafe { self.frames.get_unchecked(..self.frame_count as usize) }
     }
 
     pub unsafe fn register_thumb(&self, bg_col: [u8; 3]) -> i32 {
-        if let Some(frame) = self.get_frames().get(0).and_then(|f| f.as_ref()).filter(|f| f.width != 0 && f.height != 0)
-        {
+        if let Some(frame) = self.get_frames().get(0).filter(|f| f.width != 0 && f.height != 0) {
             frame.register_thumb(bg_col)
         } else {
             Frame::register_blank_thumb()
@@ -212,7 +221,7 @@ impl Sprite {
 #[repr(C)]
 pub struct Background {
     vmt: u32,
-    pub frame: *mut Frame,
+    pub frame: DelphiBox<Frame>,
     pub is_tileset: bool,
     pub tile_width: u32,
     pub tile_height: u32,
@@ -232,8 +241,8 @@ impl Background {
     }
 
     pub unsafe fn register_thumb(&self, bg_col: [u8; 3]) -> i32 {
-        if let Some(frame) = self.frame.as_ref().filter(|f| f.width != 0 && f.height != 0) {
-            frame.register_thumb(bg_col)
+        if self.frame.width != 0 && self.frame.height != 0 {
+            self.frame.register_thumb(bg_col)
         } else {
             Frame::register_blank_thumb()
         }
@@ -268,14 +277,16 @@ impl Path {
         unsafe { delphi_box!(0x5357b0, 0x534924) }
     }
 
-    pub unsafe fn commit(&mut self) {
-        let _: u32 = delphi_call!(0x53578c, self);
+    pub fn commit(&mut self) {
+        unsafe {
+            let _: u32 = delphi_call!(0x53578c, self);
+        }
     }
 
-    pub unsafe fn alloc_points(&mut self, count: usize) -> &mut [PathPoint] {
+    pub fn alloc_points(&mut self, count: usize) -> &mut [PathPoint] {
         self.point_count = count;
         self.points.alloc(count);
-        self.points.get_unchecked_mut(..count)
+        unsafe { self.points.get_unchecked_mut(..count) }
     }
 
     pub fn get_points(&self) -> &[PathPoint] {
@@ -356,20 +367,23 @@ impl Action {
 #[repr(C)]
 pub struct Event {
     vmt: u32,
-    actions: DelphiList<*const Action, 0x5a4be4>,
+    actions: DelphiList<DelphiBox<Action>, 0x5a4be4>,
     pub action_count: u32,
 }
 
 impl Event {
-    pub unsafe fn new() -> *mut Self {
-        delphi_call!(0x5a5048, 0x5a4c6c, 1)
+    pub fn new() -> DelphiBox<Self> {
+        unsafe { delphi_box!(0x5a5048, 0x5a4c6c) }
     }
 
-    pub unsafe fn add_action(&mut self, libid: u32, actid: u32) -> *mut Action {
-        delphi_call!(0x5a51d4, self, libid, actid)
+    pub fn add_action(&mut self, libid: u32, actid: u32) -> &mut Action {
+        unsafe {
+            let action: *mut Action = delphi_call!(0x5a51d4, self, libid, actid);
+            &mut *action
+        }
     }
 
-    pub fn get_actions(&self) -> &[*const Action] {
+    pub fn get_actions(&self) -> &[DelphiBox<Action>] {
         unsafe { self.actions.get_unchecked(..self.action_count as usize) }
     }
 }
@@ -377,7 +391,7 @@ impl Event {
 #[repr(C)]
 pub struct Timeline {
     vmt: u32,
-    pub moment_events: DelphiList<*mut Event, 0x5ad8c8>,
+    pub moment_events: DelphiList<DelphiBox<Event>, 0x5ad8c8>,
     pub moment_times: DelphiList<u32, 0x5ad900>,
     pub moment_count: usize,
 }
@@ -387,14 +401,14 @@ impl Timeline {
         unsafe { delphi_box!(0x5adf3c, 0x5ad98c) }
     }
 
-    pub unsafe fn alloc(&mut self, count: usize) -> (&mut [*mut Event], &mut [u32]) {
+    pub unsafe fn alloc(&mut self, count: usize) -> (&mut [DelphiBox<Event>], &mut [u32]) {
         self.moment_count = count;
-        self.moment_events.alloc(count);
+        self.moment_events.alloc_fill(count, Event::new);
         self.moment_times.alloc(count);
         (self.moment_events.get_unchecked_mut(..count), self.moment_times.get_unchecked_mut(..count))
     }
 
-    pub fn get_events(&self) -> &[*mut Event] {
+    pub fn get_events(&self) -> &[DelphiBox<Event>] {
         unsafe { self.moment_events.get_unchecked(..self.moment_count) }
     }
 
@@ -413,7 +427,7 @@ pub struct Object {
     pub persistent: bool,
     pub parent_index: i32,
     pub mask_index: i32,
-    pub events: [DelphiList<*mut Event, 0x5ad8c8>; 12],
+    pub events: [DelphiList<DelphiBox<Event>, 0x5ad8c8>; 12],
 }
 
 impl Object {
@@ -421,8 +435,11 @@ impl Object {
         unsafe { delphi_box!(0x7049a8, 0x704428) }
     }
 
-    pub unsafe fn get_event(&mut self, ev_type: usize, ev_numb: usize) -> *mut Event {
-        delphi_call!(0x704d74, self, ev_type, ev_numb)
+    pub fn get_event(&mut self, ev_type: usize, ev_numb: usize) -> &mut Event {
+        unsafe {
+            let event: *mut Event = delphi_call!(0x704d74, self, ev_type, ev_numb);
+            &mut *event
+        }
     }
 }
 
@@ -577,8 +594,8 @@ pub struct IncludedFile {
 }
 
 impl IncludedFile {
-    pub unsafe fn new() -> *mut Self {
-        delphi_call!(0x6ca800, 0x6ca360, 1)
+    pub fn new() -> DelphiBox<Self> {
+        unsafe { delphi_box!(0x6ca800, 0x6ca360) }
     }
 }
 
