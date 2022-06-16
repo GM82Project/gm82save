@@ -687,19 +687,29 @@ unsafe extern "C" fn dont_show_action_tooltip_if_event_is_null() {
 }
 
 #[naked]
-unsafe extern "C" fn object_form_set_parent_onclick() {
+unsafe extern "C" fn object_form_add_events() {
     asm! {
         // call original function
         "mov ecx, 0x6c60f8",
         "call ecx",
+
         // get parent label/button
         "mov eax, [ebx + 0x418]",
         // set its OnClick
-        "lea edx, {}",
+        "lea edx, {parent}",
         "mov [eax + 0x110], edx",
         "mov [eax + 0x114], ebx",
+
+        // get mask label/button
+        "mov eax, [ebx + 0x410]",
+        // set its OnClick
+        "lea edx, {mask}",
+        "mov [eax + 0x110], edx",
+        "mov [eax + 0x114], ebx",
+
         "ret",
-        sym object_open_parent,
+        parent = sym object_open_parent,
+        mask = sym object_open_mask,
         options(noreturn),
     }
 }
@@ -715,6 +725,20 @@ unsafe extern "C" fn object_open_parent() {
         "mov ecx, 0x62cde0",
         "jmp ecx",
         options(noreturn),
+    }
+}
+
+#[naked]
+unsafe extern "C" fn object_open_mask() {
+    asm! {
+    // get theobject from form
+    "mov eax, [eax + 0x45c]",
+    // get mask_index from object
+    "mov eax, [eax + 0x18]",
+    // open the form
+    "mov ecx, 0x6f5b74",
+    "jmp ecx",
+    options(noreturn),
     }
 }
 
@@ -1427,7 +1451,7 @@ unsafe fn injector() {
     patch_call(0x6f9043, dont_show_action_tooltip_if_event_is_null as _);
 
     // go to parent by clicking on parent button
-    patch_call(0x6c515e, object_form_set_parent_onclick as _);
+    patch_call(0x6c515e, object_form_add_events as _);
 
     // add scrolling to path form
     patch_call(0x71fdcb, path_form_mouse_wheel_inj as _);
