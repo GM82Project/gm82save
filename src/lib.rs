@@ -934,7 +934,7 @@ unsafe extern "C" fn get_treenode_count_and_preserve_resource_type() {
     asm! {
         "mov ecx, 0x4ad490",
         "call ecx",
-        "push edi",
+        "mov [esp], edi",
         "mov ecx, 0x71c6a5",
         "jmp ecx",
         options(noreturn),
