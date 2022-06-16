@@ -687,6 +687,38 @@ unsafe extern "C" fn dont_show_action_tooltip_if_event_is_null() {
 }
 
 #[naked]
+unsafe extern "C" fn object_form_set_parent_onclick() {
+    asm! {
+        // call original function
+        "mov ecx, 0x6c60f8",
+        "call ecx",
+        // get parent label/button
+        "mov eax, [ebx + 0x418]",
+        // set its OnClick
+        "lea edx, {}",
+        "mov [eax + 0x110], edx",
+        "mov [eax + 0x114], ebx",
+        "ret",
+        sym object_open_parent,
+        options(noreturn),
+    }
+}
+
+#[naked]
+unsafe extern "C" fn object_open_parent() {
+    asm! {
+        // get theobject from form
+        "mov eax, [eax + 0x45c]",
+        // get parent_index from object
+        "mov eax, [eax + 0x14]",
+        // open the form
+        "mov ecx, 0x62cde0",
+        "jmp ecx",
+        options(noreturn),
+    }
+}
+
+#[naked]
 unsafe extern "C" fn path_form_mouse_wheel_inj() {
     asm! {
         // call TPathForm.Create
@@ -1393,6 +1425,9 @@ unsafe fn injector() {
     // fix access violation when closing object/timeline window while mousing over action
     patch_call(0x6c6f6f, dont_show_action_tooltip_if_event_is_null as _);
     patch_call(0x6f9043, dont_show_action_tooltip_if_event_is_null as _);
+
+    // go to parent by clicking on parent button
+    patch_call(0x6c515e, object_form_set_parent_onclick as _);
 
     // add scrolling to path form
     patch_call(0x71fdcb, path_form_mouse_wheel_inj as _);
