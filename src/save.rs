@@ -1149,7 +1149,7 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
         path,
     )?;
     advance_progress_form(70);
-    if !smart_save || *ide::SCRIPTS_UPDATED {
+    if !smart_save || *ide::SCRIPTS_UPDATED || *ide::RESOURCE_TREE_UPDATED {
         save_assets(
             70,
             75,
