@@ -18,6 +18,94 @@ static mut WATCHER: Option<RecommendedWatcher> = None;
 
 static WATCHER_ERROR: Once = Once::new();
 
+unsafe extern "fastcall" fn show_message_and_reload() {
+    const SCREEN: *const *const *mut *const usize = 0x7882f0 as _;
+    // allow user to finish setting preferences
+    {
+        let screen = *SCREEN;
+        let current_modal = screen.add(0x74 / 4).read();
+        if !current_modal.is_null() {
+            let vmt = current_modal.read() as usize;
+            // is this TPreferencesForm?
+            if vmt == 0x7153c4 {
+                // call real TApplication.Idle and return
+                let _: u32 = delphi_call!(0x520418, *(0x7882ec as *const usize));
+                return
+            }
+        }
+    }
+
+    // reset TApplication.Idle
+    crate::patch_call(0x51f74b, 0x520418);
+    let message = UStr::new(format!(
+        "Project files have been modified outside Game Maker. Reload project? \
+                   Unsaved changes will be lost.\r\n\
+                   If you click \"No\", saving will overwrite any foreign changes.",
+    ));
+    let mut answer: i32;
+    asm! {
+        "push 0",  // HelpFileName
+        "push -1", // Y
+        "push -1", // X
+        "push 0",  // HelpCtx
+        "call {}",
+        in(reg) 0x4d437c, // MessageDlgPosHelp
+        inlateout("eax") message.0 => answer,
+        inlateout("edx") 3 => _, // DlgType
+        inlateout("ecx") 3 => _, // Buttons
+    }
+    if answer == 6 {
+        // yes -> reload project
+        // but first, close all modals
+        // this is done by patching the TApplication.Idle call in TApplication.HandleMessage
+        // so that instead of idling after each form is closed, it closes the next form
+        static mut OLD_ONCLOSE: usize = 0;
+        static mut OLD_ONCLOSE_SENDER: usize = 0;
+        #[naked]
+        unsafe extern "fastcall" fn put_old_onclose_back() {
+            asm! {
+                "mov edx, {}",
+                "mov [eax + 0x2f0], edx",
+                "mov edx, {}",
+                "mov [eax + 0x2f4], edx",
+                "ret",
+                sym OLD_ONCLOSE,
+                sym OLD_ONCLOSE_SENDER,
+                options(noreturn),
+            }
+        }
+        unsafe extern "fastcall" fn instead_of_idle() {
+            let screen = *SCREEN;
+            // get TScreen.FSaveFocusedList
+            let list = screen.add(0x78 / 4).read();
+            // check if that list's Count is 0 (i.e. no modals open)
+            if !list.add(2).read().is_null() {
+                // there are more modals
+                // get
+                let current_modal = screen.add(0x74 / 4).read();
+                // back up current modal's OnClose and replace with our own
+                let onclose_ptr = current_modal.add(0x2f0 / 4);
+                OLD_ONCLOSE = *onclose_ptr as _;
+                OLD_ONCLOSE_SENDER = *onclose_ptr.add(1) as _;
+                *onclose_ptr = put_old_onclose_back as _;
+                *onclose_ptr.add(1) = current_modal as _;
+                // let the modal know it should close
+                current_modal.add(0x2b8 / 4).write(2 as _);
+            } else {
+                // put original TApplication.Idle back
+                crate::patch_call(0x51f74b, 0x520418);
+                // reload
+                let _: u32 = delphi_call!(0x7059d8, (*ide::PROJECT_PATH).0);
+            }
+        }
+        // patch TApplication.Idle call in TApplication.HandleMessage to close modals instead
+        crate::patch_call(0x51f74b, instead_of_idle as _);
+    } else {
+        // no -> mark project as modified
+        ide::SETTINGS_UPDATED.write(true);
+    }
+}
+
 extern "fastcall" fn on_notify() {
     let lock = WATCHER_CHANNEL.lock();
     while let Some(_event) = lock.1.try_recv().ok().filter(|event| match event {
@@ -39,32 +127,11 @@ extern "fastcall" fn on_notify() {
         drop(lock);
         unwatch();
         unsafe {
-            let message = UStr::new(format!(
-                "Project files have been modified outside Game Maker. Reload project? \
-                   Unsaved changes will be lost.\r\n\
-                   If you click \"No\", saving will overwrite any foreign changes.",
-            ));
-            let mut answer: i32;
-            asm! {
-                "push 0",  // HelpFileName
-                "push -1", // Y
-                "push -1", // X
-                "push 0",  // HelpCtx
-                "call {}",
-                in(reg) 0x4d437c, // MessageDlgPosHelp
-                inlateout("eax") message.0 => answer,
-                inlateout("edx") 3 => _, // DlgType
-                inlateout("ecx") 3 => _, // Buttons
-            }
-            if answer == 6 {
-                // yes -> reload project
-                let _: u32 = delphi_call!(0x7059d8, (*ide::PROJECT_PATH).0);
-            } else {
-                // no -> mark project as modified
-                ide::SETTINGS_UPDATED.write(true);
-            }
-            break
-        };
+            // patch TApplication.Idle so it only pops the question after any dialogs are done
+            // (note: not modals, i actually have some level of control over those)
+            crate::patch_call(0x51f74b, show_message_and_reload as _);
+        }
+        break
     }
 }
 
