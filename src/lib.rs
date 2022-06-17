@@ -743,6 +743,47 @@ unsafe extern "C" fn object_open_mask() {
 }
 
 #[naked]
+unsafe extern "C" fn object_show_children_inj() {
+    asm! {
+        "mov ecx, eax",
+        "jmp {}",
+        sym object_show_children,
+        options(noreturn),
+    }
+}
+
+unsafe extern "fastcall" fn object_show_children(object_form: *const i32) {
+    const RESULT_PTR: *mut i32 = 0x79a9f0 as _;
+    *RESULT_PTR = -100;
+    let object_index = object_form.add(0x46c / 4).read();
+    let mut popup = delphi::TPopupMenu::new(0);
+    popup.SetAutoHotkeys(1);
+    popup.SetImages();
+
+    let mut children = ide::OBJECTS
+        .assets()
+        .iter()
+        .enumerate()
+        .filter_map(|(i, o)| Some((i, o.as_ref()?)))
+        .filter(|(_, o)| o.parent_index == object_index)
+        .map(|(i, _)| i)
+        .peekable();
+
+    if children.peek().is_some() {
+        for obj in children {
+            popup.Items.add_with_fake_tree_node(&ide::OBJECTS.names()[obj], 3, 1, obj, None);
+        }
+    } else {
+        let mut menu_item = TMenuItem::new(0);
+        menu_item.set_caption(&UStr::new("<no children>"));
+        menu_item.set_image_index(-1);
+        popup.Items.add(menu_item);
+    }
+    popup.popup_at_cursor_pos();
+    let _: u32 = delphi_call!(0x62cde0, *RESULT_PTR);
+}
+
+#[naked]
 unsafe extern "C" fn path_form_mouse_wheel_inj() {
     asm! {
         // call TPathForm.Create

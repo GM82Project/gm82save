@@ -14,7 +14,7 @@ macro_rules! check_call {
         if $call & 3 != 0 {
             crate::show_message(format!("can you let floogle know {:#x} isn't a valid function thanks", $call));
         }
-    }}
+    }};
 }
 
 #[macro_export]
@@ -204,9 +204,38 @@ pub struct TTreeView {
 }
 
 #[repr(C)]
-pub struct TMenuItem {}
+pub struct TMenuItem {
+    padding: [u8; 12],
+    pub Tag: i32,
+    padding2: [u8; 136 - 12],
+    pub OnClick: usize,
+}
 
 impl TMenuItem {
+    pub fn new(parent: usize) -> DelphiBox<Self> {
+        unsafe { delphi_box!(0x4d89cc, 0x4d5e80, parent) }
+    }
+
+    pub fn set_caption(&mut self, caption: &UStr) {
+        unsafe {
+            let _: u32 = delphi_call!(0x4dbc6c, self, caption.0);
+        }
+    }
+
+    pub fn set_image_index(&mut self, image_index: i32) {
+        unsafe {
+            let _: u32 = delphi_call!(0x4dbe60, self, image_index);
+        }
+    }
+
+    pub fn add(&mut self, added: DelphiBox<Self>) {
+        unsafe {
+            let added: &Self = &added;
+            let _: u32 = delphi_call!(0x4dc190, self, added);
+        }
+        std::mem::forget(added);
+    }
+
     pub fn add_from_tree_node(&self, tree_node: &TTreeNode, custom_events: Option<&[u32; 6]>) {
         const BLANK_EVENTS: [u32; 6] = [0; 6];
         unsafe {
@@ -239,6 +268,42 @@ impl TMenuItem {
         let data = TreeNodeData { unknown: 0, rtype, kind, index };
         let node = TTreeNode { unknown: 0x49614c, name: name.clone(), data: &data };
         self.add_from_tree_node(&node, custom_events);
+    }
+}
+
+#[repr(C)]
+pub struct TPopupMenu {
+    padding: [u8; 0x38],
+    pub Items: &'static mut TMenuItem,
+}
+
+impl TPopupMenu {
+    pub fn new(parent: usize) -> DelphiBox<Self> {
+        unsafe { delphi_box!(0x4dee2c, 0x4d7824, parent) }
+    }
+
+    pub fn SetAutoHotkeys(&mut self, hotkeys: u8) {
+        unsafe {
+            let _: u32 = delphi_call!(0x4de514, self, u32::from(hotkeys));
+        }
+    }
+
+    pub fn SetImages(&mut self) {
+        unsafe {
+            let _: u32 = delphi_call!(0x4de0a0, self, *(0x789b38 as *const usize));
+        }
+    }
+
+    pub fn popup_at_cursor_pos(&self) {
+        let mouse_pos: [i32; 2] = [0, 0];
+        unsafe {
+            // TMouse.GetCursorPos
+            let _: u32 = delphi_call!(0x4fd580, 0, mouse_pos.as_ptr());
+            // TPopupMenu.PopUp
+            let _: u32 = delphi_call!(0x4def94, self, mouse_pos[0], mouse_pos[1]);
+            // TApplication.ProcessMessages
+            let _: u32 = delphi_call!(0x51f71c, *(0x7882ec as *const usize));
+        }
     }
 }
 
