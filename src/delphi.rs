@@ -7,9 +7,20 @@ use std::{
     ptr, slice,
 };
 
+// this gets optimized out in release mode so it's fine
+#[macro_export]
+macro_rules! check_call {
+    ($call: literal) => {{
+        if $call & 3 != 0 {
+            crate::show_message(format!("can you let floogle know {:#x} isn't a valid function thanks", $call));
+        }
+    }}
+}
+
 #[macro_export]
 macro_rules! delphi_call {
     ($call: literal) => {{
+        crate::check_call!($call);
         let out;
         std::arch::asm! {
             "call {call}",
@@ -21,6 +32,7 @@ macro_rules! delphi_call {
         out
     }};
     ($call: literal, $a: expr) => {{
+        crate::check_call!($call);
         let out;
         std::arch::asm! {
             "call {call}",
@@ -32,6 +44,7 @@ macro_rules! delphi_call {
         out
     }};
     ($call: literal, $a: expr, $b: expr) => {{
+        crate::check_call!($call);
         let out;
         std::arch::asm! {
             "call {call}",
@@ -43,6 +56,7 @@ macro_rules! delphi_call {
         out
     }};
     ($call: literal, $a: expr, $b: expr, $c: expr) => {{
+        crate::check_call!($call);
         let out;
         std::arch::asm! {
             "call {call}",
@@ -54,6 +68,7 @@ macro_rules! delphi_call {
         out
     }};
     ($call: literal, $a: expr, $b: expr, $c: expr, $d: expr) => {{
+        crate::check_call!($call);
         let out;
         std::arch::asm! {
             "push {arg4}",
@@ -188,6 +203,7 @@ pub struct TTreeView {
     pub nodes: *const TTreeNodes,
 }
 
+#[repr(C)]
 pub struct TMenuItem {}
 
 impl TMenuItem {
@@ -226,6 +242,7 @@ impl TMenuItem {
     }
 }
 
+#[repr(C)]
 pub struct TBitmap {}
 
 impl TBitmap {
@@ -262,6 +279,7 @@ impl TBitmap {
     }
 }
 
+#[repr(C)]
 pub struct TIcon {}
 
 impl TIcon {
@@ -274,6 +292,7 @@ impl TIcon {
     }
 }
 
+#[repr(C)]
 pub struct TMemoryStream {
     // fields are dangerous to use
     vmt: u32,
