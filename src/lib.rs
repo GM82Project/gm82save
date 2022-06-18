@@ -1475,6 +1475,17 @@ unsafe fn injector() {
     patch(0x68ef02, &[0xe9]);
     patch_call(0x68ef02, fix_tile_null_pointer as _);
 
+    // no need to refresh icon or redraw tree when closing resource forms
+    patch(0x64e133, &[0x90; 10]);
+    patch(0x6f5c1b, &[0x90; 10]);
+    patch(0x722af3, &[0x90; 5]);
+    patch(0x62ce43, &[0x90; 5]);
+    patch(0x6525ab, &[0x90; 5]);
+    patch(0x655f1b, &[0x90; 5]);
+    patch(0x6931d7, &[0x90; 5]);
+    patch(0x6fa8bb, &[0x90; 5]);
+    patch(0x6fcf0b, &[0x90; 5]);
+
     // fix memory leak in image editor
     patch_call(0x643bd0, free_image_editor_bitmap as _);
 
