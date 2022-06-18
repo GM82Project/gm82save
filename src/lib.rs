@@ -670,6 +670,30 @@ unsafe extern "C" fn floor_st0() {
 }
 
 #[naked]
+unsafe extern "C" fn update_sprite_icon_on_revert() {
+    asm! {
+        "mov ecx, 0x6f5980",
+        "call ecx",
+        "mov eax, [ebx + 0x40c]",
+        "mov ecx, 0x6f5bb4",
+        "jmp ecx",
+        options(noreturn),
+    }
+}
+
+#[naked]
+unsafe extern "C" fn update_background_icon_on_revert() {
+    asm! {
+        "mov ecx, 0x64de98",
+        "call ecx",
+        "mov eax, [ebx + 0x400]",
+        "mov ecx, 0x64e0cc",
+        "jmp ecx",
+        options(noreturn),
+    }
+}
+
+#[naked]
 unsafe extern "C" fn dont_show_action_tooltip_if_event_is_null() {
     asm! {
         // if eax is not null, call CEvent.GetAction
@@ -1485,6 +1509,10 @@ unsafe fn injector() {
     patch(0x6931d7, &[0x90; 5]);
     patch(0x6fa8bb, &[0x90; 5]);
     patch(0x6fcf0b, &[0x90; 5]);
+
+    // but do refresh icon when changes aren't saved
+    patch_call(0x6f5152, update_sprite_icon_on_revert as _);
+    patch_call(0x64d66a, update_background_icon_on_revert as _);
 
     // fix memory leak in image editor
     patch_call(0x643bd0, free_image_editor_bitmap as _);
