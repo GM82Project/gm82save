@@ -731,9 +731,17 @@ unsafe extern "C" fn object_form_add_events() {
         "mov [eax + 0x110], edx",
         "mov [eax + 0x114], ebx",
 
+        // get "depth label" / children button
+        "mov eax, [ebx + 0x414]",
+        // set its OnClick
+        "lea edx, {children}",
+        "mov [eax + 0x110], edx",
+        "mov [eax + 0x114], ebx",
+
         "ret",
         parent = sym object_open_parent,
         mask = sym object_open_mask,
+        children = sym object_show_children_inj,
         options(noreturn),
     }
 }
