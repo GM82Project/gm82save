@@ -176,6 +176,9 @@ pub fn setup_watcher(path: &mut PathBuf) {
                 path.push("scripts");
                 watcher.watch(&path, RecursiveMode::Recursive)?;
                 path.pop();
+                path.push("settings");
+                watcher.watch(&path, RecursiveMode::Recursive)?;
+                path.pop();
                 path.push("sounds");
                 watcher.watch(&path, RecursiveMode::Recursive)?;
                 path.pop();
