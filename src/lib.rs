@@ -1525,6 +1525,13 @@ unsafe fn injector() {
     // fix memory leak in image editor
     patch_call(0x643bd0, free_image_editor_bitmap as _);
 
+    // get default blend mode from form in image editor
+    patch(0x64654d, &[
+        0x8b, 0xc3, // mov eax, ebx
+        0xe8, 0x58, 0xf6, 0xff, 0xff, // call TImageEditorForm.DrawModeGroupClick
+        0x90, 0x90, 0x90, // nops
+    ]);
+
     // copy origin when New
     patch_call(0x6ee2f8, copy_origin_on_new as _);
 
