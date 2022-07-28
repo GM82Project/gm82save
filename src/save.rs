@@ -1247,7 +1247,12 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
         save_included_files(path, smart_save)?;
     }
 
-    if !smart_save || *ide::SPRITES_UPDATED || *ide::BACKGROUNDS_UPDATED {
+    if !smart_save || *ide::SPRITES_UPDATED || *ide::BACKGROUNDS_UPDATED || {
+        path.push("cache");
+        let exists = path.exists();
+        path.pop();
+        !exists
+    } {
         save_icon_cache(path, smart_save)?;
     }
 
