@@ -1,12 +1,18 @@
-use crate::{asset, delphi, ide, AssetListTrait, InstanceExtra, TileExtra, UStr, DEFLATE_LEVEL, EXTRA_DATA};
+use crate::{
+    asset, delphi, delphi::TMemoryStream, ide, AssetListTrait, InstanceExtra, TileExtra, UStr, DEFLATE_LEVEL,
+    EXTRA_DATA,
+};
+use byteorder::{WriteBytesExt, LE};
 use flate2::{write::ZlibEncoder, Compression};
 use rayon::prelude::*;
-use std::{arch::asm, io::Write, ptr, slice};
+use std::{arch::asm, io, io::Write, ptr, slice};
 
 pub trait GetAssetList: Sync + 'static {
     fn get_asset_list() -> &'static dyn AssetListTrait<Self>;
-    fn save(&self, exe: bool, out: impl Write);
-    fn write_additional(_stream: usize) {}
+    fn save(&self, exe: bool, out: impl Write) -> io::Result<()>;
+    fn write_additional(_stream: &mut TMemoryStream) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 impl GetAssetList for asset::Sprite {
@@ -14,31 +20,31 @@ impl GetAssetList for asset::Sprite {
         &ide::SPRITES
     }
 
-    fn save(&self, exe: bool, mut out: impl Write) {
-        out.write_all(&800u32.to_le_bytes()).unwrap();
-        out.write_all(&self.origin_x.to_le_bytes()).unwrap();
-        out.write_all(&self.origin_y.to_le_bytes()).unwrap();
-        out.write_all(&self.frame_count.to_le_bytes()).unwrap();
+    fn save(&self, exe: bool, mut out: impl Write) -> io::Result<()> {
+        out.write_u32::<LE>(800)?;
+        out.write_i32::<LE>(self.origin_x)?;
+        out.write_i32::<LE>(self.origin_y)?;
+        out.write_u32::<LE>(self.frame_count as u32)?;
         for frame in self.get_frames() {
             if !exe {
-                save_frame(frame, &mut out);
+                save_frame(frame, &mut out)?;
             } else {
                 let mut f = frame.duplicate();
                 f.prepare_for_export();
-                save_frame(&f, &mut out);
+                save_frame(&f, &mut out)?;
             }
         }
         if !exe {
-            out.write_all(&self.collision_shape.to_le_bytes()).unwrap();
-            out.write_all(&self.alpha_tolerance.to_le_bytes()).unwrap();
+            out.write_u32::<LE>(self.collision_shape)?;
+            out.write_u32::<LE>(self.alpha_tolerance)?;
         }
-        out.write_all(&u32::to_le_bytes(self.per_frame_colliders.into())).unwrap();
+        out.write_u32::<LE>(self.per_frame_colliders.into())?;
         if !exe {
-            out.write_all(&self.bbox_type.to_le_bytes()).unwrap();
-            out.write_all(&self.bbox_left.to_le_bytes()).unwrap();
-            out.write_all(&self.bbox_right.to_le_bytes()).unwrap();
-            out.write_all(&self.bbox_bottom.to_le_bytes()).unwrap();
-            out.write_all(&self.bbox_top.to_le_bytes()).unwrap();
+            out.write_u32::<LE>(self.bbox_type)?;
+            out.write_i32::<LE>(self.bbox_left)?;
+            out.write_i32::<LE>(self.bbox_right)?;
+            out.write_i32::<LE>(self.bbox_bottom)?;
+            out.write_i32::<LE>(self.bbox_top)?;
         } else if self.frame_count > 0 {
             unsafe {
                 #[repr(C)]
@@ -49,19 +55,20 @@ impl GetAssetList for asset::Sprite {
                     i_mask: *const *const u8,
                     i_bbox: [u32; 4],
                 }
-                unsafe fn write_mask(mask: &Mask, mut out: impl Write) {
-                    write_int(800, &mut out);
-                    write_int(mask.i_w, &mut out);
-                    write_int(mask.i_h, &mut out);
-                    write_int(mask.i_bbox[0], &mut out);
-                    write_int(mask.i_bbox[2], &mut out);
-                    write_int(mask.i_bbox[3], &mut out);
-                    write_int(mask.i_bbox[1], &mut out);
+                unsafe fn write_mask(mask: &Mask, mut out: impl Write) -> io::Result<()> {
+                    out.write_u32::<LE>(800)?;
+                    out.write_u32::<LE>(mask.i_w)?;
+                    out.write_u32::<LE>(mask.i_h)?;
+                    out.write_u32::<LE>(mask.i_bbox[0])?;
+                    out.write_u32::<LE>(mask.i_bbox[2])?;
+                    out.write_u32::<LE>(mask.i_bbox[3])?;
+                    out.write_u32::<LE>(mask.i_bbox[1])?;
                     for y in 0..mask.i_h as usize {
                         for x in 0..mask.i_w as usize {
-                            write_int(mask.i_mask.add(x).read().add(y).read().into(), &mut out);
+                            out.write_u32::<LE>(mask.i_mask.add(x).read().add(y).read().into())?;
                         }
                     }
+                    Ok(())
                 }
                 // TODO speed up
                 if !self.per_frame_colliders {
@@ -97,7 +104,7 @@ impl GetAssetList for asset::Sprite {
                             inlateout("ecx") self.bbox_type => _,
                         }
                     }
-                    write_mask(&*mask, &mut out);
+                    write_mask(&*mask, &mut out)?;
                     // free mask
                     let _: u32 = delphi_call!(0x405a7c, mask);
                 } else {
@@ -121,13 +128,14 @@ impl GetAssetList for asset::Sprite {
                             inlateout("edx") 1 => _,
                             inlateout("ecx") f => _,
                         }
-                        write_mask(&*mask, &mut out);
+                        write_mask(&*mask, &mut out)?;
                         // free mask
                         let _: u32 = delphi_call!(0x405a7c, mask);
                     }
                 }
             }
         }
+        Ok(())
     }
 }
 
@@ -136,22 +144,23 @@ impl GetAssetList for asset::Background {
         &ide::BACKGROUNDS
     }
 
-    fn save(&self, exe: bool, mut out: impl Write) {
-        out.write_all(&710u32.to_le_bytes()).unwrap();
+    fn save(&self, exe: bool, mut out: impl Write) -> io::Result<()> {
+        out.write_u32::<LE>(710)?;
         if !exe {
-            out.write_all(&u32::to_le_bytes(self.is_tileset.into())).unwrap();
-            out.write_all(&self.tile_width.to_le_bytes()).unwrap();
-            out.write_all(&self.tile_height.to_le_bytes()).unwrap();
-            out.write_all(&self.h_offset.to_le_bytes()).unwrap();
-            out.write_all(&self.v_offset.to_le_bytes()).unwrap();
-            out.write_all(&self.h_sep.to_le_bytes()).unwrap();
-            out.write_all(&self.v_sep.to_le_bytes()).unwrap();
-            save_frame(&self.frame, out);
+            out.write_u32::<LE>(self.is_tileset.into())?;
+            out.write_u32::<LE>(self.tile_width)?;
+            out.write_u32::<LE>(self.tile_height)?;
+            out.write_u32::<LE>(self.h_offset)?;
+            out.write_u32::<LE>(self.v_offset)?;
+            out.write_u32::<LE>(self.h_sep)?;
+            out.write_u32::<LE>(self.v_sep)?;
+            save_frame(&self.frame, out)?;
         } else {
             let mut f = self.frame.duplicate();
             f.prepare_for_export();
-            save_frame(&f, out);
+            save_frame(&f, out)?;
         }
+        Ok(())
     }
 }
 
@@ -160,22 +169,23 @@ impl GetAssetList for asset::Path {
         &ide::PATHS
     }
 
-    fn save(&self, exe: bool, mut out: impl Write) {
-        write_int(530, &mut out);
-        write_int(self.connection, &mut out);
-        write_int(self.closed.into(), &mut out);
-        write_int(self.precision, &mut out);
+    fn save(&self, exe: bool, mut out: impl Write) -> io::Result<()> {
+        out.write_u32::<LE>(530)?;
+        out.write_u32::<LE>(self.connection)?;
+        out.write_u32::<LE>(self.closed.into())?;
+        out.write_u32::<LE>(self.precision)?;
         if !exe {
-            write_int(self.path_editor_room_background as _, &mut out);
-            write_int(self.snap_x, &mut out);
-            write_int(self.snap_y, &mut out);
+            out.write_u32::<LE>(self.path_editor_room_background as _)?;
+            out.write_u32::<LE>(self.snap_x)?;
+            out.write_u32::<LE>(self.snap_y)?;
         }
-        write_int(self.point_count as _, &mut out);
+        out.write_u32::<LE>(self.point_count as _)?;
         for p in self.get_points() {
-            write_f64(p.x, &mut out);
-            write_f64(p.y, &mut out);
-            write_f64(p.speed, &mut out);
+            out.write_f64::<LE>(p.x)?;
+            out.write_f64::<LE>(p.y)?;
+            out.write_f64::<LE>(p.speed)?;
         }
+        Ok(())
     }
 }
 
@@ -184,9 +194,10 @@ impl GetAssetList for asset::Script {
         &ide::SCRIPTS
     }
 
-    fn save(&self, _exe: bool, mut out: impl Write) {
-        out.write_all(&800u32.to_le_bytes()).unwrap();
-        write_string(&self.source, out);
+    fn save(&self, _exe: bool, mut out: impl Write) -> io::Result<()> {
+        out.write_u32::<LE>(800)?;
+        write_string(&self.source, out)?;
+        Ok(())
     }
 }
 
@@ -201,41 +212,40 @@ impl GetAssetList for asset::Font {
         &ide::FONTS
     }
 
-    fn save(&self, exe: bool, mut out: impl Write) {
-        write_int(800, &mut out);
-        write_string(&self.sys_name, &mut out);
-        write_int(self.size, &mut out);
-        write_int(self.bold.into(), &mut out);
-        write_int(self.italic.into(), &mut out);
+    fn save(&self, exe: bool, mut out: impl Write) -> io::Result<()> {
+        out.write_u32::<LE>(800)?;
+        write_string(&self.sys_name, &mut out)?;
+        out.write_u32::<LE>(self.size)?;
+        out.write_u32::<LE>(self.bold.into())?;
+        out.write_u32::<LE>(self.italic.into())?;
         let charset = if self.charset == 1 { 0 } else { self.charset };
-        write_int((self.range_start & 0xffff) | (charset << 16) | ((self.aa_level + 1) << 24), &mut out);
-        write_int(self.range_end, &mut out);
+        out.write_u32::<LE>((self.range_start & 0xffff) | (charset << 16) | ((self.aa_level + 1) << 24))?;
+        out.write_u32::<LE>(self.range_end)?;
         if exe {
-            unsafe {
-                let _: u32 = delphi_call!(0x5a809c, self);
-            }
+            self.render();
             for i in 0..256 {
-                write_int(self.s_x[i], &mut out);
-                write_int(self.s_y[i], &mut out);
-                write_int(self.s_w[i], &mut out);
-                write_int(self.s_h[i], &mut out);
-                write_int(self.s_shift[i], &mut out);
-                write_int(self.s_offset[i], &mut out);
+                out.write_u32::<LE>(self.s_x[i])?;
+                out.write_u32::<LE>(self.s_y[i])?;
+                out.write_u32::<LE>(self.s_w[i])?;
+                out.write_u32::<LE>(self.s_h[i])?;
+                out.write_u32::<LE>(self.s_shift[i])?;
+                out.write_u32::<LE>(self.s_offset[i])?;
             }
-            write_int(self.s_bw, &mut out);
-            write_int(self.s_bh, &mut out);
-            write_int(self.s_bw * self.s_bh, &mut out);
+            out.write_u32::<LE>(self.s_bw)?;
+            out.write_u32::<LE>(self.s_bh)?;
             unsafe {
-                out.write_all(slice::from_raw_parts(self.s_bytes, (self.s_bw * self.s_bh) as usize)).unwrap();
+                write_buffer(slice::from_raw_parts(self.s_bytes, (self.s_bw * self.s_bh) as usize), out)?;
                 delphi::DynArraySetLength((&self.s_bytes) as *const *mut u8 as *mut *mut u8, 0x5a65a4 as _, 1, 0);
             }
         }
+        Ok(())
     }
 
-    fn write_additional(_stream: usize) {
+    fn write_additional(_stream: &mut TMemoryStream) -> io::Result<()> {
         unsafe {
             *delphi::DPI = OLD_DPI;
         }
+        Ok(())
     }
 }
 
@@ -244,183 +254,177 @@ impl GetAssetList for asset::Room {
         &ide::ROOMS
     }
 
-    fn save(&self, exe: bool, mut out: impl Write) {
+    fn save(&self, exe: bool, mut out: impl Write) -> io::Result<()> {
         unsafe {
             let _: u32 = delphi_call!(0x6576fc, self); // clean unused assets
         }
         let extra_data = unsafe { EXTRA_DATA.as_ref() };
         let version: u32 = if exe && extra_data.is_some() { 811 } else { 541 };
-        write_int(version, &mut out);
-        write_string(&self.caption, &mut out);
-        write_int(self.width, &mut out);
-        write_int(self.height, &mut out);
+        out.write_u32::<LE>(version)?;
+        write_string(&self.caption, &mut out)?;
+        out.write_u32::<LE>(self.width)?;
+        out.write_u32::<LE>(self.height)?;
         if !exe {
-            write_int(self.snap_x, &mut out);
-            write_int(self.snap_y, &mut out);
-            write_int(self.isometric.into(), &mut out);
+            out.write_u32::<LE>(self.snap_x)?;
+            out.write_u32::<LE>(self.snap_y)?;
+            out.write_u32::<LE>(self.isometric.into())?;
         }
-        write_int(self.speed, &mut out);
-        write_int(self.persistent.into(), &mut out);
-        write_int(self.bg_colour as _, &mut out);
-        write_int(u32::from(self.clear_screen) | (u32::from(self.clear_view) << 1), &mut out);
-        write_string(&self.creation_code, &mut out);
-        write_int(8, &mut out);
+        out.write_u32::<LE>(self.speed)?;
+        out.write_u32::<LE>(self.persistent.into())?;
+        out.write_u32::<LE>(self.bg_colour as _)?;
+        out.write_u32::<LE>(u32::from(self.clear_screen) | (u32::from(self.clear_view) << 1))?;
+        write_string(&self.creation_code, &mut out)?;
+        out.write_u32::<LE>(8)?;
         for b in &self.backgrounds {
-            write_int(b.visible_on_start.into(), &mut out);
-            write_int(b.is_foreground.into(), &mut out);
-            write_int(b.source_bg as _, &mut out);
-            write_int(b.xoffset as _, &mut out);
-            write_int(b.yoffset as _, &mut out);
-            write_int(b.tile_horz as _, &mut out);
-            write_int(b.tile_vert as _, &mut out);
-            write_int(b.hspeed as _, &mut out);
-            write_int(b.vspeed as _, &mut out);
-            write_int(b.stretch as _, &mut out);
+            out.write_u32::<LE>(b.visible_on_start.into())?;
+            out.write_u32::<LE>(b.is_foreground.into())?;
+            out.write_u32::<LE>(b.source_bg as _)?;
+            out.write_u32::<LE>(b.xoffset as _)?;
+            out.write_u32::<LE>(b.yoffset as _)?;
+            out.write_u32::<LE>(b.tile_horz as _)?;
+            out.write_u32::<LE>(b.tile_vert as _)?;
+            out.write_u32::<LE>(b.hspeed as _)?;
+            out.write_u32::<LE>(b.vspeed as _)?;
+            out.write_u32::<LE>(b.stretch as _)?;
         }
-        write_int(self.views_enabled.into(), &mut out);
-        write_int(8, &mut out);
+        out.write_u32::<LE>(self.views_enabled.into())?;
+        out.write_u32::<LE>(8)?;
         for v in &self.views {
-            write_int(v.visible as _, &mut out);
-            write_int(v.source_x as _, &mut out);
-            write_int(v.source_y as _, &mut out);
-            write_int(v.source_w as _, &mut out);
-            write_int(v.source_h as _, &mut out);
-            write_int(v.port_x as _, &mut out);
-            write_int(v.port_y as _, &mut out);
-            write_int(v.port_w as _, &mut out);
-            write_int(v.port_h as _, &mut out);
-            write_int(v.following_hborder as _, &mut out);
-            write_int(v.following_vborder as _, &mut out);
-            write_int(v.following_hspeed as _, &mut out);
-            write_int(v.following_vspeed as _, &mut out);
-            write_int(v.following_target as _, &mut out);
+            out.write_u32::<LE>(v.visible as _)?;
+            out.write_u32::<LE>(v.source_x as _)?;
+            out.write_u32::<LE>(v.source_y as _)?;
+            out.write_u32::<LE>(v.source_w as _)?;
+            out.write_u32::<LE>(v.source_h as _)?;
+            out.write_u32::<LE>(v.port_x as _)?;
+            out.write_u32::<LE>(v.port_y as _)?;
+            out.write_u32::<LE>(v.port_w as _)?;
+            out.write_u32::<LE>(v.port_h as _)?;
+            out.write_u32::<LE>(v.following_hborder as _)?;
+            out.write_u32::<LE>(v.following_vborder as _)?;
+            out.write_u32::<LE>(v.following_hspeed as _)?;
+            out.write_u32::<LE>(v.following_vspeed as _)?;
+            out.write_u32::<LE>(v.following_target as _)?;
         }
-        write_int(self.instance_count as _, &mut out);
+        out.write_u32::<LE>(self.instance_count as _)?;
         for i in self.get_instances() {
-            write_int(i.x as _, &mut out);
-            write_int(i.y as _, &mut out);
-            write_int(i.object as _, &mut out);
-            write_int(i.id as _, &mut out);
-            write_string(&i.creation_code, &mut out);
+            out.write_u32::<LE>(i.x as _)?;
+            out.write_u32::<LE>(i.y as _)?;
+            out.write_u32::<LE>(i.object as _)?;
+            out.write_u32::<LE>(i.id as _)?;
+            write_string(&i.creation_code, &mut out)?;
             if !exe {
-                write_int(i.locked as _, &mut out);
+                out.write_u32::<LE>(i.locked as _)?;
             } else if let Some(data) = extra_data.map(|(insts, _)| insts.get(&i.id).unwrap_or(&InstanceExtra::DEFAULT))
             {
-                write_f64(data.xscale, &mut out);
-                write_f64(data.yscale, &mut out);
-                write_int(data.blend as _, &mut out);
-                write_f64(data.angle, &mut out);
+                out.write_f64::<LE>(data.xscale)?;
+                out.write_f64::<LE>(data.yscale)?;
+                out.write_u32::<LE>(data.blend as _)?;
+                out.write_f64::<LE>(data.angle)?;
             }
         }
-        write_int(self.tile_count as _, &mut out);
+        out.write_u32::<LE>(self.tile_count as _)?;
         for t in self.get_tiles() {
-            write_int(t.x as _, &mut out);
-            write_int(t.y as _, &mut out);
-            write_int(t.source_bg as _, &mut out);
-            write_int(t.u as _, &mut out);
-            write_int(t.v as _, &mut out);
-            write_int(t.width as _, &mut out);
-            write_int(t.height as _, &mut out);
-            write_int(t.depth as _, &mut out);
-            write_int(t.id as _, &mut out);
+            out.write_u32::<LE>(t.x as _)?;
+            out.write_u32::<LE>(t.y as _)?;
+            out.write_u32::<LE>(t.source_bg as _)?;
+            out.write_u32::<LE>(t.u as _)?;
+            out.write_u32::<LE>(t.v as _)?;
+            out.write_u32::<LE>(t.width as _)?;
+            out.write_u32::<LE>(t.height as _)?;
+            out.write_u32::<LE>(t.depth as _)?;
+            out.write_u32::<LE>(t.id as _)?;
             if !exe {
-                write_int(t.locked as _, &mut out);
+                out.write_u32::<LE>(t.locked as _)?;
             } else if let Some(data) = extra_data.map(|(_, tiles)| tiles.get(&t.id).unwrap_or(&TileExtra::DEFAULT)) {
-                write_f64(data.xscale, &mut out);
-                write_f64(data.yscale, &mut out);
-                write_int(data.blend as _, &mut out);
+                out.write_f64::<LE>(data.xscale)?;
+                out.write_f64::<LE>(data.yscale)?;
+                out.write_u32::<LE>(data.blend as _)?;
             }
         }
         if !exe {
-            write_int(self.remember_room_editor_info as _, &mut out);
-            write_int(self.editor_width as _, &mut out);
-            write_int(self.editor_height as _, &mut out);
-            write_int(self.show_grid as _, &mut out);
-            write_int(self.show_objects as _, &mut out);
-            write_int(self.show_tiles as _, &mut out);
-            write_int(self.show_backgrounds as _, &mut out);
-            write_int(self.show_foregrounds as _, &mut out);
-            write_int(self.show_views as _, &mut out);
-            write_int(self.delete_underlying_objects as _, &mut out);
-            write_int(self.delete_underlying_tiles as _, &mut out);
-            write_int(self.tab as _, &mut out);
-            write_int(self.x_position_scroll as _, &mut out);
-            write_int(self.y_position_scroll as _, &mut out);
+            out.write_u32::<LE>(self.remember_room_editor_info as _)?;
+            out.write_u32::<LE>(self.editor_width as _)?;
+            out.write_u32::<LE>(self.editor_height as _)?;
+            out.write_u32::<LE>(self.show_grid as _)?;
+            out.write_u32::<LE>(self.show_objects as _)?;
+            out.write_u32::<LE>(self.show_tiles as _)?;
+            out.write_u32::<LE>(self.show_backgrounds as _)?;
+            out.write_u32::<LE>(self.show_foregrounds as _)?;
+            out.write_u32::<LE>(self.show_views as _)?;
+            out.write_u32::<LE>(self.delete_underlying_objects as _)?;
+            out.write_u32::<LE>(self.delete_underlying_tiles as _)?;
+            out.write_u32::<LE>(self.tab as _)?;
+            out.write_u32::<LE>(self.x_position_scroll as _)?;
+            out.write_u32::<LE>(self.y_position_scroll as _)?;
         }
+        Ok(())
     }
 
-    fn write_additional(stream: usize) {
+    fn write_additional(stream: &mut TMemoryStream) -> io::Result<()> {
         unsafe {
-            let _: u32 = delphi_call!(0x52f12c, stream, *ide::LAST_INSTANCE_ID);
-            let _: u32 = delphi_call!(0x52f12c, stream, *ide::LAST_TILE_ID);
+            stream.write_u32::<LE>(*ide::LAST_INSTANCE_ID as _)?;
+            stream.write_u32::<LE>(*ide::LAST_TILE_ID as _)?;
         }
+        Ok(())
     }
 }
 
-fn write_int(i: u32, mut out: impl Write) {
-    out.write_all(&i.to_le_bytes()).unwrap();
-}
-
-fn write_f64(f: f64, mut out: impl Write) {
-    out.write_all(&f.to_le_bytes()).unwrap();
-}
-
-fn write_string(s_wide: &UStr, mut out: impl Write) {
+fn write_string(s_wide: &UStr, mut out: impl Write) -> io::Result<()> {
     unsafe {
         let mut s_utf8: *const usize = ptr::null();
         let _: u32 = delphi_call!(0x40810c, &mut s_utf8, s_wide.0, 0xfde9);
         if s_utf8.is_null() {
-            write_int(0, out);
+            out.write_u32::<LE>(0)?;
         } else {
             let len = s_utf8.sub(1).read();
-            out.write_all(&len.to_le_bytes()).unwrap();
-            out.write_all(slice::from_raw_parts(s_utf8.cast::<u8>(), len)).unwrap();
+            write_buffer(slice::from_raw_parts(s_utf8.cast::<u8>(), len), out)?;
             let _: u32 = delphi_call!(0x406e5c, &mut s_utf8);
         }
     }
+    Ok(())
 }
 
-fn save_frame(frame: &asset::Frame, mut out: impl Write) {
+fn write_buffer(buf: &[u8], mut out: impl Write) -> io::Result<()> {
+    out.write_u32::<LE>(buf.len() as u32)?;
+    out.write_all(buf)
+}
+
+fn save_frame(frame: &asset::Frame, mut out: impl Write) -> io::Result<()> {
     let image_size = (frame.width * frame.height * 4) as usize;
-    out.write_all(&800u32.to_le_bytes()).unwrap();
-    out.write_all(&frame.width.to_le_bytes()).unwrap();
-    out.write_all(&frame.height.to_le_bytes()).unwrap();
+    out.write_u32::<LE>(800)?;
+    out.write_u32::<LE>(frame.width)?;
+    out.write_u32::<LE>(frame.height)?;
     if image_size > 0 {
-        out.write_all(&image_size.to_le_bytes()).unwrap();
-        out.write_all(unsafe { slice::from_raw_parts(frame.data, image_size) }).unwrap();
+        write_buffer(unsafe { slice::from_raw_parts(frame.data, image_size) }, &mut out)?;
     }
+    Ok(())
 }
 
-extern "fastcall" fn save_assets<T: GetAssetList>(stream: usize, exe: bool) -> bool {
+extern "fastcall" fn save_assets<T: GetAssetList>(mut stream: &mut TMemoryStream, exe: bool) -> bool {
     let asset_list = T::get_asset_list();
-    unsafe {
-        let _: u32 = delphi_call!(0x52f12c, stream, 800);
-    }
+    stream.write_u32::<LE>(800).unwrap();
     let assets = asset_list.assets();
-    unsafe {
-        let _: u32 = delphi_call!(0x52f12c, stream, assets.len());
-    }
+    stream.write_u32::<LE>(assets.len() as _).unwrap();
     (assets, asset_list.names(), asset_list.timestamps())
         .into_par_iter()
         .map(|(asset, name, timestamp)| {
             let mut out = ZlibEncoder::new(Vec::new(), Compression::new(unsafe { DEFLATE_LEVEL }));
-            out.write_all(&u32::to_le_bytes(asset.is_some().into())).unwrap();
+            out.write_u32::<LE>(asset.is_some().into()).unwrap();
             if let Some(asset) = asset {
-                write_string(name, &mut out);
+                write_string(name, &mut out).unwrap();
                 if !exe {
-                    out.write_all(&timestamp.to_le_bytes()).unwrap();
+                    out.write_f64::<LE>(*timestamp).unwrap();
                 }
-                asset.save(exe, &mut out);
+                asset.save(exe, &mut out).unwrap();
             }
             out.finish().unwrap()
         })
         .collect::<Vec<_>>()
         .into_iter()
-        .for_each(|buf| unsafe {
-            let _: u32 = delphi_call!(0x52f12c, stream, buf.len());
-            let _: u32 = delphi_call!(0x43f4c0, stream, buf.as_ptr(), buf.len());
+        .for_each(|buf| {
+            write_buffer(&buf, &mut stream).unwrap();
         });
-    T::write_additional(stream);
+    T::write_additional(stream).unwrap();
     true
 }
 

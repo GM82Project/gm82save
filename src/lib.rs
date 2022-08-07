@@ -247,7 +247,7 @@ unsafe extern "fastcall" fn toggle_gm82room_checkbox() {
 
 unsafe fn refresh_gm82room_checkbox() {
     let main_form = *(0x790100 as *const *const *mut bool);
-    let room_item = *main_form.add(0x3b8/4);
+    let room_item = *main_form.add(0x3b8 / 4);
     let _: u32 = delphi_call!(0x4c0238, room_item, !*(0x79a982 as *const bool) as u32);
 }
 

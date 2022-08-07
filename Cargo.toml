@@ -20,7 +20,7 @@ panic = "abort"
 time = "0.3"
 
 [dependencies]
-crc = "1.8"
+byteorder = "1.4.3"
 crossbeam-channel = { version = "0.5", optional = true }
 ctor = "0.1.20"
 flate2 = { version = "1.0", default-features = false, features = ["zlib-ng-compat"] }

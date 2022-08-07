@@ -336,6 +336,12 @@ impl Font {
     pub fn new() -> DelphiBox<Self> {
         unsafe { delphi_box!(0x5a8760, 0x5a6628) }
     }
+
+    pub fn render(&self) {
+        unsafe {
+            let _: u32 = delphi_call!(0x5a809c, self);
+        }
+    }
 }
 
 #[repr(C)]
