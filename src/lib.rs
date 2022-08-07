@@ -227,6 +227,28 @@ unsafe extern "fastcall" fn stuff_to_do_on_project_init() {
     let _: u32 = delphi_call!(0x62c554); // reset objects (what this overwrote)
     // insert a blank object
     ide::OBJECTS.alloc(1);
+    // refresh the gm82room checkbox
+    refresh_gm82room_checkbox();
+}
+
+unsafe extern "fastcall" fn close_preferences_form() {
+    refresh_gm82room_checkbox();
+    // save to registry
+    let _: u32 = delphi_call!(0x718ac0);
+}
+
+unsafe extern "fastcall" fn toggle_gm82room_checkbox() {
+    let setting = 0x79a982 as *mut bool;
+    *setting = !*setting;
+    refresh_gm82room_checkbox();
+    // save to registry
+    let _: u32 = delphi_call!(0x718ac0);
+}
+
+unsafe fn refresh_gm82room_checkbox() {
+    let main_form = *(0x790100 as *const *const *mut bool);
+    let room_item = *main_form.add(0x3b8/4);
+    let _: u32 = delphi_call!(0x4c0238, room_item, !*(0x79a982 as *const bool) as u32);
 }
 
 static mut EXTRA_DATA: Option<(HashMap<usize, InstanceExtra>, HashMap<usize, TileExtra>)> = None;
@@ -1715,6 +1737,11 @@ unsafe fn injector() {
     // read NewsBrowser from form as ValueEdit
     patch(0x71a96b, &[0x8b, 0x80, 0xa0, 0x02, 0x00, 0x00, 0xa3, 0x83, 0xa9, 0x79, 0x00, 0x90, 0x90]);
     patch(0x71a972, &(&DEFAULT_ROOM_SPEED as *const u32 as usize as u32).to_le_bytes());
+    // update menu box
+    patch_call(0x71aaf7, close_preferences_form as usize);
+
+    // toggle gm82room instead of opening news
+    patch_call(0x6e2002, toggle_gm82room_checkbox as _);
 
     // check for other processes before setting MakerRunning to false
     patch(0x71af15, &[0xb9]);
