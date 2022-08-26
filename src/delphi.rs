@@ -533,6 +533,12 @@ impl UStr {
     pub const unsafe fn from_ptr(s: &*const u16) -> &Self {
         std::mem::transmute(s)
     }
+
+    pub fn push_ustr(&mut self, other: &Self) {
+        unsafe {
+            let _: u32 = delphi_call!(0x4082dc, self, other.0);
+        }
+    }
 }
 
 impl Default for UStr {

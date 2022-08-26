@@ -963,6 +963,13 @@ unsafe extern "C" fn completion_script_args_inj() {
     }
 }
 
+unsafe extern "fastcall" fn add_space_before_trigger_name(trigger_id: i32, out: &mut UStr) {
+    *out = UStr::new(" ");
+    let mut tmp = UStr::default();
+    let _: u32 = delphi_call!(0x6bcce4, trigger_id, &mut tmp);
+    out.push_ustr(&tmp);
+}
+
 unsafe extern "fastcall" fn completion_script_args(script_id: usize, out: &mut UStr) {
     let script = ide::SCRIPTS.assets().get_unchecked(script_id).as_deref().unwrap_unchecked();
     if script.source.as_slice().get(..3) == Some(&[b'/' as u16; 3]) {
@@ -1635,8 +1642,9 @@ unsafe fn injector() {
         0x6a, 0x00, // push 0
         0x6a, 0x04, // push 4
         0x8d, 0x54, 0x24, 0x4, // lea edx, [esp+4]
-        0x90, 0x90, // nops
+        0x8b, 0xcb, // mov ecx, ebx (the mov to eax afterwards is useless but that's fine)
     ]);
+    patch_call(0x6baa3a, add_space_before_trigger_name as usize);
     patch(0x6baa41, &[0xb0]);
 
     // show number on code actions
