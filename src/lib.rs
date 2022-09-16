@@ -1092,7 +1092,7 @@ unsafe extern "C" fn trace_date_inj() {
 unsafe extern "fastcall" fn trace_date() -> UStr {
     let now = time::OffsetDateTime::now_utc();
     UStr::new(format!(
-        "[{}-{:02}-{:02} {:02}:{:02}:{:02}] Unhandled Exception - ",
+        "[{}-{:02}-{:02} {:02}:{:02}:{:02} UTC] Unhandled Exception - ",
         now.year(),
         u8::from(now.month()),
         now.day(),
