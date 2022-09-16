@@ -1057,6 +1057,51 @@ unsafe extern "C" fn get_temp_folder_but_also_regen_it() {
     }
 }
 
+#[naked]
+unsafe extern "C" fn trace_date_inj() {
+    asm! {
+        // keep first two args
+        "push ecx",
+        "push eax",
+        // get date string
+        "call {}",
+        // take first two args back
+        "pop edx",
+        "pop ecx",
+        // store date string
+        "push eax",
+        // put args in right place
+        "xchg edx, eax",
+        // call UStrCat3
+        "push ebx",
+        "mov ebx, 0x40839c",
+        "call ebx",
+        "pop ebx",
+        // free date string
+        "mov eax, esp",
+        "mov edx, 0x407ea8",
+        "call edx",
+        // we done here
+        "pop eax",
+        "ret",
+        sym trace_date,
+        options(noreturn),
+    }
+}
+
+unsafe extern "fastcall" fn trace_date() -> UStr {
+    let now = time::OffsetDateTime::now_utc();
+    UStr::new(format!(
+        "[{}-{:02}-{:02} {:02}:{:02}:{:02}] Unhandled Exception - ",
+        now.year(),
+        u8::from(now.month()),
+        now.day(),
+        now.hour(),
+        now.minute(),
+        now.second()
+    ))
+}
+
 static mut SEEN_ERROR: bool = false;
 
 unsafe extern "fastcall" fn patch_error_box(caption: *const u16, text: *const u16, _flags: u32) {
@@ -1754,6 +1799,8 @@ unsafe fn injector() {
     // check for other processes before setting MakerRunning to false
     patch(0x71af15, &[0xb9]);
     patch_call(0x71af15, check_gm_processes as _);
+
+    patch_call(0x75e88c, trace_date_inj as _);
 
     // error box only shows once and has custom message
     patch_call(0x51fe33, patch_error_box as _);
