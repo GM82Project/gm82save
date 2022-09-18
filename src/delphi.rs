@@ -81,6 +81,22 @@ macro_rules! delphi_call {
         };
         out
     }};
+    ($call: literal, $a: expr, $b: expr, $c: expr, $d: expr, $e: expr) => {{
+        crate::check_call!($call);
+        let out;
+        std::arch::asm! {
+            "push {arg5}",
+            "push {arg4}",
+            "call {call}",
+            call = in(reg) $call,
+            arg4 = in(reg) $d,
+            arg5 = in(reg) $e,
+            inlateout("eax") $a => out,
+            inlateout("edx") $b => _,
+            inlateout("ecx") $c => _,
+        };
+        out
+    }};
 }
 
 #[macro_export]
