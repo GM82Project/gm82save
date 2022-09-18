@@ -905,6 +905,18 @@ unsafe extern "C" fn path_room_change_forces_room_editor_save() {
 static mut PATH_FORM_UPDATED: bool = false;
 
 #[naked]
+unsafe extern "C" fn code_editor_better_resize() {
+    asm! {
+        "cmp byte ptr [eax + 0x29a], 0x2",
+        "jne 2f",
+        "add esp, 4",
+        "2: mov edx, [0x781dd0]",
+        "ret",
+        options(noreturn),
+    }
+}
+
+#[naked]
 unsafe extern "C" fn code_editor_middle_click() {
     asm! {
         // push return address
@@ -1653,6 +1665,14 @@ unsafe fn injector() {
 
     // .gm82 file associations
     patch_call(0x6ddacd, gm82_file_association_inj as _);
+
+    // code editor don't resize on maximize
+    // script resize
+    patch(0x65508c, &[0xe8, 0, 0, 0, 0, 0x90]);
+    patch_call(0x65508c, code_editor_better_resize as _);
+    // codeaction resize
+    patch(0x682bf0, &[0xe8, 0, 0, 0, 0, 0x90]);
+    patch_call(0x682bf0, code_editor_better_resize as _);
 
     // middle click in code editor shows resource
     // remove first check
