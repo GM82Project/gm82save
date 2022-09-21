@@ -905,11 +905,28 @@ unsafe extern "C" fn path_room_change_forces_room_editor_save() {
 static mut PATH_FORM_UPDATED: bool = false;
 
 #[naked]
+unsafe extern "C" fn code_editor_dont_resize_if_maximized() {
+    asm! {
+        // are we maximized?
+        "cmp byte ptr [eax + 0x29a], 0x2",
+        "je 2f",
+        // if not, call actual function
+        "jmp [ebx + 0x98]",
+        // otherwise quit
+        "2: ret 0x8",
+        options(noreturn),
+    }
+}
+
+#[naked]
 unsafe extern "C" fn code_editor_better_resize() {
     asm! {
+        // are we maximized?
         "cmp byte ptr [eax + 0x29a], 0x2",
         "jne 2f",
+        // if maximized, return from outer function
         "add esp, 4",
+        // otherwise continue regular operation
         "2: mov edx, [0x781dd0]",
         "ret",
         options(noreturn),
@@ -1673,6 +1690,10 @@ unsafe fn injector() {
     // codeaction resize
     patch(0x682bf0, &[0xe8, 0, 0, 0, 0, 0x90]);
     patch_call(0x682bf0, code_editor_better_resize as _);
+
+    // but also don't resize on create *if* maximized
+    patch(0x653d83, &[0xe8, 0, 0, 0, 0, 0x90]);
+    patch_call(0x653d83, code_editor_dont_resize_if_maximized as usize);
 
     // middle click in code editor shows resource
     // remove first check
