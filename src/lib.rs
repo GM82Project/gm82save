@@ -16,7 +16,11 @@ mod save;
 mod save_exe;
 mod stub;
 
-use crate::delphi::{TMenuItem, TTreeNode, UStr};
+use crate::{
+    delphi::{TMenuItem, TTreeNode, UStr},
+    ide::get_triggers,
+    save::GetAsset,
+};
 use ide::AssetListTrait;
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -838,6 +842,57 @@ unsafe extern "fastcall" fn object_show_children(object_form: *const i32) {
 }
 
 #[naked]
+unsafe extern "C" fn object_clean_collide_events_inj() {
+    asm! {
+        "mov ecx, eax",
+        "mov edx, ebx",
+        "jmp {}",
+        sym object_clean_collide_events,
+        options(noreturn),
+    }
+}
+
+unsafe extern "fastcall" fn object_clean_collide_events(obj: &mut asset::Object, object_id: usize) {
+    let mut updated = false;
+    for (i, event) in obj.events[events::EV_COLLISION].iter_mut().enumerate() {
+        if event.action_count != 0 && ide::OBJECTS.assets().get_asset(i as i32).is_none() {
+            let _: u32 = delphi_call!(0x5a5090, event.as_ptr());
+            updated = true;
+        }
+    }
+    if updated {
+        let _: u32 = delphi_call!(0x62cd2c, object_id);
+    }
+}
+
+#[naked]
+unsafe extern "C" fn object_clean_triggers_inj() {
+    asm! {
+        "mov ecx, ebx",
+        "jmp {}",
+        sym object_clean_triggers,
+        options(noreturn),
+    }
+}
+
+unsafe extern "fastcall" fn object_clean_triggers(trigger_id: usize) {
+    for (obj_id, obj_opt) in ide::OBJECTS.assets_mut().iter_mut().enumerate() {
+        let mut updated = false;
+        if let Some(obj) = obj_opt {
+            if let Some(event) = obj.events[events::EV_TRIGGER].get(trigger_id) {
+                if event.action_count != 0 && get_triggers()[trigger_id].is_none() {
+                    let _: u32 = delphi_call!(0x5a5090, event.as_ptr());
+                    updated = true;
+                }
+            }
+        }
+        if updated {
+            let _: u32 = delphi_call!(0x62cd2c, obj_id);
+        }
+    }
+}
+
+#[naked]
 unsafe extern "C" fn path_form_mouse_wheel_inj() {
     asm! {
         // call TPathForm.Create
@@ -1075,7 +1130,7 @@ unsafe extern "C" fn regen_temp_folder_when_making_file() {
 
 unsafe extern "C" fn get_temp_folder_but_also_regen_it() {
     asm! {
-        //UStrAsg temp_diretory to the output
+        //UStrAsg temp_directory to the output
         "mov edx, [0x788974]",
         "mov ecx, 0x407eb8",
         "call ecx",
@@ -1650,6 +1705,13 @@ unsafe fn injector() {
 
     // go to parent by clicking on parent button
     patch_call(0x6c515e, object_form_add_events as _);
+
+    // clean collision events and mark as modified when deleting objects
+    patch_call(0x62ca82, object_clean_collide_events_inj as _);
+
+    // clean trigger events when deleting triggers
+    patch(0x6bcc94, &[0xe8, 0x00, 0x00, 0x00, 0x00, 0x90, 0x90]);
+    patch_call(0x6bcc94, object_clean_triggers_inj as _);
 
     // add scrolling to path form
     patch_call(0x71fdcb, path_form_mouse_wheel_inj as _);

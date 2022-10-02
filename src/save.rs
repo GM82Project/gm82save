@@ -34,7 +34,7 @@ impl UStr {
     }
 }
 
-trait GetAsset<T> {
+pub trait GetAsset<T> {
     fn get_asset(&self, id: i32) -> T;
 }
 
