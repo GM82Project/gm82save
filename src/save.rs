@@ -476,6 +476,11 @@ unsafe fn save_object(obj: &Object, path: &mut PathBuf) -> Result<()> {
         for (ev_type, event_group) in obj.events.iter().enumerate() {
             for (ev_numb, ev) in event_group.iter().enumerate() {
                 if ev.action_count != 0 {
+                    if (ev_type == events::EV_COLLISION && ide::OBJECTS.assets().get_asset(ev_numb as _).is_none())
+                        || (ev_type == events::EV_TRIGGER && ide::get_triggers().get_asset(ev_numb as _).is_none())
+                    {
+                        continue
+                    }
                     let name = event_name(ev_type, ev_numb);
                     save_event(ev, &name, &mut f)?;
                 }
