@@ -450,7 +450,7 @@ unsafe fn object_needs_update(obj: &Object) -> bool {
             && (ide::OBJECTS.assets().get_asset(obj.parent_index).is_none()
                 || ide::OBJECTS.timestamps().get_asset(obj.parent_index) > LAST_SAVE)
         || obj.events.iter().flatten().any(|e| event_needs_update(e))
-        || obj.events[events::EV_TRIGGER].is_empty() && *ide::TRIGGERS_UPDATED
+        || !obj.events[events::EV_TRIGGER].is_empty() && *ide::TRIGGERS_UPDATED
         || obj.events[events::EV_COLLISION]
             .iter()
             .enumerate()
