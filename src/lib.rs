@@ -263,9 +263,9 @@ unsafe extern "fastcall" fn about_inj(about_dialog: *const *const usize) {
     asm! {
         "call {}",
         in(reg) 0x4ee6d8, // TControl.SetText
-        inlateout("eax") edition_label => _,
-        inlateout("edx") info.0 => _,
-        lateout("ecx") _,
+        in("eax") edition_label,
+        in("edx") info.0,
+        clobber_abi("C"),
     }
 }
 

@@ -51,8 +51,9 @@ unsafe extern "fastcall" fn show_message_and_reload() {
         "call {}",
         in(reg) 0x4d437c, // MessageDlgPosHelp
         inlateout("eax") message.0 => answer,
-        inlateout("edx") 3 => _, // DlgType
-        inlateout("ecx") 3 => _, // Buttons
+        in("edx") 3, // DlgType
+        in("ecx") 3, // Buttons
+        clobber_abi("C"),
     }
     if answer == 6 {
         // yes -> reload project

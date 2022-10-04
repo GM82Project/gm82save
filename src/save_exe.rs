@@ -85,8 +85,9 @@ impl GetAssetList for asset::Sprite {
                         call = in(reg) 0x5aecac,
                         bbox = in(reg) &self.bbox_left,
                         inlateout("eax") 0x5ae848 => mask,
-                        inlateout("edx") 1 => _,
-                        inlateout("ecx") f => _,
+                        in("edx") 1,
+                        in("ecx") f,
+                        clobber_abi("C"),
                     }
                     // merge mask
                     for f in &self.get_frames()[1..] {
@@ -99,9 +100,10 @@ impl GetAssetList for asset::Sprite {
                             call = in(reg) 0x5af188,
                             sprite = in(reg) self,
                             frame = in(reg) &self.bbox_left,
-                            inlateout("eax") mask => _,
-                            inlateout("edx") f => _,
-                            inlateout("ecx") self.bbox_type => _,
+                            in("eax") mask,
+                            in("edx") f,
+                            in("ecx") self.bbox_type,
+                            clobber_abi("C"),
                         }
                     }
                     write_mask(&*mask, &mut out)?;
@@ -125,8 +127,9 @@ impl GetAssetList for asset::Sprite {
                             sprite = in(reg) self,
                             call = in(reg) 0x5aecac,
                             inlateout("eax") 0x5ae848 => mask,
-                            inlateout("edx") 1 => _,
-                            inlateout("ecx") f => _,
+                            in("edx") 1,
+                            in("ecx") f,
+                            clobber_abi("C"),
                         }
                         write_mask(&*mask, &mut out)?;
                         // free mask

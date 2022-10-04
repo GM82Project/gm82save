@@ -26,8 +26,7 @@ macro_rules! delphi_call {
             "call {call}",
             call = in(reg) $call,
             lateout("eax") out,
-            lateout("edx") _,
-            lateout("ecx") _,
+            clobber_abi("C"),
         };
         out
     }};
@@ -38,8 +37,7 @@ macro_rules! delphi_call {
             "call {call}",
             call = in(reg) $call,
             inlateout("eax") $a => out,
-            lateout("edx") _,
-            lateout("ecx") _,
+            clobber_abi("C"),
         };
         out
     }};
@@ -50,8 +48,8 @@ macro_rules! delphi_call {
             "call {call}",
             call = in(reg) $call,
             inlateout("eax") $a => out,
-            inlateout("edx") $b => _,
-            lateout("ecx") _,
+            in("edx") $b,
+            clobber_abi("C"),
         };
         out
     }};
@@ -62,8 +60,9 @@ macro_rules! delphi_call {
             "call {call}",
             call = in(reg) $call,
             inlateout("eax") $a => out,
-            inlateout("edx") $b => _,
-            inlateout("ecx") $c => _,
+            in("edx") $b,
+            in("ecx") $c,
+            clobber_abi("C"),
         };
         out
     }};
@@ -76,8 +75,9 @@ macro_rules! delphi_call {
             call = in(reg) $call,
             arg4 = in(reg) $d,
             inlateout("eax") $a => out,
-            inlateout("edx") $b => _,
-            inlateout("ecx") $c => _,
+            in("edx") $b,
+            in("ecx") $c,
+            clobber_abi("C"),
         };
         out
     }};
@@ -92,8 +92,9 @@ macro_rules! delphi_call {
             arg4 = in(reg) $d,
             arg5 = in(reg) $e,
             inlateout("eax") $a => out,
-            inlateout("edx") $b => _,
-            inlateout("ecx") $c => _,
+            inlateout("edx") $b,
+            inlateout("ecx") $c,
+            clobber_abi("C"),
         };
         out
     }};
@@ -265,9 +266,10 @@ impl TMenuItem {
                 "call {func}",
                 base = in(reg) custom_events.unwrap_or(&BLANK_EVENTS),
                 func = in(reg) 0x71c3fc,
-                inlateout("eax") self => _,
-                inlateout("edx") tree_node => _,
-                inlateout("ecx") u32::from(custom_events.is_some()) => _,
+                in("eax") self,
+                in("edx") tree_node,
+                in("ecx") u32::from(custom_events.is_some()),
+                clobber_abi("C"),
             }
         }
     }
@@ -343,9 +345,9 @@ impl TBitmap {
         asm! {
             "mov ecx, [eax]",
             "call [ecx+0x44]",
-            inlateout("eax") self => _,
-            inlateout("edx") width => _,
-            lateout("ecx") _,
+            in("eax") self,
+            in("edx") width,
+            clobber_abi("C"),
         }
     }
 
@@ -353,9 +355,9 @@ impl TBitmap {
         asm! {
             "mov ecx, [eax]",
             "call [ecx+0x38]",
-            inlateout("eax") self => _,
-            inlateout("edx") height => _,
-            lateout("ecx") _,
+            in("eax") self,
+            in("edx") height,
+            clobber_abi("C"),
         }
     }
 }
@@ -399,9 +401,8 @@ impl TMemoryStream {
             "call {call}",
             call = in(reg) 0x43f254,
             pos_lo = in(reg) pos,
-            inlateout("eax") self => _,
-            lateout("edx") _,
-            lateout("ecx") _,
+            in("eax") self,
+            clobber_abi("C"),
         };
     }
 
@@ -411,8 +412,7 @@ impl TMemoryStream {
             "mov ecx,[eax]",
             "call [ecx]",
             inlateout("eax") self => out,
-            lateout("edx") _,
-            lateout("ecx") _,
+            clobber_abi("C"),
         };
         out
     }
@@ -615,9 +615,10 @@ pub unsafe fn DynArraySetLength<T>(a: *mut *mut T, type_info: *const u8, dimensi
         "add esp,4",
         call = in(reg) 0x409be0,
         d = in(reg) size,
-        inlateout("eax") a => _,
-        inlateout("edx") type_info => _,
-        inlateout("ecx") dimensions => _,
+        in("eax") a,
+        in("edx") type_info,
+        in("ecx") dimensions,
+        clobber_abi("C"),
     };
 }
 
@@ -628,9 +629,11 @@ pub fn Now(out: &mut f64) {
             "fstp qword ptr [{output}]",
             call = in(reg) 0x4199b0,
             output = in(reg) out,
+            // manually exclude eax, edx, ecx from register selection
             out("eax") _,
             out("edx") _,
             out("ecx") _,
+            clobber_abi("C"),
         }
     }
 }

@@ -224,9 +224,8 @@ unsafe fn save_real(file: usize, real: &f64) {
         "call {call}",
         call = in(reg) 0x52f140,
         real = in(reg) real,
-        inlateout("eax") file => _,
-        lateout("edx") _,
-        lateout("ecx") _,
+        in("eax") file,
+        clobber_abi("C"),
     }
 }
 
