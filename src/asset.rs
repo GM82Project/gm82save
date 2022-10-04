@@ -144,6 +144,8 @@ impl Frame {
     }
 
     pub fn register_thumb(&self, bg_col: [u8; 3]) -> i32 {
+        // i'm initializing them all safely anyway, the extra MaybeUninit dancing is unnecessary
+        #[allow(invalid_value)]
         unsafe {
             let mut icon: [u8; 16 * 16 * 4] = std::mem::MaybeUninit::uninit().assume_init();
             self.thumb(&mut icon, false, bg_col);
