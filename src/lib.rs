@@ -69,7 +69,7 @@ impl std::fmt::Display for Error {
             Self::UnicodeError(s) => write!(f, "couldn't encode {}", s),
             Self::AssetNotFound(s, t, src) => write!(f, "couldn't find {} {} (from {})", t, s, src),
             Self::SyntaxError(p) => write!(f, "syntax error in file {}", p.to_string_lossy()),
-            Self::UnknownKey(p, k) => write!(f, "unknown key in {}: {}", p.to_string_lossy(), k),
+            Self::UnknownKey(p, k) => write!(f, "unknown key in {}: {:?}", p.to_string_lossy(), k),
             Self::UnknownAction(lib_id, act_id) => write!(f, "unknown action {} in lib with id {}", act_id, lib_id),
             Self::ParseIntError(e) => write!(f, "integer parse error: {}", e),
             Self::ParseFloatError(e) => write!(f, "float parse error: {}", e),
@@ -1116,6 +1116,7 @@ unsafe extern "C" fn write_number_on_actions() {
     }
 }
 
+#[naked]
 unsafe extern "C" fn regen_temp_folder_when_making_file() {
     asm! {
         "mov ecx, 0x407660",
@@ -1128,6 +1129,7 @@ unsafe extern "C" fn regen_temp_folder_when_making_file() {
     }
 }
 
+#[naked]
 unsafe extern "C" fn get_temp_folder_but_also_regen_it() {
     asm! {
         //UStrAsg temp_directory to the output
@@ -1138,6 +1140,7 @@ unsafe extern "C" fn get_temp_folder_but_also_regen_it() {
         "mov eax, [0x788974]",
         "mov ecx, 0x416eac",
         "jmp ecx",
+        options(noreturn),
     }
 }
 
