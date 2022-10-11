@@ -205,9 +205,9 @@ unsafe fn load_sound(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<Delp
     if exists {
         path.set_extension(extension.trim_matches('.'));
         verify_path(&path)?;
-        let data = &mut *delphi::TMemoryStream::new();
+        let data = delphi::TMemoryStream::new();
         data.load(&UStr::new(path));
-        snd.data = data;
+        snd.data = Some(data);
     }
     Ok(snd)
 }
@@ -915,7 +915,7 @@ unsafe fn load_included_files(path: &mut PathBuf) -> Result<()> {
         if file.stored_in_gmk {
             verify_path(&path)?;
             file.data_exists = true;
-            let data = &mut *delphi::TMemoryStream::new();
+            let data = delphi::TMemoryStream::new();
             data.load(&UStr::new(&path));
             file.source_length = data.get_size();
             file.data = data;
@@ -1019,30 +1019,30 @@ unsafe fn load_settings(path: &mut PathBuf) -> Result<()> {
         if bar_bg {
             path.push("back.bmp");
             verify_path(&path)?;
-            let bg = &mut *delphi::TBitmap::new();
+            let bg = delphi::TBitmap::new();
             bg.LoadFromFile(&UStr::new(&path));
-            *LOADING_BACKGROUND = bg;
+            *LOADING_BACKGROUND = Some(bg);
             path.pop();
         }
         if bar_fg {
             path.push("front.bmp");
             verify_path(&path)?;
-            let fg = &mut *delphi::TBitmap::new();
+            let fg = delphi::TBitmap::new();
             fg.LoadFromFile(&UStr::new(&path));
-            *LOADING_FOREGROUND = fg;
+            *LOADING_FOREGROUND = Some(fg);
             path.pop();
         }
     }
     if custom_load_bg {
         path.push("loader.bmp");
-        let im = &mut *delphi::TBitmap::new();
+        let im = delphi::TBitmap::new();
         im.LoadFromFile(&UStr::new(&path));
-        *CUSTOM_LOAD_IMAGE = im;
+        *CUSTOM_LOAD_IMAGE = Some(im);
         path.pop();
     }
     path.push("icon.ico");
     verify_path(&path)?;
-    (&mut **ICON).LoadFromFile(&UStr::new(&path));
+    (*ICON).LoadFromFile(&UStr::new(&path));
     path.pop();
     {
         path.push("extensions.txt");

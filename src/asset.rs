@@ -33,7 +33,7 @@ pub struct Sound {
     pub volume: f64,
     pub pan: f64,
     pub preload: bool,
-    pub data: *const TMemoryStream,
+    pub data: Option<DelphiBox<TMemoryStream>>,
 }
 
 impl Sound {
@@ -593,7 +593,7 @@ pub struct IncludedFile {
     pub data_exists: bool,
     pub source_length: u32,
     pub stored_in_gmk: bool,
-    pub data: *const TMemoryStream,
+    pub data: DelphiBox<TMemoryStream>,
     pub export_setting: u32,
     pub export_custom_folder: UStr,
     pub overwrite_file: bool,

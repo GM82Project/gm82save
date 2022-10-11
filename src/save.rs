@@ -155,7 +155,7 @@ unsafe fn save_sound(sound: &Sound, path: &mut PathBuf) -> Result<()> {
     path.set_extension("txt");
     let mut f = open_file(&path)?;
     writeln!(f, "extension={}", extension)?;
-    writeln!(f, "exists={}", u8::from(!sound.data.is_null()))?;
+    writeln!(f, "exists={}", u8::from(!sound.data.is_none()))?;
     writeln!(f, "source={}", sound.source.try_decode()?)?;
     writeln!(f, "kind={}", sound.kind)?;
     writeln!(f, "effects={}", sound.effects)?;
@@ -690,7 +690,7 @@ unsafe fn save_settings(path: &mut PathBuf, smart_save: bool) -> Result<()> {
     }
     if !smart_save || *ide::SETTINGS_UPDATED {
         // not the usual behaviour, but i don't feel like adding more flags than necessary
-        if *HAS_CUSTOM_LOAD_IMAGE && CUSTOM_LOAD_IMAGE.read().is_null() {
+        if *HAS_CUSTOM_LOAD_IMAGE && (*CUSTOM_LOAD_IMAGE).is_none() {
             HAS_CUSTOM_LOAD_IMAGE.write(false);
         }
         {
@@ -723,8 +723,8 @@ unsafe fn save_settings(path: &mut PathBuf, smart_save: bool) -> Result<()> {
             writeln!(f, "freeze_on_lose_focus={}", u8::from(*FREEZE_ON_LOSE_FOCUS))?;
             writeln!(f, "custom_loader={}", u8::from(*HAS_CUSTOM_LOAD_IMAGE))?;
             writeln!(f, "custom_bar={}", *LOADING_BAR)?;
-            writeln!(f, "bar_has_bg={}", u8::from(!LOADING_BACKGROUND.read().is_null()))?;
-            writeln!(f, "bar_has_fg={}", u8::from(!LOADING_FOREGROUND.read().is_null()))?;
+            writeln!(f, "bar_has_bg={}", u8::from(!(*LOADING_BACKGROUND).is_none()))?;
+            writeln!(f, "bar_has_fg={}", u8::from(!(*LOADING_FOREGROUND).is_none()))?;
             writeln!(f, "transparent={}", u8::from(*LOADING_TRANSPARENT))?;
             writeln!(f, "translucency={}", *LOADING_TRANSLUCENCY)?;
             writeln!(f, "scale_progress_bar={}", u8::from(*LOADING_PROGRESS_BAR_SCALE))?;
@@ -736,12 +736,12 @@ unsafe fn save_settings(path: &mut PathBuf, smart_save: bool) -> Result<()> {
             f.flush()?;
         }
         if LOADING_BAR.read() == 2 {
-            if let Some(bg) = LOADING_BACKGROUND.read().as_ref() {
+            if let Some(bg) = (*LOADING_BACKGROUND).as_ref() {
                 path.push("back.bmp");
                 bg.SaveToFile(&UStr::new(&path));
                 path.pop();
             }
-            if let Some(fg) = LOADING_FOREGROUND.read().as_ref() {
+            if let Some(fg) = (*LOADING_FOREGROUND).as_ref() {
                 path.push("front.bmp");
                 fg.SaveToFile(&UStr::new(&path));
                 path.pop();
@@ -749,12 +749,12 @@ unsafe fn save_settings(path: &mut PathBuf, smart_save: bool) -> Result<()> {
         }
         if HAS_CUSTOM_LOAD_IMAGE.read() {
             path.push("loader.bmp");
-            (&*CUSTOM_LOAD_IMAGE.read()).SaveToFile(&UStr::new(&path));
+            (*CUSTOM_LOAD_IMAGE).as_ref().unwrap().SaveToFile(&UStr::new(&path));
             path.pop();
         }
         // icon is never legally null, so no need to check
         path.push("icon.ico");
-        (&*ICON.read()).SaveToFile(&UStr::new(&path));
+        (*ICON).SaveToFile(&UStr::new(&path));
         path.pop();
     }
     if !smart_save || *ide::EXTENSIONS_UPDATED {
@@ -916,13 +916,11 @@ unsafe fn save_included_files(path: &mut PathBuf, smart_save: bool) -> Result<()
         let mut name = file.file_name.try_decode()?;
         if file.data_exists {
             if file.stored_in_gmk {
-                if let Some(stream) = file.data.as_ref() {
-                    path.push("include");
-                    path.push(&name);
-                    save_stream(stream, &path)?;
-                    path.pop();
-                    path.pop();
-                }
+                path.push("include");
+                path.push(&name);
+                save_stream(&file.data, &path)?;
+                path.pop();
+                path.pop();
             } else {
                 // try to copy it to gmk dir if not already done
                 path.push("include");

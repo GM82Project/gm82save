@@ -148,6 +148,16 @@ impl<T> std::ops::DerefMut for DelphiBox<T> {
     }
 }
 
+impl<T: std::io::Write> std::io::Write for DelphiBox<T> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        (**self).write(buf)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        (**self).flush()
+    }
+}
+
 // this is really game maker specific but i left it here for simplicity
 #[repr(C)]
 pub struct TreeNodeData {
@@ -329,8 +339,8 @@ impl TPopupMenu {
 pub struct TBitmap {}
 
 impl TBitmap {
-    pub unsafe fn new() -> *mut Self {
-        delphi_call!(0x462144, 0x4587d4, 1)
+    pub unsafe fn new() -> DelphiBox<Self> {
+        delphi_box!(0x462144, 0x4587d4)
     }
 
     pub unsafe fn SaveToFile(&self, filename: &UStr) {
@@ -386,8 +396,8 @@ pub struct TMemoryStream {
 }
 
 impl TMemoryStream {
-    pub unsafe fn new() -> *mut Self {
-        delphi_call!(0x405a4c, 0x433630, 1)
+    pub unsafe fn new() -> DelphiBox<Self> {
+        delphi_box!(0x405a4c, 0x433630)
     }
 
     pub unsafe fn get_pos(&self) -> u32 {

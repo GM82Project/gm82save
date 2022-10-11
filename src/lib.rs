@@ -413,8 +413,8 @@ unsafe extern "C" fn inflate_inj() {
     }
 }
 
-unsafe extern "fastcall" fn inflate(src: &delphi::TMemoryStream) -> &mut delphi::TMemoryStream {
-    let dst = &mut *delphi::TMemoryStream::new();
+unsafe extern "fastcall" fn inflate(src: &delphi::TMemoryStream) -> delphi::DelphiBox<delphi::TMemoryStream> {
+    let dst = delphi::TMemoryStream::new();
     let mut size: usize = 0;
     src.read(&mut size as *mut usize as *mut u8, 4);
     let mut data = Vec::with_capacity(size);

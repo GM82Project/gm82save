@@ -315,7 +315,7 @@ pub const LAST_TILE_ID: IntPtr = 0x77f2e4 as IntPtr;
 pub const SETTINGS_UPDATED: *mut bool = 0x790824 as _;
 pub mod settings {
     #![allow(dead_code)]
-    use crate::delphi::{TBitmap, TIcon, UStr};
+    use crate::delphi::{DelphiBox, TBitmap, TIcon, UStr};
 
     pub const FULLSCREEN: *mut bool = 0x77f514 as _;
     pub const INTERPOLATE_PIXELS: *mut bool = 0x77f518 as _;
@@ -341,14 +341,14 @@ pub mod settings {
     pub const PRIORITY: *mut u32 = 0x77f56c as _;
     pub const FREEZE_ON_LOSE_FOCUS: *mut bool = 0x77f548 as _;
     pub const LOADING_BAR: *mut u32 = 0x77f570 as _;
-    pub const LOADING_BACKGROUND: *mut *mut TBitmap = 0x77f580 as _;
-    pub const LOADING_FOREGROUND: *mut *mut TBitmap = 0x77f57c as _;
+    pub const LOADING_BACKGROUND: *mut Option<DelphiBox<TBitmap>> = 0x77f580 as _;
+    pub const LOADING_FOREGROUND: *mut Option<DelphiBox<TBitmap>> = 0x77f57c as _;
     pub const HAS_CUSTOM_LOAD_IMAGE: *mut bool = 0x77f574 as _;
-    pub const CUSTOM_LOAD_IMAGE: *mut *mut TBitmap = 0x77f578 as _;
+    pub const CUSTOM_LOAD_IMAGE: *mut Option<DelphiBox<TBitmap>> = 0x77f578 as _;
     pub const LOADING_TRANSPARENT: *mut bool = 0x77f584 as _;
     pub const LOADING_TRANSLUCENCY: *mut u32 = 0x77f588 as _;
     pub const LOADING_PROGRESS_BAR_SCALE: *mut bool = 0x77f58c as _;
-    pub const ICON: *const *mut TIcon = 0x77f590 as _;
+    pub const ICON: *mut DelphiBox<TIcon> = 0x77f590 as _;
     pub const SHOW_ERROR_MESSAGES: *mut bool = 0x77f594 as _;
     pub const LOG_ERRORS: *mut bool = 0x77f598 as _;
     pub const ALWAYS_ABORT: *mut bool = 0x77f59c as _;
