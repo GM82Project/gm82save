@@ -329,7 +329,7 @@ pub struct Font {
     pub s_chr: [u32; 256],
     pub s_bw: u32,
     pub s_bh: u32,
-    pub s_bytes: *mut u8,
+    pub s_bytes: DelphiList<u8, 0x5a65a4>,
 }
 
 unsafe impl Sync for Font {}

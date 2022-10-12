@@ -1,5 +1,6 @@
 use crate::delphi::DynArraySetLength;
 use std::{
+    arch::asm,
     ops::{Deref, DerefMut},
     ptr, slice,
 };
@@ -45,6 +46,20 @@ impl<'a, T, const P: usize> IntoIterator for &'a DelphiList<T, P> {
 }
 
 impl<T, const P: usize> DelphiList<T, P> {
+    pub unsafe fn alloc_evil(&self, len: usize) {
+        asm! {
+            "push {d}",
+            "call {call}",
+            "add esp,4",
+            call = in(reg) 0x409be0,
+            d = in(reg) len,
+            in("eax") self.0,
+            in("edx") P,
+            in("ecx") 1,
+            clobber_abi("C"),
+        };
+    }
+
     pub fn alloc(&mut self, len: usize) {
         unsafe {
             DynArraySetLength(&mut self.0, P as _, 1, len);

@@ -237,8 +237,8 @@ impl GetAssetList for asset::Font {
             out.write_u32::<LE>(self.s_bw)?;
             out.write_u32::<LE>(self.s_bh)?;
             unsafe {
-                write_buffer(slice::from_raw_parts(self.s_bytes, (self.s_bw * self.s_bh) as usize), out)?;
-                delphi::DynArraySetLength((&self.s_bytes) as *const *mut u8 as *mut *mut u8, 0x5a65a4 as _, 1, 0);
+                write_buffer(&self.s_bytes.get_unchecked(..(self.s_bw * self.s_bh) as usize), out)?;
+                self.s_bytes.alloc_evil(0);
             }
         }
         Ok(())
