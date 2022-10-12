@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use crate::{
-    delphi::{DelphiBox, TBitmap, TMemoryStream, UStr},
+    delphi::{DelphiBox, TBitmap, TFont, TMemoryStream, UStr},
     delphi_box, delphi_call,
     list::DelphiList,
 };
@@ -337,6 +337,10 @@ unsafe impl Sync for Font {}
 impl Font {
     pub fn new() -> DelphiBox<Self> {
         unsafe { delphi_box!(0x5a8760, 0x5a6628) }
+    }
+
+    pub unsafe fn make_tfont(&self) -> DelphiBox<TFont> {
+        DelphiBox::from_ptr(delphi_call!(0x5a86b4, self))
     }
 
     pub fn render(&self) {

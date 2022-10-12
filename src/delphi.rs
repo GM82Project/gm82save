@@ -370,6 +370,77 @@ impl TBitmap {
             clobber_abi("C"),
         }
     }
+
+    pub unsafe fn SetPixelFormat(&mut self, format: u8) {
+        let _: u32 = delphi_call!(0x463dc0, self, u32::from(format));
+    }
+
+    pub unsafe fn GetCanvas(&self) -> &mut TCanvas {
+        let ptr: *mut TCanvas = delphi_call!(0x462a64, self);
+        &mut *ptr
+    }
+
+    pub unsafe fn GetScanline(&self, row: i32) -> *const u8 {
+        delphi_call!(0x462be8, self, row)
+    }
+}
+
+#[repr(C)]
+pub struct TCanvas {
+    _unused: [u8; 0x40],
+    pub FFont: &'static mut TFont,
+    _unused2: u32,
+    pub FBrush: &'static mut TBrush,
+}
+
+impl TCanvas {
+    pub unsafe fn GetHandle(&self) -> usize {
+        delphi_call!(0x45ce2c, self)
+    }
+
+    pub unsafe fn TextWidth(&self, text: &UStr) -> u32 {
+        delphi_call!(0x45bec4, self, text.0)
+    }
+
+    pub unsafe fn TextHeight(&self, text: &UStr) -> u32 {
+        delphi_call!(0x45bea4, self, text.0)
+    }
+
+    pub unsafe fn GetClipRect(&self, rect: &mut [u32; 4]) {
+        let _: u32 = delphi_call!(0x45ce04, self, rect.as_mut_ptr());
+    }
+
+    pub unsafe fn FillRect(&self, rect: &[u32; 4]) {
+        let _: u32 = delphi_call!(0x45c664, self, rect.as_ptr());
+    }
+
+    pub unsafe fn TextOut(&self, x: i32, y: i32, text: &UStr) {
+        let _: u32 = delphi_call!(0x45c9e8, self, x, y, text.0);
+    }
+}
+
+#[repr(C)]
+pub struct TFont {}
+
+impl TFont {
+    pub fn Assign(&mut self, other: &Self) {
+        unsafe {
+            let _: u32 = delphi_call!(0x45af94, self, other);
+        }
+    }
+
+    pub unsafe fn SetColor(&self, col: u32) {
+        let _: u32 = delphi_call!(0x45b0d0, self, col);
+    }
+}
+
+#[repr(C)]
+pub struct TBrush {}
+
+impl TBrush {
+    pub unsafe fn SetStyle(&self, style: u8) {
+        let _: u32 = delphi_call!(0x45bda4, self, u32::from(style));
+    }
 }
 
 #[repr(C)]
