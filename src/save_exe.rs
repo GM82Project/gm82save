@@ -225,7 +225,10 @@ impl GetAssetList for asset::Font {
         out.write_u32::<LE>((self.range_start & 0xffff) | (charset << 16) | ((self.aa_level + 1) << 24))?;
         out.write_u32::<LE>(self.range_end)?;
         if exe {
-            self.render();
+            unsafe {
+                // oh no
+                (*(self as *const Self as *mut Self)).render();
+            }
             for i in 0..256 {
                 out.write_u32::<LE>(self.s_x[i])?;
                 out.write_u32::<LE>(self.s_y[i])?;

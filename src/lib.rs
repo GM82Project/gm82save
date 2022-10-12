@@ -8,6 +8,7 @@ mod asset;
 mod delphi;
 mod compiler;
 mod events;
+mod font_render;
 mod ide;
 mod list;
 mod load;

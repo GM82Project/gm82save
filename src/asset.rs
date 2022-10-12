@@ -342,12 +342,6 @@ impl Font {
     pub unsafe fn make_tfont(&self) -> DelphiBox<TFont> {
         DelphiBox::from_ptr(delphi_call!(0x5a86b4, self))
     }
-
-    pub fn render(&self) {
-        unsafe {
-            let _: u32 = delphi_call!(0x5a809c, self);
-        }
-    }
 }
 
 #[repr(C)]
