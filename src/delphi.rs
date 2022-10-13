@@ -380,7 +380,7 @@ impl TBitmap {
         &mut *ptr
     }
 
-    pub unsafe fn GetScanline(&self, row: i32) -> *const u8 {
+    pub unsafe fn GetScanline(&self, row: u32) -> *const u8 {
         delphi_call!(0x462be8, self, row)
     }
 }
@@ -414,7 +414,7 @@ impl TCanvas {
         let _: u32 = delphi_call!(0x45c664, self, rect.as_ptr());
     }
 
-    pub unsafe fn TextOut(&self, x: i32, y: i32, text: &UStr) {
+    pub unsafe fn TextOut(&self, x: i32, y: u32, text: &UStr) {
         let _: u32 = delphi_call!(0x45c9e8, self, x, y, text.0);
     }
 }
@@ -438,6 +438,10 @@ impl TFont {
 pub struct TBrush {}
 
 impl TBrush {
+    pub unsafe fn SetColor(&self, color: u32) {
+        let _: u32 = delphi_call!(0x45bc24, self, color);
+    }
+
     pub unsafe fn SetStyle(&self, style: u8) {
         let _: u32 = delphi_call!(0x45bda4, self, u32::from(style));
     }
@@ -612,6 +616,12 @@ impl UStr {
             }
             UStrSetLength(&mut out, real_len);
         }
+        out
+    }
+
+    pub fn from_char(c: u16) -> Self {
+        let mut out = UStr(ptr::null_mut());
+        let _: u32 = unsafe { delphi_call!(0x408034, &mut out, u32::from(c)) };
         out
     }
 
