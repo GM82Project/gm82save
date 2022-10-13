@@ -154,13 +154,10 @@ impl Font {
             if GetTextMetricsW(hdc, &mut text_metrics) == 0 {
                 return
             }
-            let format = [1, 4, 5, 6].get(self.aa_level as usize).copied().unwrap_or(1);
+            // generate unicode characters
             let codepage = charset_to_codepage(self.charset);
-            let mut max_buffer_size = 0;
-            let mut glyph_metrics = std::mem::zeroed();
             for c in self.range_start..=self.range_end {
-                let c = c as usize;
-                self.s_chr[c] = if c == 0 {
+                self.s_chr[c as usize] = if c == 0 {
                     0
                 } else {
                     let mut wc = 1;
@@ -168,61 +165,92 @@ impl Font {
                     MultiByteToWideChar(codepage, 0, &cc, 1, &mut wc, 1);
                     wc.into()
                 };
-                let out = GetGlyphOutlineW(hdc, self.s_chr[c], format, &mut glyph_metrics, 0, ptr::null_mut(), &matrix);
-                max_buffer_size = max_buffer_size.max(out);
-                self.s_w[c] = glyph_metrics.gmBlackBoxX;
-                self.s_h[c] = (text_metrics.tmAscent as i32 + glyph_metrics.gmBlackBoxY as i32 - glyph_metrics.gmptGlyphOrigin[1]) as u32;
-                self.s_shift[c] = (glyph_metrics.gmCellIncX as i32 - glyph_metrics.gmptGlyphOrigin[0].min(0)) as u32;
-                self.s_offset[c] = glyph_metrics.gmptGlyphOrigin[0] as u32;
-                self.s_x[c] = 0;
-                self.s_y[c] = 0;
             }
-            if self.s_h[0x20] == 0 {
-                self.s_h[0x20] = text_metrics.tmHeight;
-            }
-            if self.s_w[0x20] == 0 {
-                GetGlyphOutlineW(hdc, 0x20, format, &mut glyph_metrics, 0, ptr::null_mut(), &matrix);
-                self.s_w[0x20] = if glyph_metrics.gmCellIncX != 0 {
-                    glyph_metrics.gmCellIncX
-                } else {
-                    text_metrics.tmAveCharWidth.min(text_metrics.tmMaxCharWidth)
-                };
-                self.s_shift[0x20] = self.s_w[0x20];
-            }
-            let mut chars = (self.range_start..=self.range_end).collect::<Vec<_>>();
-            chars.sort_unstable_by_key(|&c| -((self.s_w[c as usize] * self.s_h[c as usize]) as i32));
-            self.calculate_bitmap_size(&chars);
-            self.s_bytes.alloc((self.s_bw * self.s_bh) as usize);
-            self.s_bytes.fill(0); // is this really necessary?
-            let mut glyph_buf = vec![0; max_buffer_size as usize];
-            let mut x = 0;
-            let mut y = 0;
-            let mut row_height = 0;
-            let hspacing = 2;
-            let vspacing = 2;
-            for c in chars {
-                if x + self.s_w[c as usize] >= self.s_bw {
-                    x = 0;
-                    y += row_height + vspacing;
-                    row_height = 0;
+            self.s_bw = 0;
+            self.s_bh = 0;
+            if text_metrics.tmPitchAndFamily & 0x2 != 0 {
+                // vector font, should work with GetGlyphOutlineW
+                let format = [1, 4, 5, 6].get(self.aa_level as usize).copied().unwrap_or(1);
+                let mut max_buffer_size = 0;
+                let mut glyph_metrics = std::mem::zeroed();
+                for c in self.range_start..=self.range_end {
+                    let c = c as usize;
+                    let out =
+                        GetGlyphOutlineW(hdc, self.s_chr[c], format, &mut glyph_metrics, 0, ptr::null_mut(), &matrix);
+                    if out != u32::MAX {
+                        max_buffer_size = max_buffer_size.max(out);
+                        self.s_w[c] = glyph_metrics.gmBlackBoxX;
+                        self.s_h[c] = (text_metrics.tmAscent as i32 + glyph_metrics.gmBlackBoxY as i32
+                            - glyph_metrics.gmptGlyphOrigin[1]) as u32;
+                        self.s_shift[c] =
+                            (glyph_metrics.gmCellIncX as i32 - glyph_metrics.gmptGlyphOrigin[0].min(0)) as u32;
+                        self.s_offset[c] = glyph_metrics.gmptGlyphOrigin[0] as u32;
+                    } else {
+                        self.s_w[c] = 0;
+                        self.s_h[c] = 0;
+                        self.s_shift[c] = 0;
+                        self.s_offset[c] = 0;
+                    }
+                    self.s_x[c] = 0;
+                    self.s_y[c] = 0;
                 }
-                glyph_buf.fill(0);
-                GetGlyphOutlineW(
-                    hdc,
-                    self.s_chr[c as usize],
-                    format,
-                    &mut glyph_metrics,
-                    max_buffer_size,
-                    glyph_buf.as_mut_ptr(),
-                    &matrix,
-                );
-                row_height = row_height.max(self.s_h[c as usize]);
-                self.s_x[c as usize] = x;
-                self.s_y[c as usize] = y;
-                if c != 0x20 {
-                    self.copy_glyph_onto_atlas(format, y, glyph_buf.as_mut_ptr(), &text_metrics, &glyph_metrics, c, x);
+                if self.s_h[0x20] == 0 {
+                    self.s_h[0x20] = text_metrics.tmHeight;
                 }
-                x += self.s_w[c as usize] + hspacing;
+                if self.s_w[0x20] == 0 {
+                    GetGlyphOutlineW(hdc, 0x20, format, &mut glyph_metrics, 0, ptr::null_mut(), &matrix);
+                    self.s_w[0x20] = if glyph_metrics.gmCellIncX != 0 {
+                        glyph_metrics.gmCellIncX
+                    } else {
+                        text_metrics.tmAveCharWidth.min(text_metrics.tmMaxCharWidth)
+                    };
+                    self.s_shift[0x20] = self.s_w[0x20];
+                }
+                let mut chars = (self.range_start..=self.range_end).collect::<Vec<_>>();
+                chars.sort_unstable_by_key(|&c| -((self.s_w[c as usize] * self.s_h[c as usize]) as i32));
+                self.calculate_bitmap_size(&chars);
+                self.s_bytes.alloc((self.s_bw * self.s_bh) as usize);
+                self.s_bytes.fill(0); // is this really necessary?
+                let mut glyph_buf = vec![0; max_buffer_size as usize];
+                let mut x = 0;
+                let mut y = 0;
+                let mut row_height = 0;
+                let hspacing = 2;
+                let vspacing = 2;
+                for c in chars {
+                    if x + self.s_w[c as usize] >= self.s_bw {
+                        x = 0;
+                        y += row_height + vspacing;
+                        row_height = 0;
+                    }
+                    row_height = row_height.max(self.s_h[c as usize]);
+                    self.s_x[c as usize] = x;
+                    self.s_y[c as usize] = y;
+                    if c != 0x20 {
+                        glyph_buf.fill(0);
+                        GetGlyphOutlineW(
+                            hdc,
+                            self.s_chr[c as usize],
+                            format,
+                            &mut glyph_metrics,
+                            max_buffer_size,
+                            glyph_buf.as_mut_ptr(),
+                            &matrix,
+                        );
+                        self.copy_glyph_onto_atlas(
+                            format,
+                            y,
+                            glyph_buf.as_mut_ptr(),
+                            &text_metrics,
+                            &glyph_metrics,
+                            c,
+                            x,
+                        );
+                    }
+                    x += self.s_w[c as usize] + hspacing;
+                }
+            } else {
+                // placeholder
             }
         }
     }
