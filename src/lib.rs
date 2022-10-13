@@ -1703,7 +1703,10 @@ unsafe fn injector() {
     patch_call(0x64639e, floor_st0 as _);
     patch_call(0x6463d7, floor_st0 as _);
 
-    // don't skip font dwType 2
+    // don't skip font dwType 2 (otf)
+    patch(0x6fb501, &[0x90, 0x90]);
+
+    // don't skip font dwType 1 (bitmap fonts)
     patch(0x6fb504, &[0x90, 0x90]);
 
     // fix access violation when closing object/timeline window while mousing over action
