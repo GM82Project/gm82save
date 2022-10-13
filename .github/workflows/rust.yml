@@ -20,6 +20,7 @@ jobs:
     - uses: actions-rs/toolchain@v1
       with:
         target: i686-pc-windows-msvc
+        toolchain: nightly
         default: true
     - name: Build
       run: cargo build --release --verbose
