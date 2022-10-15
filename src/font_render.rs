@@ -337,7 +337,7 @@ impl Font {
                     for (dst, src) in
                         dst_row.iter_mut().zip(slice::from_raw_parts(scanline, self.s_bw as usize * 3).chunks(3))
                     {
-                        *dst = (u16::from(*dst) + 0xff - src.iter().copied().map(u16::from).sum::<u16>() / 3u16) as u8;
+                        *dst = ((u16::from(*dst) + 0xff - src.iter().copied().map(u16::from).sum::<u16>() / 3u16) / 2) as u8;
                     }
                 }
             }
