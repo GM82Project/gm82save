@@ -237,8 +237,7 @@ impl Font {
             chars.sort_unstable_by_key(|&c| -((self.s_w[c as usize] * self.s_h[c as usize]) as i32));
             self.calculate_bitmap_size(&chars);
             if !vector_font {
-                bitmap.SetWidth(self.s_bw);
-                bitmap.SetHeight(self.s_bh);
+                bitmap.SetSize(self.s_bw, self.s_bh);
                 let canvas = bitmap.GetCanvas();
                 canvas.FBrush.SetColor(0);
                 let mut rect = [0; 4];

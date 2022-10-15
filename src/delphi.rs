@@ -371,6 +371,16 @@ impl TBitmap {
         }
     }
 
+    pub unsafe fn SetSize(&mut self, width: u32, height: u32) {
+        asm! {
+            "call {}",
+            in(reg) (self as *const Self).cast::<*const u32>().read().add(0x6c / 4).read(),
+            in("eax") self,
+            in("edx") width,
+            in("ecx") height,
+        }
+    }
+
     pub unsafe fn SetPixelFormat(&mut self, format: u8) {
         let _: u32 = delphi_call!(0x463dc0, self, u32::from(format));
     }
