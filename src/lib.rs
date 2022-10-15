@@ -386,6 +386,31 @@ unsafe extern "fastcall" fn load(proj_path: &UStr, stream_ptr: *mut u32, result_
 }
 
 #[naked]
+unsafe extern "C" fn load_recent_project_and_maybe_compile() {
+    unsafe extern "C" fn inj() {
+        let mut args = std::env::args().peekable();
+        while let Some(arg) = args.next() {
+            if arg == "--build" {
+                if let Some(path) = args.peek() {
+                    // we found a build arg, build project and close
+                    let path = UStr::new(path);
+                    let _: u32 = delphi_call!(0x6ce300, path.0, 0, 0, 0);
+                    std::process::exit(0);
+                }
+            }
+        }
+    }
+    asm! {
+        // load project
+        "mov ecx, 0x7059d8",
+        "call ecx",
+        "jmp {}",
+        sym inj,
+        options(noreturn),
+    }
+}
+
+#[naked]
 unsafe extern "C" fn gm81_or_gm82_inj() {
     asm! {
         "mov ecx, eax",
@@ -1641,6 +1666,8 @@ unsafe fn injector() {
 
     // accept only the first commandline argument as a project path
     patch(0x6dead7, &[0xeb]);
+
+    patch_call(0x6deb0f, load_recent_project_and_maybe_compile as _);
 
     // about dialog
     #[rustfmt::skip]
