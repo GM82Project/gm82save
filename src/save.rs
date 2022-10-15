@@ -15,7 +15,7 @@ use std::{
     fs::File,
     io::{BufWriter, Write},
     path::PathBuf,
-    slice, str,
+    str,
 };
 
 impl UStr {
@@ -112,7 +112,7 @@ fn save_gml(path: &std::path::Path, code: &UStr) -> Result<()> {
     Ok(())
 }
 
-unsafe fn save_frame(frame: &Frame, path: &std::path::Path) -> Result<()> {
+fn save_frame(frame: &Frame, path: &std::path::Path) -> Result<()> {
     let err = |_| Error::Other(format!("failed to save frame {}", path.to_string_lossy()));
     // set up encoder
     let mut f = open_file(path)?;
@@ -121,7 +121,7 @@ unsafe fn save_frame(frame: &Frame, path: &std::path::Path) -> Result<()> {
     encoder.set_filter(png::FilterType::NoFilter);
     let mut writer = encoder.write_header().map_err(err)?;
     // BGRA8 -> RGBA8
-    let mut pixels = slice::from_raw_parts(frame.data, frame.width as usize * frame.height as usize * 4).to_vec();
+    let mut pixels = frame.get_data().to_vec();
     pixels.par_chunks_exact_mut(4).for_each(|px| px.swap(0, 2));
     // save
     writer.write_image_data(&pixels).map_err(err)?;
@@ -130,27 +130,15 @@ unsafe fn save_frame(frame: &Frame, path: &std::path::Path) -> Result<()> {
     Ok(())
 }
 
-unsafe fn save_stream(data: &delphi::TMemoryStream, path: &std::path::Path) -> Result<()> {
-    let old_pos = data.get_pos();
-    data.set_pos(0);
-    let len = data.get_size() as usize;
-    let mut s = Vec::with_capacity(len);
-    s.set_len(len);
-    data.read(s.as_mut_ptr(), len as _);
-    data.set_pos(old_pos);
-    write_file(path, s)?;
-    Ok(())
-}
-
 fn no_dependencies<T>(_: &T) -> bool {
     false
 }
 
-unsafe fn save_sound(sound: &Sound, path: &mut PathBuf) -> Result<()> {
+fn save_sound(sound: &Sound, path: &mut PathBuf) -> Result<()> {
     let extension = sound.extension.try_decode()?;
     path.set_extension(extension.trim_matches('.'));
     if let Some(data) = sound.data.as_ref() {
-        save_stream(data, &path)?;
+        write_file(&path, data.get_slice())?;
     }
     path.set_extension("txt");
     let mut f = open_file(&path)?;
@@ -166,7 +154,7 @@ unsafe fn save_sound(sound: &Sound, path: &mut PathBuf) -> Result<()> {
     Ok(())
 }
 
-unsafe fn save_sprite(sprite: &Sprite, path: &mut PathBuf) -> Result<()> {
+fn save_sprite(sprite: &Sprite, path: &mut PathBuf) -> Result<()> {
     create_dirs(&path)?;
     for (i, frame) in sprite.get_frames().iter().enumerate() {
         path.push(format!("{}.png", i));
@@ -191,7 +179,7 @@ unsafe fn save_sprite(sprite: &Sprite, path: &mut PathBuf) -> Result<()> {
     Ok(())
 }
 
-unsafe fn save_background(back: &Background, path: &mut PathBuf) -> Result<()> {
+fn save_background(back: &Background, path: &mut PathBuf) -> Result<()> {
     path.set_extension("png");
     let frame = &back.frame;
     if frame.width != 0 && frame.height != 0 {
@@ -918,7 +906,7 @@ unsafe fn save_included_files(path: &mut PathBuf, smart_save: bool) -> Result<()
             if file.stored_in_gmk {
                 path.push("include");
                 path.push(&name);
-                save_stream(&file.data, &path)?;
+                write_file(&path, file.data.get_slice())?;
                 path.pop();
                 path.pop();
             } else {

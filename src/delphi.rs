@@ -485,35 +485,39 @@ impl TMemoryStream {
         delphi_box!(0x405a4c, 0x433630)
     }
 
-    pub unsafe fn get_pos(&self) -> u32 {
-        delphi_call!(0x43f234, self)
+    pub fn get_pos(&self) -> u32 {
+        unsafe { delphi_call!(0x43f234, self) }
     }
 
-    pub unsafe fn set_pos(&self, pos: u32) {
-        asm! {
-            "push 0",
-            "push {pos_lo}",
-            "call {call}",
-            call = in(reg) 0x43f254,
-            pos_lo = in(reg) pos,
-            in("eax") self,
-            clobber_abi("C"),
-        };
+    pub fn set_pos(&self, pos: u32) {
+        unsafe {
+            asm! {
+                "push 0",
+                "push {pos_lo}",
+                "call {call}",
+                call = in(reg) 0x43f254,
+                pos_lo = in(reg) pos,
+                in("eax") self,
+                clobber_abi("C"),
+            };
+        }
     }
 
-    pub unsafe fn get_size(&self) -> u32 {
+    pub fn get_size(&self) -> u32 {
         let out;
-        asm! {
-            "mov ecx,[eax]",
-            "call [ecx]",
-            inlateout("eax") self => out,
-            clobber_abi("C"),
-        };
+        unsafe {
+            asm! {
+                "mov ecx,[eax]",
+                "call [ecx]",
+                inlateout("eax") self => out,
+                clobber_abi("C"),
+            };
+        }
         out
     }
 
-    pub unsafe fn get_slice(&self) -> &[u8] {
-        slice::from_raw_parts(self.memory, self.size)
+    pub fn get_slice(&self) -> &[u8] {
+        unsafe { slice::from_raw_parts(self.memory, self.size) }
     }
 
     pub unsafe fn read(&self, buf: *mut u8, count: u32) {

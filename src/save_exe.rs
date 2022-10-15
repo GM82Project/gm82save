@@ -396,12 +396,12 @@ fn write_buffer(buf: &[u8], mut out: impl Write) -> io::Result<()> {
 }
 
 fn save_frame(frame: &asset::Frame, mut out: impl Write) -> io::Result<()> {
-    let image_size = (frame.width * frame.height * 4) as usize;
     out.write_u32::<LE>(800)?;
     out.write_u32::<LE>(frame.width)?;
     out.write_u32::<LE>(frame.height)?;
-    if image_size > 0 {
-        write_buffer(unsafe { slice::from_raw_parts(frame.data, image_size) }, &mut out)?;
+    let data = frame.get_data();
+    if !data.is_empty() {
+        write_buffer(data, &mut out)?;
     }
     Ok(())
 }

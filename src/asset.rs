@@ -61,11 +61,15 @@ impl Frame {
         let _: u32 = delphi_call!(0x7026A4, self, file);
     }
 
-    pub unsafe fn thumb(&self, out: &mut [u8], flip: bool, bg_col: [u8; 3]) {
+    pub fn get_data(&self) -> &[u8] {
+        unsafe { slice::from_raw_parts(self.data, (self.width * self.height * 4) as usize) }
+    }
+
+    pub fn thumb(&self, out: &mut [u8], flip: bool, bg_col: [u8; 3]) {
         // note: this assumes output format == input format
         // these are stored as BGRA8 so make sure to double check what the output should be
         use itertools::Itertools;
-        let data = slice::from_raw_parts(self.data, (self.width * self.height * 4) as usize);
+        let data = self.get_data();
         let (width, height) = if self.width > self.height {
             (16, (self.height * 16 / self.width) as usize)
         } else {
