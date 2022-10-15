@@ -4,8 +4,8 @@ use crate::{
     delphi::{advance_progress_form, DelphiBox, TTreeNode, UStr},
     events, ide,
     ide::AssetListTrait,
-    project_watcher, run_while_updating_bar, show_message, update_timestamp, Error, InstanceExtra, Result, TileExtra,
-    ACTION_TOKEN, EXTRA_DATA, LAST_SAVE, PATH_FORM_UPDATED, SAW_APPLIES_TO_WARNING,
+    project_watcher, run_while_updating_bar, show_message, update_timestamp, Error, GMLLines, InstanceExtra, Result,
+    TileExtra, ACTION_TOKEN, EXTRA_DATA, LAST_SAVE, PATH_FORM_UPDATED, SAW_APPLIES_TO_WARNING,
 };
 use itertools::Itertools;
 use rayon::prelude::*;
@@ -99,8 +99,8 @@ fn write_file(path: &std::path::Path, content: impl AsRef<[u8]>) -> Result<()> {
 }
 
 fn write_gml<F: Write>(f: &mut F, code: &UStr) -> Result<()> {
-    for line in code.try_decode()?.trim_end().lines() {
-        writeln!(f, "{}", line.trim_end())?;
+    for line in GMLLines::new(code.try_decode()?.trim_end().lines()) {
+        writeln!(f, "{}", line)?;
     }
     Ok(())
 }

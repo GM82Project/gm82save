@@ -4,8 +4,8 @@ use crate::{
     delphi::{advance_progress_form, DelphiBox, UStr},
     events, ide,
     ide::AssetListTrait,
-    project_watcher, run_while_updating_bar, show_message, update_timestamp, Error, InstanceExtra, Result, TileExtra,
-    ACTION_TOKEN, EXTRA_DATA, PATH_FORM_UPDATED,
+    project_watcher, run_while_updating_bar, show_message, update_timestamp, Error, GMLLines, InstanceExtra, Result,
+    TileExtra, ACTION_TOKEN, EXTRA_DATA, PATH_FORM_UPDATED,
 };
 use itertools::izip;
 use parking_lot::Mutex;
@@ -44,8 +44,8 @@ impl UStrPtr for *mut UStr {
 fn load_gml(code: &str) -> UStr {
     let mut buf = String::with_capacity(code.len());
     // don't use string.replace() in case your gml is \r\n for some reason
-    for line in code.lines() {
-        buf += line.trim_end();
+    for line in GMLLines::new(code.lines()) {
+        buf += line;
         buf += "\r\n";
     }
     UStr::new(buf)

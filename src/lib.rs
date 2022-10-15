@@ -105,6 +105,32 @@ impl From<std::num::ParseFloatError> for Error {
     }
 }
 
+// line iterator that strips right end but only if not in a string
+pub struct GMLLines<'a>(std::str::Lines<'a>, u8);
+
+impl<'a> GMLLines<'a> {
+    fn new(lines: std::str::Lines<'a>) -> Self {
+        Self(lines, 0)
+    }
+}
+
+impl<'a> Iterator for GMLLines<'a> {
+    type Item = &'a str;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let line = self.0.next()?;
+        let trimmed = line.trim_end();
+        for c in trimmed.bytes() {
+            if self.1 == 0 && (c == b'"' || c == b'\'') {
+                self.1 = c;
+            } else if c == self.1 {
+                self.1 = 0;
+            }
+        }
+        Some(if self.1 == 0 { trimmed } else { line })
+    }
+}
+
 pub type Result<T> = std::result::Result<T, Error>;
 
 const ACTION_TOKEN: &str = "/*\"/*'/**//* YYD ACTION";
