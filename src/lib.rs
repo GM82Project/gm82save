@@ -1634,16 +1634,8 @@ unsafe fn patch_call(instr: usize, proc: usize) {
 #[cfg_attr(test, allow(dead_code))]
 unsafe fn injector() {
     std::panic::set_hook(Box::new(|info| {
-        #[link(name = "user32")]
-        extern "system" {
-            fn MessageBoxW(hWnd: usize, lpText: *const u16, lpCaption: *const u16, uType: u32) -> i32;
-        }
-        let msg = (info.to_string() + "\r\n\r\nPlease send a screenshot of this error message to Floogle.")
-            .encode_utf16()
-            .chain(std::iter::once(0))
-            .collect::<Vec<_>>();
-        MessageBoxW(0, msg.as_ptr(), std::ptr::null(), 0x10);
-
+        let msg = UStr::new(info.to_string() + "\r\n\r\nPlease send a screenshot of this error message to Floogle.");
+        let _: u32 = delphi_call!(0x51fbdc, *(0x7882ec as *const usize), msg.0, 0, 0x10);
         std::process::exit(-1);
     }));
 
