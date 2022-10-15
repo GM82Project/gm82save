@@ -1647,6 +1647,9 @@ unsafe fn injector() {
         std::process::exit(-1);
     }));
 
+    // accept only the first commandline argument as a project path
+    patch(0x6dead7, &[0xeb]);
+
     // about dialog
     #[rustfmt::skip]
     patch(0x71be58, &[
