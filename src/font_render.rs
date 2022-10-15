@@ -303,7 +303,6 @@ impl Font {
                 x += self.s_w[c as usize] + hspacing;
             }
             if !vector_font {
-                // extra processing for bitmap fonts
                 // download bitmap
                 for (y, dst_row) in self.s_bytes.chunks_mut(self.s_bw as usize).enumerate() {
                     let scanline = bitmap.GetScanline(y as u32);
@@ -311,33 +310,6 @@ impl Font {
                         dst_row.iter_mut().zip(slice::from_raw_parts(scanline, self.s_bw as usize * 3).chunks(3))
                     {
                         *dst = (src.iter().copied().map(u16::from).sum::<u16>() / 3u16) as u8;
-                    }
-                }
-                // setup for second pass (???)
-                canvas.FBrush.SetColor(0xffffff);
-                let mut rect = [0; 4];
-                canvas.GetClipRect(&mut rect);
-                canvas.FillRect(&rect);
-                canvas.FFont.SetColor(0);
-                canvas.FBrush.SetStyle(1);
-                // draw characters 2 (???)
-                for c in self.range_start..=self.range_end {
-                    let c = c as usize;
-                    let s = UStr::from_char(c as u16);
-                    let mut abc = Default::default();
-                    if GetCharABCWidthsW(hdc, self.s_chr[c], self.s_chr[c], &mut abc) != 0 {
-                        canvas.TextOut(self.s_x[c] as i32 - abc.abcA, self.s_y[c], &s);
-                    } else {
-                        canvas.TextOut(self.s_x[c] as i32, self.s_y[c], &s);
-                    }
-                }
-                // download bitmap and also process or something ig?
-                for (y, dst_row) in self.s_bytes.chunks_mut(self.s_bw as usize).enumerate() {
-                    let scanline = bitmap.GetScanline(y as u32);
-                    for (dst, src) in
-                        dst_row.iter_mut().zip(slice::from_raw_parts(scanline, self.s_bw as usize * 3).chunks(3))
-                    {
-                        *dst = ((u16::from(*dst) + 0xff - src.iter().copied().map(u16::from).sum::<u16>() / 3u16) / 2) as u8;
                     }
                 }
             }
