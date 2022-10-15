@@ -118,6 +118,7 @@ impl<'a> Iterator for GMLLines<'a> {
     type Item = &'a str;
 
     fn next(&mut self) -> Option<Self::Item> {
+        // trim line only if EOL is not in a string
         let line = self.0.next()?;
         let trimmed = line.trim_end();
         for c in trimmed.bytes() {
