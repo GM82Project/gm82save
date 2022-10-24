@@ -715,6 +715,10 @@ unsafe extern "C" fn free_image_editor_bitmap() {
         // free it
         "mov edx, 0x405a7c",
         "call edx",
+        // null it
+        "mov eax, dword ptr [esi]",
+        "xor edx, edx",
+        "mov dword ptr [eax + 0x708], edx",
         "1: ret",
         options(noreturn),
     }
