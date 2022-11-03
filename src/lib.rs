@@ -1,4 +1,4 @@
-#![feature(asm_sym, naked_functions)]
+#![feature(naked_functions)]
 
 #[cfg(not(all(windows, target_arch = "x86")))]
 compile_error!("this tool only works on windows 32-bit");
