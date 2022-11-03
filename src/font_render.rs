@@ -139,14 +139,14 @@ impl Font {
         c: u32,
         x: u32,
     ) {
-        std::arch::asm! {
+        std::arch::asm!(
             "mov eax, ecx",
             "pop ecx",
             "xchg ecx, [esp]",
-            "push 0x5a7b54",
+            "push 0x5a7b54", // copy glyph onto font atlas
             "ret",
             options(noreturn),
-        }
+        );
     }
 
     pub fn render(&mut self) {

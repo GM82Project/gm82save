@@ -7,12 +7,12 @@ use std::{arch::asm, collections::HashSet};
 
 #[naked]
 unsafe extern "C" fn compile_constants_inj() {
-    asm! {
+    asm!(
         "mov ecx, eax",
         "jmp {}",
         sym compile_constants,
         options(noreturn),
-    }
+    );
 }
 
 lazy_static! {
@@ -111,7 +111,7 @@ unsafe extern "fastcall" fn compile_constants(stream: usize) -> bool {
 #[naked]
 unsafe extern "C" fn save_82_if_exe() {
     // only saves settings version 825 when saving an exe with the creation code flag set
-    asm! {
+    asm!(
         "mov edx, 825",
         "mov ecx, 800",
         "test bl, bl", // if exe
@@ -120,51 +120,52 @@ unsafe extern "C" fn save_82_if_exe() {
         "cmovnc edx, ecx",
         "ret",
         options(noreturn),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn save_bool_if_exe() {
-    asm! {
+    asm!(
         "push esi",
         "mov esi, 0x52f240", // WriteBoolean
         "mov ecx, 0x52f12c", // WriteInteger
-        "test bl, bl", // if exe
+        "test bl, bl",       // if exe
         "cmovnz ecx, esi",
         "call ecx",
         "pop esi",
         "ret",
         options(noreturn),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn save_creation_code_flag() {
-    asm! {
+    asm!(
         "mov ecx, 0x52f12c", // WriteInteger (for uninitialized args)
         "call ecx",
         "test bl, bl", // if exe
         "jz 1f",
         "bt word ptr [0x77f54e], 15", // if force cpu
         "jnc 1f",
-
-        "mov eax, esi", // gmk stream
-        "xor edx, edx", // 0 (webgl)
+        // write webgl
+        "mov eax, esi",      // gmk stream
+        "xor edx, edx",      // 0 (webgl)
         "mov ecx, 0x52f12c", // WriteInteger
         "call ecx",
-        "mov eax, esi", // gmk stream
-        "mov dl, 1", // true (creation code)
+        // write creation code flag
+        "mov eax, esi",      // gmk stream
+        "mov dl, 1",         // true (creation code)
         "mov ecx, 0x52f240", // WriteBoolean
         "call ecx",
-
+        // exit
         "1: ret",
         options(noreturn),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn save_room_version_inj() {
-    asm! {
+    asm!(
         "mov cl, byte ptr [esp]",
         "call {}",
         "mov edx, eax",
@@ -172,7 +173,7 @@ unsafe extern "C" fn save_room_version_inj() {
         "jmp eax",
         sym save_room_version,
         options(noreturn),
-    }
+    );
 }
 
 unsafe extern "fastcall" fn save_room_version(exe: bool) -> u32 {
@@ -181,7 +182,7 @@ unsafe extern "fastcall" fn save_room_version(exe: bool) -> u32 {
 
 #[naked]
 unsafe extern "C" fn save_instance_extra_inj() {
-    asm! {
+    asm!(
         "mov ecx, ebx", // file
         "mov eax, dword ptr [edi + 0x2f4]", // instance list
         "mov edx, dword ptr [eax + ebp*0x8 + 0xc]", // instance id
@@ -195,12 +196,12 @@ unsafe extern "C" fn save_instance_extra_inj() {
         "jmp eax",
         sym save_instance_extra,
         options(noreturn),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn save_tile_extra_inj() {
-    asm! {
+    asm!(
         "mov ecx, ebx", // file
         "mov eax, dword ptr [edi + 0x2fc]", // tile list
         "mov edx, dword ptr [eax + ebp*0x8 + 0x20]", // tile id
@@ -214,11 +215,11 @@ unsafe extern "C" fn save_tile_extra_inj() {
         "jmp eax",
         sym save_tile_extra,
         options(noreturn),
-    }
+    );
 }
 
 unsafe fn save_real(file: usize, real: &f64) {
-    asm! {
+    asm!(
         "push dword ptr [{real} + 0x4]",
         "push dword ptr [{real}]",
         "call {call}",
@@ -226,7 +227,7 @@ unsafe fn save_real(file: usize, real: &f64) {
         real = in(reg) real,
         in("eax") file,
         clobber_abi("C"),
-    }
+    );
 }
 
 unsafe extern "fastcall" fn save_instance_extra(file: usize, id: usize, exe: bool) {

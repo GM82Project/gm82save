@@ -204,7 +204,7 @@ fn update_timestamp() {
 
 #[naked]
 unsafe extern "C" fn reset_if_time_went_backwards() {
-    asm! {
+    asm!(
         "movsd xmm0, qword ptr [{last_save}]", // load last save
         "ucomisd xmm0, qword ptr [esp]",       // compare to now
         "jb 2f", // jump if now > last save (i.e. no change needed)
@@ -214,7 +214,7 @@ unsafe extern "C" fn reset_if_time_went_backwards() {
         "ret",
         last_save = sym LAST_SAVE,
         options(noreturn),
-    }
+    );
 }
 
 #[derive(Clone)]
@@ -288,18 +288,18 @@ static mut EXTRA_DATA: Option<(HashMap<usize, InstanceExtra>, HashMap<usize, Til
 unsafe extern "fastcall" fn about_inj(about_dialog: *const *const usize) {
     let info = UStr::new(concat!("gm82save: ", env!("BUILD_DATE")));
     let edition_label = *about_dialog.add(0xe5);
-    asm! {
+    asm!(
         "call {}",
         in(reg) 0x4ee6d8, // TControl.SetText
         in("eax") edition_label,
         in("edx") info.0,
         clobber_abi("C"),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn save_inj() {
-    asm! {
+    asm!(
         "mov ecx, ebp",
         "sub ecx, 4",
         "mov edx, ebp",
@@ -307,7 +307,7 @@ unsafe extern "C" fn save_inj() {
         "jmp {}",
         sym save,
         options(noreturn),
-    }
+    );
 }
 
 // set the high byte to nonzero if YYD save code was used
@@ -345,7 +345,7 @@ unsafe extern "fastcall" fn save(proj_path: &UStr, stream_ptr: *mut u32) -> u16 
 
 #[naked]
 unsafe extern "C" fn load_inj() {
-    asm! {
+    asm!(
         "mov ecx, ebp",
         "sub ecx, 4",
         "mov edx, ebp",
@@ -357,7 +357,7 @@ unsafe extern "C" fn load_inj() {
         "ret",
         sym load,
         options(noreturn),
-    };
+    );
 }
 
 unsafe extern "fastcall" fn load(proj_path: &UStr, stream_ptr: *mut u32, result_ptr: *mut bool) -> bool {
@@ -400,24 +400,24 @@ unsafe extern "C" fn load_recent_project_and_maybe_compile() {
             }
         }
     }
-    asm! {
+    asm!(
         // load project
         "mov ecx, 0x7059d8",
         "call ecx",
         "jmp {}",
         sym inj,
         options(noreturn),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn gm81_or_gm82_inj() {
-    asm! {
+    asm!(
         "mov ecx, eax",
         "jmp {}",
         sym gm81_or_gm82,
         options(noreturn),
-    }
+    );
 }
 
 unsafe extern "fastcall" fn gm81_or_gm82(s: *const u16) -> i32 {
@@ -444,7 +444,7 @@ unsafe extern "fastcall" fn make_new_folder(_: u32, path_ptr: *const u16) {
 
 #[naked]
 unsafe extern "C" fn fix_tile_null_pointer() {
-    asm! {
+    asm!(
         "mov edx, 0x64e048",
         "call edx",
         "mov edx, 0x68ef07",
@@ -453,17 +453,17 @@ unsafe extern "C" fn fix_tile_null_pointer() {
         "cmovz edx, ecx",
         "jmp edx",
         options(noreturn),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn inflate_inj() {
-    asm! {
+    asm!(
         "mov ecx, eax",
         "jmp {}",
         sym inflate,
         options(noreturn),
-    }
+    );
 }
 
 unsafe extern "fastcall" fn inflate(src: &delphi::TMemoryStream) -> delphi::DelphiBox<delphi::TMemoryStream> {
@@ -482,12 +482,12 @@ unsafe extern "fastcall" fn inflate(src: &delphi::TMemoryStream) -> delphi::Delp
 
 #[naked]
 unsafe extern "C" fn deflate_inj() {
-    asm! {
+    asm!(
         "mov ecx, eax",
         "jmp {}",
         sym deflate,
         options(noreturn),
-    }
+    );
 }
 
 unsafe extern "fastcall" fn deflate(dst: &mut delphi::TMemoryStream, src: &delphi::TMemoryStream) {
@@ -503,38 +503,38 @@ static mut DEFLATE_LEVEL: u32 = 6; // default
 
 #[naked]
 unsafe extern "C" fn build_small() {
-    asm! {
+    asm!(
         "mov ecx, 9",
         "mov {}, ecx",
         "mov ecx, 0x4cf2f4",
         "jmp ecx",
         sym DEFLATE_LEVEL,
         options(noreturn),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn build_fast() {
-    asm! {
+    asm!(
         "mov ecx, 1",
         "mov {}, ecx",
         "mov ecx, 0x41735c",
         "jmp ecx",
         sym DEFLATE_LEVEL,
         options(noreturn),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn reset_compression() {
-    asm! {
+    asm!(
         "mov ecx, 6",
         "mov {}, ecx",
         "mov ecx, 0x51cc64",
         "jmp ecx",
         sym DEFLATE_LEVEL,
         options(noreturn),
-    }
+    );
 }
 
 unsafe extern "stdcall" fn duplicate_room(room: &mut asset::Room, old_id: usize, new_id: usize) {
@@ -574,26 +574,26 @@ unsafe fn freshen_room_ids(room: &mut asset::Room) {
 
 #[naked]
 unsafe extern "C" fn setup_unicode_parse_inj() {
-    asm! {
+    asm!(
         "mov ecx, edi",
         "call {}",
         "mov eax, 5",
         "ret",
         sym setup_unicode_parse,
         options(noreturn),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn teardown_unicode_parse_inj() {
-    asm! {
+    asm!(
         "mov ecx, 810",
         "call {}",
         "mov eax, 0x6ca2cc",
         "jmp eax",
         sym setup_unicode_parse,
         options(noreturn),
-    }
+    );
 }
 
 unsafe extern "fastcall" fn setup_unicode_parse(version: i32) {
@@ -606,27 +606,27 @@ unsafe extern "fastcall" fn setup_unicode_parse(version: i32) {
 
 #[naked]
 unsafe extern "C" fn properly_update_object_timestamp_drag_drop() {
-    asm! {
-        "mov eax, [esi + 0x46c]",
-        "mov ecx, 0x62cd2c",
+    asm!(
+        "mov eax, [esi + 0x46c]", // TObjectForm.index
+        "mov ecx, 0x62cd2c",      // update object timestamp
         "jmp ecx",
         options(noreturn),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn properly_update_timeline_timestamp_drag_drop() {
-    asm! {
-        "mov eax, [esi + 0x430]",
-        "mov ecx, 0x6fa7b0",
+    asm!(
+        "mov eax, [esi + 0x430]", // TTimeLineForm.index
+        "mov ecx, 0x6fa7b0",      // update timeline timestamp
         "jmp ecx",
         options(noreturn),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn properly_update_object_timestamp_right_click() {
-    asm! {
+    asm!(
         // show action modal
         "mov ecx, 0x6ff4dc",
         "call ecx",
@@ -640,12 +640,12 @@ unsafe extern "C" fn properly_update_object_timestamp_right_click() {
         "mov al, 1",
         "2: ret",
         options(noreturn),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn properly_update_timeline_timestamp_right_click() {
-    asm! {
+    asm!(
         // show action modal
         "mov ecx, 0x6ff4dc",
         "call ecx",
@@ -659,27 +659,27 @@ unsafe extern "C" fn properly_update_timeline_timestamp_right_click() {
         "mov al, 1",
         "2: ret",
         options(noreturn),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn update_sprite_mask_timestamp() {
-    asm! {
-        "mov eax, [ebx+0x42c]",
-        "mov ecx, 0x6f5ac8",
+    asm!(
+        "mov eax, [ebx+0x42c]", // TMaskForm.theindex
+        "mov ecx, 0x6f5ac8",    // update sprite timestamp
         "jmp ecx",
         options(noreturn),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn gm82_file_association_inj() {
-    asm! {
+    asm!(
         "mov ecx, eax",
         "jmp {}",
         sym gm82_file_association,
         options(noreturn),
-    }
+    );
 }
 
 unsafe extern "fastcall" fn gm82_file_association(reg: u32) {
@@ -702,7 +702,7 @@ unsafe extern "fastcall" fn check_gm_processes(name: usize, value: u32) {
 
 #[naked]
 unsafe extern "C" fn free_image_editor_bitmap() {
-    asm! {
+    asm!(
         // call free on TheBitmap
         "mov edx, 0x405a7c",
         "call edx",
@@ -721,12 +721,12 @@ unsafe extern "C" fn free_image_editor_bitmap() {
         "mov dword ptr [eax + 0x708], edx",
         "1: ret",
         options(noreturn),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn copy_origin_on_new() {
-    asm! {
+    asm!(
         "mov ecx, [eax+0xc]",
         "mov [esi+0xc], ecx",
         "mov ecx, [eax+0x10]",
@@ -734,12 +734,12 @@ unsafe extern "C" fn copy_origin_on_new() {
         "mov ecx, 0x405a7c",
         "jmp ecx",
         options(noreturn),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn floor_st0() {
-    asm! {
+    asm!(
         // move the return address and put st0 on the stack before it so it's like an argument
         "mov eax, [esp]",
         "sub esp, 8",
@@ -749,36 +749,36 @@ unsafe extern "C" fn floor_st0() {
         "mov eax, 0x410538",
         "jmp eax",
         options(noreturn),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn update_sprite_icon_on_revert() {
-    asm! {
-        "mov ecx, 0x6f5980",
+    asm!(
+        "mov ecx, 0x6f5980", // set sprite name (original function)
         "call ecx",
-        "mov eax, [ebx + 0x40c]",
-        "mov ecx, 0x6f5bb4",
+        "mov eax, [ebx + 0x40c]", // TSpriteForm.index
+        "mov ecx, 0x6f5bb4",      // update sprite icon
         "jmp ecx",
         options(noreturn),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn update_background_icon_on_revert() {
-    asm! {
-        "mov ecx, 0x64de98",
+    asm!(
+        "mov ecx, 0x64de98", // set background name (original function)
         "call ecx",
-        "mov eax, [ebx + 0x400]",
-        "mov ecx, 0x64e0cc",
+        "mov eax, [ebx + 0x400]", // TBackgroundForm.index
+        "mov ecx, 0x64e0cc",      // update background icon
         "jmp ecx",
         options(noreturn),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn dont_show_action_tooltip_if_event_is_null() {
-    asm! {
+    asm!(
         // if eax is not null, call CEvent.GetAction
         "mov ecx, 0x5a502c",
         "test eax, eax",
@@ -790,12 +790,12 @@ unsafe extern "C" fn dont_show_action_tooltip_if_event_is_null() {
         "2: add dword ptr [esp], 0x25",
         "ret",
         options(noreturn),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn object_form_add_events() {
-    asm! {
+    asm!(
         // call original function
         "mov ecx, 0x6c60f8",
         "call ecx",
@@ -826,12 +826,12 @@ unsafe extern "C" fn object_form_add_events() {
         mask = sym object_open_mask,
         children = sym object_show_children_inj,
         options(noreturn),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn object_open_parent() {
-    asm! {
+    asm!(
         // get theobject from form
         "mov eax, [eax + 0x45c]",
         // get parent_index from object
@@ -840,31 +840,31 @@ unsafe extern "C" fn object_open_parent() {
         "mov ecx, 0x62cde0",
         "jmp ecx",
         options(noreturn),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn object_open_mask() {
-    asm! {
-    // get theobject from form
-    "mov eax, [eax + 0x45c]",
-    // get mask_index from object
-    "mov eax, [eax + 0x18]",
-    // open the form
-    "mov ecx, 0x6f5b74",
-    "jmp ecx",
-    options(noreturn),
-    }
+    asm!(
+        // get theobject from form
+        "mov eax, [eax + 0x45c]",
+        // get mask_index from object
+        "mov eax, [eax + 0x18]",
+        // open the form
+        "mov ecx, 0x6f5b74",
+        "jmp ecx",
+        options(noreturn),
+    );
 }
 
 #[naked]
 unsafe extern "C" fn object_show_children_inj() {
-    asm! {
+    asm!(
         "mov ecx, eax",
         "jmp {}",
         sym object_show_children,
         options(noreturn),
-    }
+    );
 }
 
 unsafe extern "fastcall" fn object_show_children(object_form: *const i32) {
@@ -900,13 +900,13 @@ unsafe extern "fastcall" fn object_show_children(object_form: *const i32) {
 
 #[naked]
 unsafe extern "C" fn object_clean_collide_events_inj() {
-    asm! {
+    asm!(
         "mov ecx, eax",
         "mov edx, ebx",
         "jmp {}",
         sym object_clean_collide_events,
         options(noreturn),
-    }
+    );
 }
 
 unsafe extern "fastcall" fn object_clean_collide_events(obj: &mut asset::Object, object_id: usize) {
@@ -924,12 +924,12 @@ unsafe extern "fastcall" fn object_clean_collide_events(obj: &mut asset::Object,
 
 #[naked]
 unsafe extern "C" fn object_clean_triggers_inj() {
-    asm! {
+    asm!(
         "mov ecx, ebx",
         "jmp {}",
         sym object_clean_triggers,
         options(noreturn),
-    }
+    );
 }
 
 unsafe extern "fastcall" fn object_clean_triggers(trigger_id: usize) {
@@ -951,7 +951,7 @@ unsafe extern "fastcall" fn object_clean_triggers(trigger_id: usize) {
 
 #[naked]
 unsafe extern "C" fn path_form_mouse_wheel_inj() {
-    asm! {
+    asm!(
         // call TPathForm.Create
         "mov ebx, 0x514e78",
         "call ebx",
@@ -962,12 +962,12 @@ unsafe extern "C" fn path_form_mouse_wheel_inj() {
         "ret",
         sym path_form_mouse_wheel,
         options(noreturn),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn path_form_mouse_wheel() {
-    asm! {
+    asm!(
         // check handled flag
         "mov edx, [esp + 0x4]",
         "cmp byte ptr [edx], 0",
@@ -999,26 +999,26 @@ unsafe extern "C" fn path_form_mouse_wheel() {
         "4:",
         "ret 0xc",
         options(noreturn),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn path_room_change_forces_room_editor_save() {
-    asm! {
+    asm!(
         "mov ecx, 0x720560", // draw form
         "call ecx",
         "mov byte ptr {}, 1",
         "ret",
         sym PATH_FORM_UPDATED,
         options(noreturn),
-    }
+    );
 }
 
 static mut PATH_FORM_UPDATED: bool = false;
 
 #[naked]
 unsafe extern "C" fn code_editor_dont_resize_if_maximized() {
-    asm! {
+    asm!(
         // are we maximized?
         "cmp byte ptr [eax + 0x29a], 0x2",
         "je 2f",
@@ -1027,12 +1027,12 @@ unsafe extern "C" fn code_editor_dont_resize_if_maximized() {
         // otherwise quit
         "2: ret 0x8",
         options(noreturn),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn code_editor_better_resize() {
-    asm! {
+    asm!(
         // are we maximized?
         "cmp byte ptr [eax + 0x29a], 0x2",
         "jne 2f",
@@ -1042,12 +1042,12 @@ unsafe extern "C" fn code_editor_better_resize() {
         "2: mov edx, [0x781dd0]",
         "ret",
         options(noreturn),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn code_editor_middle_click() {
-    asm! {
+    asm!(
         // push return address
         "mov ecx, 0x6b734e",
         "push ecx",
@@ -1069,7 +1069,7 @@ unsafe extern "C" fn code_editor_middle_click() {
         "pop dword ptr [ebx + 0x2ec]",
         "2: ret",
         options(noreturn),
-    }
+    );
 }
 
 unsafe extern "fastcall" fn code_editor_script_hint(name: *const u16, out: &mut UStr) {
@@ -1092,7 +1092,7 @@ unsafe extern "fastcall" fn code_editor_script_hint(name: *const u16, out: &mut 
 
 #[naked]
 unsafe extern "C" fn completion_script_args_inj() {
-    asm! {
+    asm!(
         "mov ecx, eax",
         "call {}",
         // copy output of this to the argument on the stack
@@ -1101,7 +1101,7 @@ unsafe extern "C" fn completion_script_args_inj() {
         "ret",
         sym completion_script_args,
         options(noreturn),
-    }
+    );
 }
 
 unsafe extern "fastcall" fn add_space_before_trigger_name(trigger_id: i32, out: &mut UStr) {
@@ -1130,7 +1130,7 @@ unsafe extern "fastcall" fn completion_script_args(script_id: usize, out: &mut U
 
 #[naked]
 unsafe extern "C" fn write_number_on_actions() {
-    asm! {
+    asm!(
         // call original function
         "mov ecx, 0x45b498",
         "call ecx",
@@ -1170,12 +1170,12 @@ unsafe extern "C" fn write_number_on_actions() {
         "2:",
         ".short '.', ' ', 0",
         options(noreturn),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn regen_temp_folder_when_making_file() {
-    asm! {
+    asm!(
         "mov ecx, 0x407660",
         "call ecx",
         // ForceDirectories the temp directory
@@ -1183,12 +1183,12 @@ unsafe extern "C" fn regen_temp_folder_when_making_file() {
         "mov ecx, 0x416eac",
         "jmp ecx",
         options(noreturn),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn get_temp_folder_but_also_regen_it() {
-    asm! {
+    asm!(
         //UStrAsg temp_directory to the output
         "mov edx, [0x788974]",
         "mov ecx, 0x407eb8",
@@ -1198,12 +1198,12 @@ unsafe extern "C" fn get_temp_folder_but_also_regen_it() {
         "mov ecx, 0x416eac",
         "jmp ecx",
         options(noreturn),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn trace_date_inj() {
-    asm! {
+    asm!(
         // keep first two args
         "push ecx",
         "push eax",
@@ -1230,7 +1230,7 @@ unsafe extern "C" fn trace_date_inj() {
         "ret",
         sym trace_date,
         options(noreturn),
-    }
+    );
 }
 
 unsafe extern "fastcall" fn trace_date() -> UStr {
@@ -1278,19 +1278,12 @@ unsafe extern "fastcall" fn patch_error_box(caption: *const u16, text: *const u1
 
 #[naked]
 unsafe extern "C" fn get_treenode_count_and_preserve_resource_type() {
-    asm! {
-        "mov ecx, 0x4ad490",
-        "call ecx",
-        "mov [esp], edi",
-        "mov ecx, 0x71c6a5",
-        "jmp ecx",
-        options(noreturn),
-    }
+    asm!("mov ecx, 0x4ad490", "call ecx", "mov [esp], edi", "mov ecx, 0x71c6a5", "jmp ecx", options(noreturn),)
 }
 
 #[naked]
 unsafe extern "C" fn add_three_newest_inj() {
-    asm! {
+    asm!(
         // add a line
         "mov eax, [esi + 0x38]",
         "mov ecx, 0x4dd244",
@@ -1309,7 +1302,7 @@ unsafe extern "C" fn add_three_newest_inj() {
         "jmp ecx",
         sym add_three_newest,
         options(noreturn),
-    }
+    );
 }
 
 unsafe extern "fastcall" fn add_three_newest(items: &TMenuItem, ty: u32, ebp: *const u8) {
@@ -1349,17 +1342,17 @@ unsafe extern "fastcall" fn add_three_newest(items: &TMenuItem, ty: u32, ebp: *c
 
 #[naked]
 unsafe extern "C" fn room_form_inj() {
-    asm! {
+    asm!(
         "mov ecx, eax",
         "jmp {}",
         sym room_form,
         options(noreturn),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn room_size() {
-    asm! {
+    asm!(
         "mov eax, {width}",
         "mov dword ptr [ebx+0xc], eax",
         "mov eax, {height}",
@@ -1382,12 +1375,12 @@ unsafe extern "C" fn room_size() {
         height = sym DEFAULT_ROOM_HEIGHT,
         speed = sym DEFAULT_ROOM_SPEED,
         options(noreturn),
-    }
+    );
 }
 
 #[naked]
 unsafe extern "C" fn fix_broken_room_size() {
-    asm! {
+    asm!(
         // we already have speed in eax so do that one first
         "cmp eax, 0",
         "cmovz eax, {speed}",
@@ -1407,7 +1400,7 @@ unsafe extern "C" fn fix_broken_room_size() {
         height = sym DEFAULT_ROOM_HEIGHT,
         speed = sym DEFAULT_ROOM_SPEED,
         options(noreturn),
-    }
+    );
 }
 
 static mut DEFAULT_ROOM_WIDTH: u32 = 800;
@@ -1415,8 +1408,8 @@ static mut DEFAULT_ROOM_HEIGHT: u32 = 608;
 static mut DEFAULT_ROOM_SPEED: u32 = 50;
 
 #[naked]
-unsafe extern "fastcall" fn rename_room_inj() {
-    asm! {
+unsafe extern "C" fn rename_room_inj() {
+    asm!(
         "mov ecx, ebx",
         "mov edx, [ebp - 4]",
         "call {}",
@@ -1424,7 +1417,7 @@ unsafe extern "fastcall" fn rename_room_inj() {
         "ret",
         sym rename_room,
         options(noreturn),
-    }
+    );
 }
 
 unsafe extern "fastcall" fn rename_room(room_id: usize, new_name: *const u16) -> *const UStr {
@@ -1472,13 +1465,13 @@ fn fix_instances_when_renaming_room(room: &mut asset::Room, old_name: &str, new_
 }
 
 #[naked]
-unsafe extern "fastcall" fn dont_make_room_form_inj() {
-    asm! {
+unsafe extern "C" fn dont_make_room_form_inj() {
+    asm!(
         "mov ecx, eax",
         "jmp {}",
         sym dont_make_room_form,
         options(noreturn)
-    }
+    );
 }
 
 unsafe extern "fastcall" fn dont_make_room_form(node: &TTreeNode) {
@@ -1492,8 +1485,8 @@ unsafe extern "fastcall" fn dont_make_room_form(node: &TTreeNode) {
 }
 
 #[naked]
-unsafe extern "fastcall" fn show_instance_id_inj() {
-    asm! {
+unsafe extern "C" fn show_instance_id_inj() {
+    asm!(
         "mov ecx, eax",
         "mov eax, [ebx + 0x630]",
         "push eax",
@@ -1501,7 +1494,7 @@ unsafe extern "fastcall" fn show_instance_id_inj() {
         "ret",
         sym show_instance_id,
         options(noreturn),
-    }
+    );
 }
 
 unsafe extern "fastcall" fn show_instance_id(id: usize, out: &mut UStr, room_id: usize) {

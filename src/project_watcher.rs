@@ -43,7 +43,7 @@ unsafe extern "fastcall" fn show_message_and_reload() {
                    If you click \"No\", saving will overwrite any foreign changes.",
     ));
     let mut answer: i32;
-    asm! {
+    asm!(
         "push 0",  // HelpFileName
         "push -1", // Y
         "push -1", // X
@@ -54,7 +54,7 @@ unsafe extern "fastcall" fn show_message_and_reload() {
         in("edx") 3, // DlgType
         in("ecx") 3, // Buttons
         clobber_abi("C"),
-    }
+    );
     if answer == 6 {
         // yes -> reload project
         // but first, close all modals
@@ -63,8 +63,8 @@ unsafe extern "fastcall" fn show_message_and_reload() {
         static mut OLD_ONCLOSE: usize = 0;
         static mut OLD_ONCLOSE_SENDER: usize = 0;
         #[naked]
-        unsafe extern "fastcall" fn put_old_onclose_back() {
-            asm! {
+        unsafe extern "C" fn put_old_onclose_back() {
+            asm!(
                 "mov edx, {}",
                 "mov [eax + 0x2f0], edx",
                 "mov edx, {}",
@@ -73,7 +73,7 @@ unsafe extern "fastcall" fn show_message_and_reload() {
                 sym OLD_ONCLOSE,
                 sym OLD_ONCLOSE_SENDER,
                 options(noreturn),
-            }
+            );
         }
         unsafe extern "fastcall" fn instead_of_idle() {
             let screen = *SCREEN;

@@ -22,54 +22,54 @@ macro_rules! delphi_call {
     ($call: literal) => {{
         crate::check_call!($call);
         let out;
-        std::arch::asm! {
+        std::arch::asm!(
             "call {call}",
             call = in(reg) $call,
             lateout("eax") out,
             clobber_abi("C"),
-        };
+        );
         out
     }};
     ($call: literal, $a: expr) => {{
         crate::check_call!($call);
         let out;
-        std::arch::asm! {
+        std::arch::asm!(
             "call {call}",
             call = in(reg) $call,
             inlateout("eax") $a => out,
             clobber_abi("C"),
-        };
+        );
         out
     }};
     ($call: literal, $a: expr, $b: expr) => {{
         crate::check_call!($call);
         let out;
-        std::arch::asm! {
+        std::arch::asm!(
             "call {call}",
             call = in(reg) $call,
             inlateout("eax") $a => out,
             in("edx") $b,
             clobber_abi("C"),
-        };
+        );
         out
     }};
     ($call: literal, $a: expr, $b: expr, $c: expr) => {{
         crate::check_call!($call);
         let out;
-        std::arch::asm! {
+        std::arch::asm!(
             "call {call}",
             call = in(reg) $call,
             inlateout("eax") $a => out,
             in("edx") $b,
             in("ecx") $c,
             clobber_abi("C"),
-        };
+        );
         out
     }};
     ($call: literal, $a: expr, $b: expr, $c: expr, $d: expr) => {{
         crate::check_call!($call);
         let out;
-        std::arch::asm! {
+        std::arch::asm!(
             "push {arg4}",
             "call {call}",
             call = in(reg) $call,
@@ -78,13 +78,13 @@ macro_rules! delphi_call {
             in("edx") $b,
             in("ecx") $c,
             clobber_abi("C"),
-        };
+        );
         out
     }};
     ($call: literal, $a: expr, $b: expr, $c: expr, $d: expr, $e: expr) => {{
         crate::check_call!($call);
         let out;
-        std::arch::asm! {
+        std::arch::asm!(
             "push {arg5}",
             "push {arg4}",
             "call {call}",
@@ -95,7 +95,7 @@ macro_rules! delphi_call {
             inlateout("edx") $b,
             inlateout("ecx") $c,
             clobber_abi("C"),
-        };
+        );
         out
     }};
 }
@@ -266,7 +266,7 @@ impl TMenuItem {
     pub fn add_from_tree_node(&self, tree_node: &TTreeNode, custom_events: Option<&[u32; 6]>) {
         const BLANK_EVENTS: [u32; 6] = [0; 6];
         unsafe {
-            asm! {
+            asm!(
                 "push dword ptr [{base} + 0x1c]",
                 "push dword ptr [{base} + 0x18]",
                 "push dword ptr [{base} + 0x14]",
@@ -280,7 +280,7 @@ impl TMenuItem {
                 in("edx") tree_node,
                 in("ecx") u32::from(custom_events.is_some()),
                 clobber_abi("C"),
-            }
+            );
         }
     }
 
@@ -352,33 +352,33 @@ impl TBitmap {
     }
 
     pub unsafe fn SetWidth(&mut self, width: u32) {
-        asm! {
+        asm!(
             "mov ecx, [eax]",
             "call [ecx+0x44]",
             in("eax") self,
             in("edx") width,
             clobber_abi("C"),
-        }
+        );
     }
 
     pub unsafe fn SetHeight(&mut self, height: u32) {
-        asm! {
+        asm!(
             "mov ecx, [eax]",
             "call [ecx+0x38]",
             in("eax") self,
             in("edx") height,
             clobber_abi("C"),
-        }
+        );
     }
 
     pub unsafe fn SetSize(&mut self, width: u32, height: u32) {
-        asm! {
+        asm!(
             "call {}",
             in(reg) (self as *const Self).cast::<*const u32>().read().add(0x6c / 4).read(),
             in("eax") self,
             in("edx") width,
             in("ecx") height,
-        }
+        );
     }
 
     pub unsafe fn SetPixelFormat(&mut self, format: u8) {
@@ -491,7 +491,7 @@ impl TMemoryStream {
 
     pub fn set_pos(&self, pos: u32) {
         unsafe {
-            asm! {
+            asm!(
                 "push 0",
                 "push {pos_lo}",
                 "call {call}",
@@ -499,19 +499,19 @@ impl TMemoryStream {
                 pos_lo = in(reg) pos,
                 in("eax") self,
                 clobber_abi("C"),
-            };
+            );
         }
     }
 
     pub fn get_size(&self) -> u32 {
         let out;
         unsafe {
-            asm! {
+            asm!(
                 "mov ecx,[eax]",
                 "call [ecx]",
                 inlateout("eax") self => out,
                 clobber_abi("C"),
-            };
+            );
         }
         out
     }
@@ -714,7 +714,7 @@ pub fn Random() -> u32 {
 
 pub unsafe fn DynArraySetLength<T>(a: *mut *mut T, type_info: *const u8, dimensions: usize, size: usize) {
     // this has caller clean-up for some reason
-    asm! {
+    asm!(
         "push {d}",
         "call {call}",
         "add esp,4",
@@ -724,12 +724,12 @@ pub unsafe fn DynArraySetLength<T>(a: *mut *mut T, type_info: *const u8, dimensi
         in("edx") type_info,
         in("ecx") dimensions,
         clobber_abi("C"),
-    };
+    );
 }
 
 pub fn Now(out: &mut f64) {
     unsafe {
-        asm! {
+        asm!(
             "call {call}",
             "fstp qword ptr [{output}]",
             call = in(reg) 0x4199b0,
@@ -739,6 +739,6 @@ pub fn Now(out: &mut f64) {
             out("edx") _,
             out("ecx") _,
             clobber_abi("C"),
-        }
+        );
     }
 }

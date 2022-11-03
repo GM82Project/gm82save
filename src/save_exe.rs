@@ -75,7 +75,7 @@ impl GetAssetList for asset::Sprite {
                     // create mask
                     let f: &asset::Frame = &self.get_frames()[0];
                     let mut mask: *const Mask;
-                    asm! {
+                    asm!(
                         "push dword ptr [{sprite}+0x1c]",
                         "push {bbox}",
                         "push dword ptr [{sprite}+0x10]",
@@ -88,11 +88,11 @@ impl GetAssetList for asset::Sprite {
                         in("edx") 1,
                         in("ecx") f,
                         clobber_abi("C"),
-                    }
+                    );
                     // merge mask
                     for f in &self.get_frames()[1..] {
                         let f: &asset::Frame = f;
-                        asm! {
+                        asm!(
                             "push {frame}",
                             "push dword ptr [{sprite}+0x10]",
                             "push dword ptr [{sprite}+0x14]",
@@ -104,7 +104,7 @@ impl GetAssetList for asset::Sprite {
                             in("edx") f,
                             in("ecx") self.bbox_type,
                             clobber_abi("C"),
-                        }
+                        );
                     }
                     write_mask(&*mask, &mut out)?;
                     // free mask
@@ -115,7 +115,7 @@ impl GetAssetList for asset::Sprite {
                         let f: &asset::Frame = f;
                         // create mask
                         let mut mask: *const Mask;
-                        asm! {
+                        asm!(
                             "push dword ptr [{sprite}+0x1c]",
                             "lea eax, [{sprite}+0x20]",
                             "push eax",
@@ -130,7 +130,7 @@ impl GetAssetList for asset::Sprite {
                             in("edx") 1,
                             in("ecx") f,
                             clobber_abi("C"),
-                        }
+                        );
                         write_mask(&*mask, &mut out)?;
                         // free mask
                         let _: u32 = delphi_call!(0x405a7c, mask);
@@ -436,10 +436,10 @@ extern "fastcall" fn save_assets<T: GetAssetList>(mut stream: &mut TMemoryStream
 
 #[naked]
 pub unsafe extern "C" fn save_assets_inj<T: GetAssetList>() {
-    asm! {
+    asm!(
         "mov ecx, eax",
         "jmp {save_assets}",
         save_assets = sym save_assets::<T>,
         options(noreturn),
-    }
+    );
 }

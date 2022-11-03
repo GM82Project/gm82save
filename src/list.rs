@@ -47,7 +47,7 @@ impl<'a, T, const P: usize> IntoIterator for &'a DelphiList<T, P> {
 
 impl<T, const P: usize> DelphiList<T, P> {
     pub unsafe fn alloc_evil(&self, len: usize) {
-        asm! {
+        asm!(
             "push {d}",
             "call {call}",
             "add esp,4",
@@ -57,7 +57,7 @@ impl<T, const P: usize> DelphiList<T, P> {
             in("edx") P,
             in("ecx") 1,
             clobber_abi("C"),
-        };
+        );
     }
 
     pub fn alloc(&mut self, len: usize) {
