@@ -2013,4 +2013,6 @@ unsafe fn injector() {
     patch_call(0x6cd994, save_exe::save_assets_inj::<asset::Script> as usize);
     patch_call(0x6cd9af, save_exe::save_assets_inj::<asset::Font> as usize);
     patch_call(0x6cd9f8, save_exe::save_assets_inj::<asset::Room> as usize);
+
+    patch_call(0x6ce104, save_exe::write_encrypted_gamedata_inj as usize);
 }

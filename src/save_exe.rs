@@ -443,3 +443,49 @@ pub unsafe extern "C" fn save_assets_inj<T: GetAssetList>() {
         options(noreturn),
     );
 }
+
+#[naked]
+pub unsafe extern "C" fn write_encrypted_gamedata_inj() {
+    asm!(
+        "mov ecx, eax",
+        "jmp {}",
+        sym write_encrypted_gamedata,
+        options(noreturn),
+    )
+}
+
+pub unsafe extern "fastcall" fn write_encrypted_gamedata(stream: &mut TMemoryStream) -> bool {
+    // write encryption headers
+    // no garbage data
+    stream.write_u32::<LE>(0).ok();
+    stream.write_u32::<LE>(0).ok();
+    // no swap table: it's just 0,1,2,etc
+    for i in 0..=255 {
+        stream.write_u8(i).ok();
+    }
+    let length_pos = stream.get_pos() as usize;
+    stream.write_u32::<LE>(0).ok();
+    // encrypted data start
+    let data_pos = stream.get_pos() as usize;
+    // no garbage data
+    stream.write_u32::<LE>(0).ok();
+    stream.write_u32::<LE>(1).ok();
+    // generate gamedata
+    let res: u32 = delphi_call!(0x6cd8ac, stream);
+    if res == 0 {
+        return false
+    }
+    let data = stream.get_slice_mut();
+    let data_len = data.len() - data_pos;
+    data[length_pos..data_pos].copy_from_slice(&data_len.to_le_bytes());
+    let data = &mut data[data_pos..];
+    // first pass: swap bytes around
+    for i in 0..data_len {
+        data.swap(i, i & !0xff);
+    }
+    // second pass
+    for i in 1..data_len {
+        data[i] = data[i].wrapping_add(data[i - 1]).wrapping_add(i as u8);
+    }
+    true
+}

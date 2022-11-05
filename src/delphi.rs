@@ -474,7 +474,7 @@ impl TIcon {
 pub struct TMemoryStream {
     // fields are dangerous to use
     vmt: u32,
-    memory: *const u8,
+    memory: *mut u8,
     size: usize,
     position: usize,
     capacity: usize,
@@ -518,6 +518,10 @@ impl TMemoryStream {
 
     pub fn get_slice(&self) -> &[u8] {
         unsafe { slice::from_raw_parts(self.memory, self.size) }
+    }
+
+    pub fn get_slice_mut(&mut self) -> &mut [u8] {
+        unsafe { slice::from_raw_parts_mut(self.memory, self.size) }
     }
 
     pub unsafe fn read(&self, buf: *mut u8, count: u32) {
