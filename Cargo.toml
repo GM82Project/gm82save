@@ -32,9 +32,6 @@ parking_lot = "0.12.0"
 png = "0.17"
 rayon = "1.5"
 regex = { version = "1.5.5", default-features = false, features = ["std"] }
-sysinfo = "0.23.2"
+sysinfo = "0.26.7"
 time = "0.3"
 unicase = "2.6"
-
-[patch.crates-io]
-cmake = { git = "https://github.com/rust-lang/cmake-rs" }
