@@ -1,5 +1,5 @@
 use crate::{ide, show_message, UStr, SAVE_END};
-use notify::{watcher, DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{recommended_watcher, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use once_cell::unsync::Lazy;
 use parking_lot::Mutex;
 use std::{
@@ -9,10 +9,9 @@ use std::{
         mpsc::{channel, Receiver, Sender},
         Once,
     },
-    time::Duration,
 };
 
-static WATCHER_CHANNEL: Mutex<Lazy<(Sender<DebouncedEvent>, Receiver<DebouncedEvent>)>> =
+static WATCHER_CHANNEL: Mutex<Lazy<(Sender<notify::Result<Event>>, Receiver<notify::Result<Event>>)>> =
     Mutex::new(Lazy::new(|| channel()));
 static mut WATCHER: Option<RecommendedWatcher> = None;
 
@@ -109,19 +108,22 @@ unsafe extern "fastcall" fn show_message_and_reload() {
 
 extern "fastcall" fn on_notify() {
     let lock = WATCHER_CHANNEL.lock();
-    while let Some(_event) = lock.1.try_recv().ok().filter(|event| match event {
-        DebouncedEvent::Chmod(_) | DebouncedEvent::Create(_) => false,
-        DebouncedEvent::NoticeWrite(p) | DebouncedEvent::Write(p) => {
-            if let Ok(modified) = p.metadata().and_then(|m| m.modified()) {
-                unsafe {
-                    // it's foreign if modified time is after save end
-                    // if someone edited a file in notepad, we'll get one of these
-                    // if someone dragged in an older copy, we'll get a NoticeRemove instead
-                    SAVE_END < modified
+    // note: no need to check needs_rescan because no windows watcher uses it
+    while let Some(_event) = lock.1.try_recv().ok().map(|e| e.unwrap()).filter(|event| match event.kind {
+        EventKind::Create(_) => false,
+        EventKind::Modify(_) => {
+            event.paths.iter().any(|p| {
+                if let Ok(modified) = p.metadata().and_then(|m| m.modified()) {
+                    unsafe {
+                        // it's foreign if modified time is after save end
+                        // if someone edited a file in notepad, we'll get one of these
+                        // if someone dragged in an older copy, we'll get a NoticeRemove instead
+                        SAVE_END < modified
+                    }
+                } else {
+                    true
                 }
-            } else {
-                true
-            }
+            })
         },
         _ => true,
     }) {
@@ -153,7 +155,7 @@ pub fn setup_watcher(path: &mut PathBuf) {
     let lock = WATCHER_CHANNEL.lock();
     let tx = lock.0.clone();
     drop(lock);
-    match watcher(tx, Duration::from_secs(1)) {
+    match recommended_watcher(tx) {
         Ok(mut watcher) => {
             let mut watch_all = || -> notify::Result<()> {
                 path.push("backgrounds");
@@ -192,7 +194,7 @@ pub fn setup_watcher(path: &mut PathBuf) {
                 path.push("triggers");
                 watcher.watch(&path, RecursiveMode::Recursive)?;
                 path.pop();
-                watcher.watch(unsafe { &*ide::PROJECT_PATH }.to_os_string(), RecursiveMode::Recursive)?;
+                watcher.watch(unsafe { &*ide::PROJECT_PATH }.to_os_string().as_ref(), RecursiveMode::Recursive)?;
                 Ok(())
             };
             if let Err(e) = watch_all() {
