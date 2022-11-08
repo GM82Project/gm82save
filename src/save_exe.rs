@@ -475,6 +475,10 @@ pub unsafe extern "fastcall" fn write_encrypted_gamedata(stream: &mut TMemoryStr
     if res == 0 {
         return false
     }
+    // write a few null bytes so i don't have to figure out how to fix the decompiler
+    for _ in 0..4 {
+        stream.write_u32::<LE>(0).ok();
+    }
     let data = stream.get_slice_mut();
     let data_len = data.len() - data_pos;
     data[length_pos..data_pos].copy_from_slice(&data_len.to_le_bytes());
