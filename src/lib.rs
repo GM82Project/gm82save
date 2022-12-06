@@ -286,7 +286,7 @@ unsafe fn refresh_gm82room_checkbox() {
 static mut EXTRA_DATA: Option<(HashMap<usize, InstanceExtra>, HashMap<usize, TileExtra>)> = None;
 
 unsafe extern "fastcall" fn about_inj(about_dialog: *const *const usize) {
-    let info = UStr::new(concat!("gm82save: ", env!("BUILD_DATE")));
+    let info = UStr::new(concat!("gm82save: ", env!("ABOUT_BUILD_DATE")));
     let edition_label = *about_dialog.add(0xe5);
     asm!(
         "call {}",
@@ -1236,13 +1236,14 @@ unsafe extern "C" fn trace_date_inj() {
 unsafe extern "fastcall" fn trace_date() -> UStr {
     let now = time::OffsetDateTime::now_utc();
     UStr::new(format!(
-        "[{}-{:02}-{:02} {:02}:{:02}:{:02} UTC] Unhandled Exception - ",
+        "[{}-{:02}-{:02} {:02}:{:02}:{:02} UTC | gm82save {}] Unhandled Exception - ",
         now.year(),
         u8::from(now.month()),
         now.day(),
         now.hour(),
         now.minute(),
-        now.second()
+        now.second(),
+        env!("ERROR_BUILD_DATE"),
     ))
 }
 
