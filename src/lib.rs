@@ -702,6 +702,19 @@ unsafe extern "fastcall" fn check_gm_processes(name: usize, value: u32) {
 }
 
 #[naked]
+unsafe extern "C" fn image_editor_dont_error_when_switching_tool() {
+    asm!(
+        // set mouse down global to -1
+        "mov eax, 0x77f108",
+        "mov dword ptr [eax], -1",
+        // what this overwrote
+        "mov eax, [ebx + 0x768]",
+        "ret",
+        options(noreturn),
+    )
+}
+
+#[naked]
 unsafe extern "C" fn free_image_editor_bitmap() {
     asm!(
         // call free on TheBitmap
@@ -1734,6 +1747,10 @@ unsafe fn injector() {
 
     // fix memory leak in image editor
     patch_call(0x643bd0, free_image_editor_bitmap as _);
+
+    // don't dereference null pointer when changing image editor tool while mouse is down
+    patch(0x643eb6, &[0x90, 0xe8]);
+    patch_call(0x643eb7, image_editor_dont_error_when_switching_tool as _);
 
     // get default blend mode from form in image editor
     patch(0x64654d, &[
