@@ -255,6 +255,7 @@ impl Default for TileExtra {
 
 unsafe extern "fastcall" fn stuff_to_do_on_project_init() {
     EXTRA_DATA = None;
+    SEEN_ERROR = false;
     project_watcher::unwatch();
     let _: u32 = delphi_call!(0x62c554); // reset objects (what this overwrote)
     // insert a blank object
