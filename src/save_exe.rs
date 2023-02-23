@@ -1,6 +1,6 @@
 use crate::{
-    asset, delphi, delphi::TMemoryStream, ide, AssetListTrait, InstanceExtra, TileExtra, UStr, DEFLATE_LEVEL,
-    EXTRA_DATA,
+    asset, delphi, delphi::TMemoryStream, ide, regular::extension_watcher::update_extensions, AssetListTrait,
+    InstanceExtra, TileExtra, UStr, DEFLATE_LEVEL, EXTRA_DATA,
 };
 use byteorder::{WriteBytesExt, LE};
 use flate2::{write::ZlibEncoder, Compression};
@@ -455,6 +455,8 @@ pub unsafe extern "C" fn write_encrypted_gamedata_inj() {
 }
 
 pub unsafe extern "fastcall" fn write_encrypted_gamedata(stream: &mut TMemoryStream) -> bool {
+    // update extensions if needed
+    update_extensions();
     // write encryption headers
     // no garbage data
     stream.write_u32::<LE>(0).ok();

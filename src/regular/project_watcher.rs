@@ -106,7 +106,7 @@ unsafe extern "fastcall" fn show_message_and_reload() {
     }
 }
 
-extern "fastcall" fn on_notify() {
+pub fn on_notify() {
     let lock = WATCHER_CHANNEL.lock();
     // note: no need to check needs_rescan because no windows watcher uses it
     while let Some(_event) = lock.1.try_recv().ok().map(|e| e.unwrap()).filter(|event| match event.kind {
@@ -136,14 +136,6 @@ extern "fastcall" fn on_notify() {
         }
         break
     }
-}
-
-unsafe fn enable_timer() {
-    let timer = (0x790100 as *const *const *mut usize).read().add(0x65c / 4).read();
-    timer.add(0x34 / 4).write(1000); // interval (ms)
-    timer.add(0x40 / 4).write(on_notify as _); // event
-    timer.add(0x48 / 4).write(1); // enabled
-    let _: u32 = delphi_call!(0x48e12c, timer);
 }
 
 pub fn watching() -> bool {
@@ -203,7 +195,6 @@ pub fn setup_watcher(path: &mut PathBuf) {
                 // Great Success!
                 unsafe {
                     WATCHER = Some(watcher);
-                    enable_timer();
                 }
             }
         },
@@ -211,22 +202,9 @@ pub fn setup_watcher(path: &mut PathBuf) {
     }
 }
 
-unsafe fn disable_timer() {
-    let main_form = (0x790100 as *const *mut *mut usize).read();
-    let timer_ptr = main_form.add(0x65c / 4);
-    if timer_ptr.read().is_null() {
-        // create timer if needed
-        *timer_ptr = delphi_call!(0x48e048, 0x48ab50, 1, main_form);
-    }
-    let timer = timer_ptr.read();
-    timer.add(0x12).write(0); // enabled
-    let _: u32 = delphi_call!(0x48e12c, timer); // update timer
-}
-
 pub fn unwatch() {
     WATCHER_CHANNEL.lock().1.try_iter().for_each(|_| ()); // clear channel
     unsafe {
         WATCHER = None;
-        disable_timer();
     }
 }

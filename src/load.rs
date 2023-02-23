@@ -4,8 +4,9 @@ use crate::{
     delphi::{advance_progress_form, DelphiBox, UStr},
     events, ide,
     ide::AssetListTrait,
-    project_watcher, run_while_updating_bar, show_message, update_timestamp, Error, GMLLines, InstanceExtra, Result,
-    TileExtra, ACTION_TOKEN, EXTRA_DATA, PATH_FORM_UPDATED,
+    regular::project_watcher,
+    run_while_updating_bar, show_message, update_timestamp, Error, GMLLines, InstanceExtra, Result, TileExtra,
+    ACTION_TOKEN, EXTRA_DATA, PATH_FORM_UPDATED,
 };
 use itertools::izip;
 use parking_lot::Mutex;

@@ -4,8 +4,9 @@ use crate::{
     delphi::{advance_progress_form, DelphiBox, TTreeNode, UStr},
     events, ide,
     ide::AssetListTrait,
-    project_watcher, run_while_updating_bar, show_message, update_timestamp, Error, GMLLines, InstanceExtra, Result,
-    TileExtra, ACTION_TOKEN, EXTRA_DATA, LAST_SAVE, PATH_FORM_UPDATED, SAW_APPLIES_TO_WARNING,
+    regular::project_watcher,
+    run_while_updating_bar, show_message, update_timestamp, Error, GMLLines, InstanceExtra, Result, TileExtra,
+    ACTION_TOKEN, EXTRA_DATA, LAST_SAVE, PATH_FORM_UPDATED, SAW_APPLIES_TO_WARNING,
 };
 use itertools::Itertools;
 use rayon::prelude::*;

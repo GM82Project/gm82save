@@ -12,7 +12,7 @@ mod font_render;
 mod ide;
 mod list;
 mod load;
-mod project_watcher;
+mod regular;
 mod save;
 mod save_exe;
 mod stub;
@@ -20,6 +20,7 @@ mod stub;
 use crate::{
     delphi::{TMenuItem, TTreeNode, UStr},
     ide::get_triggers,
+    regular::{extension_watcher::update_extensions, project_watcher},
     save::GetAsset,
 };
 use ide::AssetListTrait;
@@ -384,6 +385,20 @@ unsafe extern "fastcall" fn load(proj_path: &UStr, stream_ptr: *mut u32, result_
         result_ptr.write(true);
     }
     true
+}
+
+#[naked]
+unsafe extern "C" fn stuff_to_do_on_ide_start() {
+    unsafe extern "C" fn inj() {
+        regular::init();
+    }
+    asm!(
+        "mov eax, 0x77f464",
+        "mov byte ptr [eax], 0",
+        "jmp {}",
+        sym inj,
+        options(noreturn),
+    )
 }
 
 #[naked]
@@ -1065,6 +1080,18 @@ unsafe extern "C" fn path_room_change_forces_room_editor_save() {
 static mut PATH_FORM_UPDATED: bool = false;
 
 #[naked]
+unsafe extern "C" fn maybe_reload_extensions_when_typing() {
+    asm!(
+        "mov [ebp-8], eax",
+        "call {}",
+        "mov eax, 0x6ab1bb",
+        "jmp eax",
+        sym update_extensions,
+        options(noreturn),
+    );
+}
+
+#[naked]
 unsafe extern "C" fn code_editor_dont_resize_if_maximized() {
     asm!(
         // are we maximized?
@@ -1710,6 +1737,10 @@ unsafe fn injector() {
         std::process::exit(-1);
     }));
 
+    // do whatever needs doing when the IDE starts up
+    patch(0x6deb83, &[0x90, 0x90, 0xe8]);
+    patch_call(0x6deb83 + 2, stuff_to_do_on_ide_start as _);
+
     // accept only the first commandline argument as a project path
     patch(0x6dead7, &[0xeb]);
 
@@ -1856,6 +1887,10 @@ unsafe fn injector() {
 
     // .gm82 file associations
     patch_call(0x6ddacd, gm82_file_association_inj as _);
+
+    // check if extensions need updating when drawing code
+    patch(0x6ab18c, &[0xe9]);
+    patch_call(0x6ab18c, maybe_reload_extensions_when_typing as _);
 
     // code editor don't resize on maximize
     // script resize
