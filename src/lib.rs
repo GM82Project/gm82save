@@ -808,6 +808,40 @@ unsafe extern "C" fn dont_show_action_tooltip_if_event_is_null() {
 }
 
 #[naked]
+unsafe extern "C" fn first_object_updates_room_forms() {
+    asm!(
+        // get number of objects in resource tree
+        "mov eax, [0x79a9b8]",
+        "mov edx, 0x4ad490",
+        "call edx",
+        // skip if there are objects
+        "test eax, eax",
+        "jnz 2f",
+        // go over all room forms
+        "push ebx",
+        "xor ebx, ebx",
+        "4: cmp ebx, [0x77f3b8]",
+        "jge 3f",
+        // initialize objects tab
+        "mov eax, [0x77f3ac]",
+        "mov eax, [eax+4*ebx]",
+        "mov edx, 0x68a1e0",
+        "call edx",
+        "inc ebx",
+        "jmp 4b",
+        "3: pop ebx",
+        "2:",
+        // call overwritten tree node write function
+        "mov eax, [ebp-0xc]",
+        "mov ecx, [ebp-0x8]",
+        "mov edx, edi",
+        "push 0x71cb48",
+        "ret",
+        options(noreturn),
+    )
+}
+
+#[naked]
 unsafe extern "C" fn object_form_add_events() {
     asm!(
         // call original function
@@ -1777,6 +1811,9 @@ unsafe fn injector() {
     // fix access violation when closing object/timeline window while mousing over action
     patch_call(0x6c6f6f, dont_show_action_tooltip_if_event_is_null as _);
     patch_call(0x6f9043, dont_show_action_tooltip_if_event_is_null as _);
+
+    // update room forms if first object is created
+    patch_call(0x71cfa2, first_object_updates_room_forms as _);
 
     // go to parent by clicking on parent button
     patch_call(0x6c515e, object_form_add_events as _);
