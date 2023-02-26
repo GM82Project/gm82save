@@ -391,6 +391,8 @@ unsafe extern "fastcall" fn load(proj_path: &UStr, stream_ptr: *mut u32, result_
 unsafe extern "C" fn stuff_to_do_on_ide_start() {
     unsafe extern "C" fn inj() {
         regular::init();
+        // overwrite HelpBtn OnClick
+        (0x790100 as *const *const *mut usize).read().add(0x3fc / 4).read().add(0x110 / 4).write(start_shader_compiler as usize);
     }
     asm!(
         "mov eax, 0x77f464",
@@ -399,6 +401,12 @@ unsafe extern "C" fn stuff_to_do_on_ide_start() {
         sym inj,
         options(noreturn),
     )
+}
+
+unsafe extern "fastcall" fn start_shader_compiler() {
+    if let Err(e) = std::process::Command::new("anvil.exe").spawn() {
+        show_message(format!("Couldn't start anvil.exe: {e}"));
+    }
 }
 
 #[naked]
