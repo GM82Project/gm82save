@@ -392,7 +392,12 @@ unsafe extern "C" fn stuff_to_do_on_ide_start() {
     unsafe extern "C" fn inj() {
         regular::init();
         // overwrite HelpBtn OnClick
-        (0x790100 as *const *const *mut usize).read().add(0x3fc / 4).read().add(0x110 / 4).write(start_shader_compiler as usize);
+        (0x790100 as *const *const *mut usize)
+            .read()
+            .add(0x3fc / 4)
+            .read()
+            .add(0x110 / 4)
+            .write(start_shader_compiler as usize);
     }
     asm!(
         "mov eax, 0x77f464",
