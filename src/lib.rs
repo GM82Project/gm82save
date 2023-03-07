@@ -853,9 +853,11 @@ unsafe extern "C" fn first_object_updates_room_forms() {
         // initialize objects tab
         "mov eax, [0x77f3ac]",
         "mov eax, [eax+4*ebx]",
+        "test eax, eax",
+        "je 5f",
         "mov edx, 0x68a1e0",
         "call edx",
-        "inc ebx",
+        "5: inc ebx",
         "jmp 4b",
         "3: pop ebx",
         "2:",
