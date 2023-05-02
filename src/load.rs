@@ -52,16 +52,16 @@ fn load_gml(code: &str) -> UStr {
     UStr::new(buf)
 }
 
-struct Assets {
-    index: Vec<String>,
-    map: HashMap<String, usize>,
+pub struct Assets {
+    pub index: Vec<String>,
+    pub map: HashMap<String, usize>,
 }
 pub struct AssetMaps {
     triggers: Assets,
     sprites: Assets,
     sounds: Assets,
     backgrounds: Assets,
-    paths: Assets,
+    pub paths: Assets,
     scripts: Assets,
     objects: Assets,
     rooms: Assets,
@@ -97,7 +97,7 @@ fn read_txt<F: FnMut(&str, &str) -> Result<()>>(path: &std::path::Path, mut func
     Ok(())
 }
 
-unsafe fn read_resource_tree(
+pub unsafe fn read_resource_tree(
     base: *const *const delphi::TTreeNode,
     kind: u32,
     type_name: &'static str,
@@ -576,7 +576,7 @@ unsafe fn load_timeline(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<De
     Ok(tl)
 }
 
-fn load_path(file_path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<DelphiBox<Path>> {
+pub fn load_path(file_path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<DelphiBox<Path>> {
     let mut path = Path::new();
     file_path.push("path.txt");
     let path_name =

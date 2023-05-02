@@ -283,6 +283,12 @@ impl Path {
         unsafe { delphi_box!(0x5357b0, 0x534924) }
     }
 
+    pub fn assign(&mut self, other: &Self) {
+        unsafe {
+            let _: u32 = delphi_call!(0x535828, self, other);
+        }
+    }
+
     pub fn commit(&mut self) {
         unsafe {
             let _: u32 = delphi_call!(0x53578c, self);

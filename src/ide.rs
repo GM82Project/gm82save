@@ -97,6 +97,8 @@ unsafe impl<T, const P1: usize, const P2: usize, const P3: usize, const P4: usiz
 impl<T, const P1: usize, const P2: usize, const P3: usize, const P4: usize> AssetList<T, P1, P2, P3, P4> {
     get_member!(pub forms, Form, forms);
 
+    get_member_mut!(pub forms_mut, Form, forms);
+
     get_member_mut!(pub timestamps_mut, f64, timestamps);
 
     unsafe fn range(&self) -> std::ops::RangeTo<usize> {

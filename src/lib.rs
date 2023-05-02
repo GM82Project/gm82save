@@ -1695,10 +1695,46 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
 
                 *room_opt = None; // delete room
             }
+            // reload paths
+            let asset_maps = load::load_asset_maps(&mut asset_maps_path).expect("loading updated indexes failed");
+            asset_maps_path.push("paths");
+            let path_names = &asset_maps.paths.index;
+            ide::PATHS.alloc(path_names.len());
+            path_names
+                .iter()
+                .zip(ide::PATHS.assets_mut())
+                .zip(ide::PATHS.names_mut())
+                .try_for_each(|((name, asset), name_p)| -> Result<()> {
+                    if !name.is_empty() {
+                        *name_p = UStr::new(name);
+                        *asset = Some(load::load_path(&mut asset_maps_path.join(name), &asset_maps)?);
+                    }
+                    Ok(())
+                })
+                .expect("loading updated paths failed");
+            for (&form, path, name) in ide::PATHS
+                .forms()
+                .iter()
+                .zip(ide::PATHS.assets())
+                .zip(ide::PATHS.names())
+                .filter(|((&f, _), _)| f != 0)
+                .filter_map(|((f, o), n)| o.as_ref().map(|p| (f, p, n)))
+            {
+                (*((form + 0x444) as *const *mut asset::Path)).as_mut().map(|p| p.assign(path));
+                (*((form + 0x448) as *const *mut asset::Path)).as_mut().map(|p| p.assign(path));
+                (*((form + 0x454) as *const *mut asset::Path)).as_mut().map(|p| p.assign(path));
+                *((form + 0x44c) as *mut UStr) = name.clone();
+                *((form + 0x450) as *mut bool) = false;
+                // update path form
+                let _: u32 = delphi_call!(0x71ffe4, form);
+            }
+            asset_maps_path.pop();
+            (**ide::RT_PATHS).DeleteChildren();
+            load::read_resource_tree(ide::RT_PATHS, 8, "paths", &asset_maps.paths.map, true, &mut asset_maps_path)
+                .expect("loading updated path tree failed");
             // reload room
             ide::ROOMS.assets_mut()[room_id] = Some(
-                load::load_asset_maps(&mut asset_maps_path)
-                    .and_then(|asset_maps| load::load_room(&mut room_path, &asset_maps))
+                load::load_room(&mut room_path, &asset_maps)
                     .map_err(|e| e.to_string())
                     .expect("loading the updated room failed"),
             );

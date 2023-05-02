@@ -207,6 +207,10 @@ impl TTreeNode {
     pub unsafe fn new(name: &UStr, rtype: u32, kind: u32, index: usize) -> *const TTreeNode {
         delphi_call!(0x71cb48, name.0, rtype, kind, index)
     }
+
+    pub unsafe fn DeleteChildren(&self) {
+        let _: u32 = delphi_call!(0x4ad9ec, self);
+    }
 }
 
 #[repr(C)]
