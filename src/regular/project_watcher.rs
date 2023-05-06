@@ -151,40 +151,60 @@ pub fn setup_watcher(path: &mut PathBuf) {
         Ok(mut watcher) => {
             let mut watch_all = || -> notify::Result<()> {
                 path.push("backgrounds");
-                watcher.watch(&path, RecursiveMode::Recursive)?;
+                if path.exists() {
+                    watcher.watch(&path, RecursiveMode::Recursive)?;
+                }
                 path.pop();
                 path.push("datafiles");
-                watcher.watch(&path, RecursiveMode::Recursive)?;
+                if path.exists() {
+                    watcher.watch(&path, RecursiveMode::Recursive)?;
+                }
                 path.pop();
                 path.push("fonts");
-                watcher.watch(&path, RecursiveMode::Recursive)?;
+                if path.exists() {
+                    watcher.watch(&path, RecursiveMode::Recursive)?;
+                }
                 path.pop();
                 path.push("objects");
-                watcher.watch(&path, RecursiveMode::Recursive)?;
+                if path.exists() {
+                    watcher.watch(&path, RecursiveMode::Recursive)?;
+                }
                 path.pop();
                 path.push("paths");
-                watcher.watch(&path, RecursiveMode::Recursive)?;
+                if path.exists() {
+                    watcher.watch(&path, RecursiveMode::Recursive)?;
+                }
                 path.pop();
                 path.push("rooms");
                 watcher.watch(&path, RecursiveMode::Recursive)?;
                 path.pop();
                 path.push("scripts");
-                watcher.watch(&path, RecursiveMode::Recursive)?;
+                if path.exists() {
+                    watcher.watch(&path, RecursiveMode::Recursive)?;
+                }
                 path.pop();
                 path.push("settings");
                 watcher.watch(&path, RecursiveMode::Recursive)?;
                 path.pop();
                 path.push("sounds");
-                watcher.watch(&path, RecursiveMode::Recursive)?;
+                if path.exists() {
+                    watcher.watch(&path, RecursiveMode::Recursive)?;
+                }
                 path.pop();
                 path.push("sprites");
-                watcher.watch(&path, RecursiveMode::Recursive)?;
+                if path.exists() {
+                    watcher.watch(&path, RecursiveMode::Recursive)?;
+                }
                 path.pop();
                 path.push("timelines");
-                watcher.watch(&path, RecursiveMode::Recursive)?;
+                if path.exists() {
+                    watcher.watch(&path, RecursiveMode::Recursive)?;
+                }
                 path.pop();
                 path.push("triggers");
-                watcher.watch(&path, RecursiveMode::Recursive)?;
+                if path.exists() {
+                    watcher.watch(&path, RecursiveMode::Recursive)?;
+                }
                 path.pop();
                 watcher.watch(unsafe { &*ide::PROJECT_PATH }.to_os_string().as_ref(), RecursiveMode::Recursive)?;
                 Ok(())

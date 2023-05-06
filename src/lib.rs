@@ -1695,8 +1695,50 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
 
                 *room_opt = None; // delete room
             }
+            // reload whether assets exist
+            let asset_maps = {
+                let mut has_backgrounds = true;
+                let mut has_datafiles = true;
+                let mut has_fonts = true;
+                let mut has_objects = true;
+                let mut has_paths = true;
+                let mut has_scripts = true;
+                let mut has_sounds = true;
+                let mut has_sprites = true;
+                let mut has_timelines = true;
+                let mut has_triggers = true;
+                let project_path = PathBuf::from((&*ide::PROJECT_PATH).to_os_string());
+                load::read_txt(&project_path, |k, v| {
+                    Ok(match k {
+                        "has_backgrounds" => has_backgrounds = v.parse::<u8>()? != 0,
+                        "has_datafiles" => has_datafiles = v.parse::<u8>()? != 0,
+                        "has_fonts" => has_fonts = v.parse::<u8>()? != 0,
+                        "has_objects" => has_objects = v.parse::<u8>()? != 0,
+                        "has_paths" => has_paths = v.parse::<u8>()? != 0,
+                        "has_scripts" => has_scripts = v.parse::<u8>()? != 0,
+                        "has_sounds" => has_sounds = v.parse::<u8>()? != 0,
+                        "has_sprites" => has_sprites = v.parse::<u8>()? != 0,
+                        "has_timelines" => has_timelines = v.parse::<u8>()? != 0,
+                        "has_triggers" => has_triggers = v.parse::<u8>()? != 0,
+                        _ => (),
+                    })
+                })
+                .expect("reloading project failed");
+                load::load_asset_maps(
+                    &mut asset_maps_path,
+                    has_triggers,
+                    has_sprites,
+                    has_sounds,
+                    has_backgrounds,
+                    has_paths,
+                    has_scripts,
+                    has_objects,
+                    has_fonts,
+                    has_timelines,
+                )
+                .expect("loading updated indexes failed")
+            };
             // reload paths
-            let asset_maps = load::load_asset_maps(&mut asset_maps_path).expect("loading updated indexes failed");
             asset_maps_path.push("paths");
             let path_names = &asset_maps.paths.index;
             ide::PATHS.alloc(path_names.len());

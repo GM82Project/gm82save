@@ -1040,12 +1040,23 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
     let smart_save = project_watcher::watching() && LAST_SAVE != 0.0;
     project_watcher::unwatch();
     PATH_FORM_UPDATED = false;
+    // check if we have any assets to save
+    let has_backgrounds = ide::BACKGROUNDS.assets().iter().any(Option::is_some);
+    let has_datafiles = !ide::get_included_files().is_empty();
+    let has_fonts = ide::FONTS.assets().iter().any(Option::is_some);
+    let has_objects = ide::OBJECTS.assets().iter().any(Option::is_some);
+    let has_paths = ide::PATHS.assets().iter().any(Option::is_some);
+    let has_scripts = ide::SCRIPTS.assets().iter().any(Option::is_some);
+    let has_sounds = ide::SOUNDS.assets().iter().any(Option::is_some);
+    let has_sprites = ide::SPRITES.assets().iter().any(Option::is_some);
+    let has_timelines = ide::TIMELINES.assets().iter().any(Option::is_some);
+    let has_triggers = !ide::get_triggers().is_empty();
     // always rewrite the .gm82 file so you can easily see the timestamp
     {
         create_dirs(path.parent().unwrap())?;
         // some stuff to go in the main gmk
         let mut f = open_file(&path)?;
-        writeln!(f, "gm82_version=4")?;
+        writeln!(f, "gm82_version=5")?;
         writeln!(f, "gameid={}", ide::GAME_ID.read())?;
         writeln!(f)?;
         writeln!(f, "info_author={}", (&*ide::settings::INFO_AUTHOR).try_decode()?)?;
@@ -1065,6 +1076,16 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
             *ide::settings::VERSION_BUILD
         )?;
         writeln!(f)?;
+        writeln!(f, "has_backgrounds={}", u8::from(has_backgrounds))?;
+        writeln!(f, "has_datafiles={}", u8::from(has_datafiles))?;
+        writeln!(f, "has_fonts={}", u8::from(has_fonts))?;
+        writeln!(f, "has_objects={}", u8::from(has_objects))?;
+        writeln!(f, "has_paths={}", u8::from(has_paths))?;
+        writeln!(f, "has_scripts={}", u8::from(has_scripts))?;
+        writeln!(f, "has_sounds={}", u8::from(has_sounds))?;
+        writeln!(f, "has_sprites={}", u8::from(has_sprites))?;
+        writeln!(f, "has_timelines={}", u8::from(has_timelines))?;
+        writeln!(f, "has_triggers={}", u8::from(has_triggers))?;
         /*
         writeln!(f, "last_instance_id={}", *ide::_LAST_INSTANCE_ID)?;
         writeln!(f, "last_tile_id={}", *ide::_LAST_TILE_ID)?;
@@ -1075,11 +1096,11 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
     advance_progress_form(5);
     save_settings(path, smart_save)?;
     advance_progress_form(10);
-    if !smart_save || *ide::TRIGGERS_UPDATED {
+    if has_triggers && (!smart_save || *ide::TRIGGERS_UPDATED) {
         save_triggers(path)?;
     }
     advance_progress_form(15);
-    if !smart_save || *ide::SOUNDS_UPDATED || *ide::RESOURCE_TREE_UPDATED {
+    if has_sounds && (!smart_save || *ide::SOUNDS_UPDATED || *ide::RESOURCE_TREE_UPDATED) {
         save_assets(
             15,
             30,
@@ -1095,7 +1116,7 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
         )?;
     }
     advance_progress_form(30);
-    if !smart_save || *ide::SPRITES_UPDATED || *ide::RESOURCE_TREE_UPDATED {
+    if has_sprites && (!smart_save || *ide::SPRITES_UPDATED || *ide::RESOURCE_TREE_UPDATED) {
         save_assets(
             30,
             55,
@@ -1111,7 +1132,7 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
         )?;
     }
     advance_progress_form(55);
-    if !smart_save || *ide::BACKGROUNDS_UPDATED || *ide::RESOURCE_TREE_UPDATED {
+    if has_backgrounds && (!smart_save || *ide::BACKGROUNDS_UPDATED || *ide::RESOURCE_TREE_UPDATED) {
         save_assets(
             55,
             65,
@@ -1127,21 +1148,23 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
         )?;
     }
     advance_progress_form(65);
-    save_assets(
-        65,
-        70,
-        "paths",
-        ide::PATHS.assets(),
-        ide::PATHS.names(),
-        ide::PATHS.timestamps(),
-        ide::RT_PATHS,
-        save_path,
-        smart_save,
-        path_needs_update,
-        path,
-    )?;
+    if has_paths {
+        save_assets(
+            65,
+            70,
+            "paths",
+            ide::PATHS.assets(),
+            ide::PATHS.names(),
+            ide::PATHS.timestamps(),
+            ide::RT_PATHS,
+            save_path,
+            smart_save,
+            path_needs_update,
+            path,
+        )?;
+    }
     advance_progress_form(70);
-    if !smart_save || *ide::SCRIPTS_UPDATED || *ide::RESOURCE_TREE_UPDATED {
+    if has_scripts && (!smart_save || *ide::SCRIPTS_UPDATED || *ide::RESOURCE_TREE_UPDATED) {
         save_assets(
             70,
             75,
@@ -1157,7 +1180,7 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
         )?;
     }
     advance_progress_form(75);
-    if !smart_save || *ide::FONTS_UPDATED || *ide::RESOURCE_TREE_UPDATED {
+    if has_fonts && (!smart_save || *ide::FONTS_UPDATED || *ide::RESOURCE_TREE_UPDATED) {
         save_assets(
             75,
             80,
@@ -1173,33 +1196,37 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
         )?;
     }
     advance_progress_form(80);
-    save_assets(
-        80,
-        85,
-        "timelines",
-        ide::TIMELINES.assets(),
-        ide::TIMELINES.names(),
-        ide::TIMELINES.timestamps(),
-        ide::RT_TIMELINES,
-        save_timeline,
-        smart_save,
-        timeline_needs_update,
-        path,
-    )?;
+    if has_timelines {
+        save_assets(
+            80,
+            85,
+            "timelines",
+            ide::TIMELINES.assets(),
+            ide::TIMELINES.names(),
+            ide::TIMELINES.timestamps(),
+            ide::RT_TIMELINES,
+            save_timeline,
+            smart_save,
+            timeline_needs_update,
+            path,
+        )?;
+    }
     advance_progress_form(85);
-    save_assets(
-        85,
-        90,
-        "objects",
-        ide::OBJECTS.assets(),
-        ide::OBJECTS.names(),
-        ide::OBJECTS.timestamps(),
-        ide::RT_OBJECTS,
-        save_object,
-        smart_save,
-        object_needs_update,
-        path,
-    )?;
+    if has_objects {
+        save_assets(
+            85,
+            90,
+            "objects",
+            ide::OBJECTS.assets(),
+            ide::OBJECTS.names(),
+            ide::OBJECTS.timestamps(),
+            ide::RT_OBJECTS,
+            save_object,
+            smart_save,
+            object_needs_update,
+            path,
+        )?;
+    }
     advance_progress_form(90);
     // give instances ids if they don't already have one
     for (room, timestamp) in
@@ -1235,7 +1262,7 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
         path,
     )?;
     advance_progress_form(95);
-    if !smart_save || *ide::INCLUDED_FILES_UPDATED {
+    if has_datafiles && (!smart_save || *ide::INCLUDED_FILES_UPDATED) {
         save_included_files(path, smart_save)?;
     }
 

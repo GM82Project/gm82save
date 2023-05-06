@@ -89,7 +89,7 @@ fn decode_line<'a, F: FnMut(&'a str, &'a str) -> Result<()>>(
     Ok(())
 }
 
-fn read_txt<F: FnMut(&str, &str) -> Result<()>>(path: &std::path::Path, mut func: F) -> Result<()> {
+pub fn read_txt<F: FnMut(&str, &str) -> Result<()>>(path: &std::path::Path, mut func: F) -> Result<()> {
     let f = open_file(path)?;
     for line in f.lines() {
         decode_line(path, &line?, &mut func)?;
@@ -105,6 +105,9 @@ pub unsafe fn read_resource_tree(
     visible: bool,
     path: &mut PathBuf,
 ) -> Result<()> {
+    if names.is_empty() {
+        return Ok(())
+    }
     path.push(type_name);
     path.push("tree.yyd");
     let f = open_file(path)?;
@@ -1073,7 +1076,10 @@ unsafe fn load_settings(path: &mut PathBuf) -> Result<()> {
     Ok(())
 }
 
-fn load_index(name: &str, path: &mut PathBuf) -> Result<Assets> {
+fn load_index(name: &str, has_any: bool, path: &mut PathBuf) -> Result<Assets> {
+    if !has_any {
+        return Ok(Assets { index: Vec::new(), map: HashMap::new() })
+    }
     path.push(name);
     path.push("index.yyd");
     let text = read_file(&path)?;
@@ -1097,6 +1103,10 @@ unsafe fn load_assets<'a, T: 'static + Sync, AL: AssetListTrait<T> + Sync>(
     path.push(name);
     let names = &assets.index;
     the_assets.alloc(names.len());
+    // blank object in 0th slot
+    if names.is_empty() && name == "objects" {
+        the_assets.alloc(1);
+    }
     if name != "rooms" {
         run_while_updating_bar(bar_start, bar_end, names.len() as u32, |tx| {
             names.par_iter().zip(the_assets.assets_mut()).zip(the_assets.names_mut()).try_for_each(
@@ -1128,18 +1138,29 @@ unsafe fn load_assets<'a, T: 'static + Sync, AL: AssetListTrait<T> + Sync>(
     Ok(())
 }
 
-pub fn load_asset_maps(path: &mut PathBuf) -> Result<AssetMaps> {
+pub fn load_asset_maps(
+    path: &mut PathBuf,
+    has_triggers: bool,
+    has_sprites: bool,
+    has_sounds: bool,
+    has_backgrounds: bool,
+    has_paths: bool,
+    has_scripts: bool,
+    has_objects: bool,
+    has_fonts: bool,
+    has_timelines: bool,
+) -> Result<AssetMaps> {
     Ok(AssetMaps {
-        triggers: load_index("triggers", path)?,
-        sprites: load_index("sprites", path)?,
-        sounds: load_index("sounds", path)?,
-        backgrounds: load_index("backgrounds", path)?,
-        paths: load_index("paths", path)?,
-        scripts: load_index("scripts", path)?,
-        objects: load_index("objects", path)?,
-        rooms: load_index("rooms", path)?,
-        fonts: load_index("fonts", path)?,
-        timelines: load_index("timelines", path)?,
+        triggers: load_index("triggers", has_triggers, path)?,
+        sprites: load_index("sprites", has_sprites, path)?,
+        sounds: load_index("sounds", has_sounds, path)?,
+        backgrounds: load_index("backgrounds", has_backgrounds, path)?,
+        paths: load_index("paths", has_paths, path)?,
+        scripts: load_index("scripts", has_scripts, path)?,
+        objects: load_index("objects", has_objects, path)?,
+        rooms: load_index("rooms", true, path)?,
+        fonts: load_index("fonts", has_fonts, path)?,
+        timelines: load_index("timelines", has_timelines, path)?,
     })
 }
 
@@ -1147,10 +1168,20 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     ide::initialize_project();
     PATH_FORM_UPDATED = false;
     EXTRA_DATA = Some(Default::default());
+    let mut has_backgrounds = true;
+    let mut has_datafiles = true;
+    let mut has_fonts = true;
+    let mut has_objects = true;
+    let mut has_paths = true;
+    let mut has_scripts = true;
+    let mut has_sounds = true;
+    let mut has_sprites = true;
+    let mut has_timelines = true;
+    let mut has_triggers = true;
     read_txt(&path, |k, v| {
         match k {
             "gm82_version" => {
-                if v.parse::<u8>()? > 4 {
+                if v.parse::<u8>()? > 5 {
                     return Err(Error::OldGM82)
                 }
             },
@@ -1174,6 +1205,16 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
                     return Err(Error::InvalidVersion(v.to_string()))
                 }
             },
+            "has_backgrounds" => has_backgrounds = v.parse::<u8>()? != 0,
+            "has_datafiles" => has_datafiles = v.parse::<u8>()? != 0,
+            "has_fonts" => has_fonts = v.parse::<u8>()? != 0,
+            "has_objects" => has_objects = v.parse::<u8>()? != 0,
+            "has_paths" => has_paths = v.parse::<u8>()? != 0,
+            "has_scripts" => has_scripts = v.parse::<u8>()? != 0,
+            "has_sounds" => has_sounds = v.parse::<u8>()? != 0,
+            "has_sprites" => has_sprites = v.parse::<u8>()? != 0,
+            "has_timelines" => has_timelines = v.parse::<u8>()? != 0,
+            "has_triggers" => has_triggers = v.parse::<u8>()? != 0,
             _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
         }
         Ok(())
@@ -1182,7 +1223,18 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     advance_progress_form(5);
     load_settings(&mut path)?;
     advance_progress_form(10);
-    let asset_maps = load_asset_maps(&mut path)?;
+    let asset_maps = load_asset_maps(
+        &mut path,
+        has_triggers,
+        has_sprites,
+        has_sounds,
+        has_backgrounds,
+        has_paths,
+        has_scripts,
+        has_objects,
+        has_fonts,
+        has_timelines,
+    )?;
     advance_progress_form(15);
     load_triggers(&asset_maps, &mut path)?;
     advance_progress_form(20);
@@ -1242,7 +1294,9 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     advance_progress_form(90);
     load_assets("rooms", load_room, &ide::ROOMS, &asset_maps.rooms, 90, 95, &mut path, &asset_maps)?;
     advance_progress_form(95);
-    load_included_files(&mut path)?;
+    if has_datafiles {
+        load_included_files(&mut path)?;
+    }
 
     read_resource_tree(ide::RT_SOUNDS, 3, "sounds", &asset_maps.sounds.map, true, &mut path)?;
     read_resource_tree(ide::RT_SPRITES, 2, "sprites", &asset_maps.sprites.map, true, &mut path)?;
