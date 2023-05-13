@@ -1981,6 +1981,9 @@ unsafe fn injector() {
     // .gm82 file associations
     patch_call(0x6ddacd, gm82_file_association_inj as _);
 
+    // fix access violation when pasting empty clipboard
+    patch(0x6b8a7f + 1, &[0x0d]);
+
     // check if extensions need updating when drawing code
     patch(0x6ab18c, &[0xe9]);
     patch_call(0x6ab18c, maybe_reload_extensions_when_typing as _);
