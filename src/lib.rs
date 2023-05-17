@@ -545,7 +545,8 @@ unsafe extern "C" fn build_small() {
 #[naked]
 unsafe extern "C" fn build_fast() {
     asm!(
-        "mov ecx, 1",
+        "mov ecx, 0x79a998",
+        "movzx ecx, byte ptr [ecx]",
         "mov {}, ecx",
         "mov ecx, 0x41735c",
         "jmp ecx",
@@ -1954,6 +1955,36 @@ unsafe fn injector() {
 
     // changing room in path form counts as a change
     patch_call(0x7211ff, path_room_change_forces_room_editor_save as _);
+
+    // don't show Trace.log after debug run
+    patch(0x6d83f1, &[0xe9, 0x45, 0x05, 0x00, 0x00]);
+    // load DebugTraceCheckBox as TValueEdit
+    patch(0x71a6bb, &[
+        0xe8, 0xa0, 0x60, 0xe1, 0xff, // call TValueEdit.SetValue
+        0x90, 0x90, 0x90, // nop slide
+    ]);
+    // save DebugTraceCheckBox as TValueEdit
+    patch(0x71aad5, &[
+        0x8b, 0x80, 0xa0, 0x02, 0x00, 0x00, // mov eax, DebugTraceCheckBox.i_value
+        0xa2, 0x98, 0xa9, 0x79, 0x00, // mov [compression_value], al
+    ]);
+    // set default to 1
+    patch(0x71792e, &[0xb2, 0x01]);
+    // load from registry as int
+    patch(0x717936, &[0x96, 0xf4]);
+    // save to registry as int
+    patch(0x719068, &[0x94]);
+    // ShowDebugTrace -> TestComprLevel
+    patch(0x7187dc, &[
+        b'T', 0, b'e', 0, b's', 0, b't',
+        b'C', 0, b'o', 0, b'm', 0, b'p', 0, b'r', 0,
+        b'L', 0, b'e', 0, b'v', 0, b'e', 0, b'l'
+    ]);
+    patch(0x719da0, &[
+        b'T', 0, b'e', 0, b's', 0, b't',
+        b'C', 0, b'o', 0, b'm', 0, b'p', 0, b'r', 0,
+        b'L', 0, b'e', 0, b'v', 0, b'e', 0, b'l'
+    ]);
 
     // use zlib-ng for compression
     patch(0x52f34c, &[0xe9]);
