@@ -39,7 +39,7 @@ pub fn on_notify() {
     while let Some(_event) = lock.1.try_recv().ok().map(|e| e.unwrap()).filter(|event| match event.kind {
         EventKind::Create(_) => false,
         EventKind::Modify(_) => {
-            event.paths.iter().any(|p| {
+            event.paths.iter().filter(|p| p.extension() == Some("ged".as_ref())).any(|p| {
                 if let Ok(modified) = p.metadata().and_then(|m| m.modified()) {
                     unsafe {
                         // it's foreign if modified time is after save end
