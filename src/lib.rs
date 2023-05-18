@@ -1975,11 +1975,13 @@ unsafe fn injector() {
     // save to registry as int
     patch(0x719068, &[0x94]);
     // ShowDebugTrace -> TestComprLevel
+    #[rustfmt::skip]
     patch(0x7187dc, &[
         b'T', 0, b'e', 0, b's', 0, b't',
         b'C', 0, b'o', 0, b'm', 0, b'p', 0, b'r', 0,
         b'L', 0, b'e', 0, b'v', 0, b'e', 0, b'l'
     ]);
+    #[rustfmt::skip]
     patch(0x719da0, &[
         b'T', 0, b'e', 0, b's', 0, b't', 0,
         b'C', 0, b'o', 0, b'm', 0, b'p', 0, b'r', 0,
