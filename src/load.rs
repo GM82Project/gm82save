@@ -1178,11 +1178,14 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     let mut has_sprites = true;
     let mut has_timelines = true;
     let mut has_triggers = true;
+    let mut importing_old_version = false;
     read_txt(&path, |k, v| {
         match k {
             "gm82_version" => {
-                if v.parse::<u8>()? > 5 {
-                    return Err(Error::OldGM82)
+                match v.parse::<u8>()? {
+                    newer if newer > 5 => return Err(Error::OldGM82),
+                    older if older < 5 => importing_old_version = true,
+                    _ => (),
                 }
             },
             "gameid" => ide::GAME_ID.write(v.parse()?),
@@ -1337,7 +1340,9 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
 
     update_timestamp();
 
-    project_watcher::setup_watcher(&mut path);
+    if !importing_old_version {
+        project_watcher::setup_watcher(&mut path);
+    }
 
     Ok(())
 }
