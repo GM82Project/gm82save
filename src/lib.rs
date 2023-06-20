@@ -258,9 +258,17 @@ unsafe extern "fastcall" fn stuff_to_do_on_project_init() {
     EXTRA_DATA = None;
     SEEN_ERROR = false;
     project_watcher::unwatch();
-    let _: u32 = delphi_call!(0x62c554); // reset objects (what this overwrote)
-    // insert a blank object
+    let _: u32 = delphi_call!(0x7149c4); // reload action libraries (what this overwrote)
+    // insert blank resources
+    ide::SOUNDS.alloc(1);
+    ide::SPRITES.alloc(1);
+    ide::BACKGROUNDS.alloc(1);
+    ide::PATHS.alloc(1);
+    ide::SCRIPTS.alloc(1);
+    ide::FONTS.alloc(1);
+    ide::TIMELINES.alloc(1);
     ide::OBJECTS.alloc(1);
+    ide::ROOMS.alloc(1);
     // refresh the gm82room checkbox
     refresh_gm82room_checkbox();
 }
@@ -2071,7 +2079,7 @@ unsafe fn injector() {
     // compiler injections
     compiler::inject();
     // reset extra data, unwatch project folder, and add a blank object when loading a new project
-    patch_call(0x70598c, stuff_to_do_on_project_init as _);
+    patch_call(0x7059d2, stuff_to_do_on_project_init as _);
 
     // read text as ANSI on pre-8.1
     patch(0x70537b, &[0xe8]);
