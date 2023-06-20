@@ -873,6 +873,25 @@ unsafe extern "C" fn first_object_updates_room_forms() {
 }
 
 #[naked]
+unsafe extern "C" fn timeline_form_add_events() {
+    asm!(
+        // call original function
+        "mov ecx, 0x6f7fac",
+        "call ecx",
+
+        // get event list
+        "mov eax, [ebx + 0x3d0]",
+        // set its OnDblClick to open action
+        "mov edx, 0x6f9860",
+        "mov [eax + 0x118], edx",
+        "mov [eax + 0x11c], ebx",
+
+        "ret",
+        options(noreturn),
+    )
+}
+
+#[naked]
 unsafe extern "C" fn object_form_add_events() {
     asm!(
         // call original function
@@ -899,6 +918,13 @@ unsafe extern "C" fn object_form_add_events() {
         "lea edx, {children}",
         "mov [eax + 0x110], edx",
         "mov [eax + 0x114], ebx",
+
+        // get event list
+        "mov eax, [ebx + 0x3d4]",
+        // set its OnDblClick to open action
+        "mov edx, 0x6c77d0",
+        "mov [eax + 0x118], edx",
+        "mov [eax + 0x11c], ebx",
 
         "ret",
         parent = sym object_open_parent,
@@ -1939,6 +1965,9 @@ unsafe fn injector() {
 
     // update room forms if first object is created
     patch_call(0x71cfa2, first_object_updates_room_forms as _);
+
+    // double clicking a timeline moment opens the first action
+    patch_call(0x6f7f42, timeline_form_add_events as _);
 
     // go to parent by clicking on parent button
     patch_call(0x6c515e, object_form_add_events as _);
