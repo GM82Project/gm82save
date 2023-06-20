@@ -9,7 +9,7 @@ use std::{arch::asm, io, io::Write, ptr, slice};
 
 pub trait GetAssetList: Sync + 'static {
     fn get_asset_list() -> &'static dyn AssetListTrait<Self>;
-    fn save(&self, exe: bool, out: impl Write) -> io::Result<()>;
+    fn save(&mut self, exe: bool, out: impl Write) -> io::Result<()>;
     fn write_additional(_stream: &mut TMemoryStream) -> io::Result<()> {
         Ok(())
     }
@@ -20,7 +20,7 @@ impl GetAssetList for asset::Sprite {
         &ide::SPRITES
     }
 
-    fn save(&self, exe: bool, mut out: impl Write) -> io::Result<()> {
+    fn save(&mut self, exe: bool, mut out: impl Write) -> io::Result<()> {
         out.write_u32::<LE>(800)?;
         out.write_i32::<LE>(self.origin_x)?;
         out.write_i32::<LE>(self.origin_y)?;
@@ -81,7 +81,7 @@ impl GetAssetList for asset::Sprite {
                         "push dword ptr [{sprite}+0x10]",
                         "push dword ptr [{sprite}+0x14]",
                         "call {call}",
-                        sprite = in(reg) self,
+                        sprite = in(reg) &*self,
                         call = in(reg) 0x5aecac,
                         bbox = in(reg) &self.bbox_left,
                         inlateout("eax") 0x5ae848 => mask,
@@ -98,7 +98,7 @@ impl GetAssetList for asset::Sprite {
                             "push dword ptr [{sprite}+0x14]",
                             "call {call}",
                             call = in(reg) 0x5af188,
-                            sprite = in(reg) self,
+                            sprite = in(reg) &*self,
                             frame = in(reg) &self.bbox_left,
                             in("eax") mask,
                             in("edx") f,
@@ -124,7 +124,7 @@ impl GetAssetList for asset::Sprite {
                             "mov edx, 1",
                             "mov eax, 0x5ae848",
                             "call {call}",
-                            sprite = in(reg) self,
+                            sprite = in(reg) &*self,
                             call = in(reg) 0x5aecac,
                             inlateout("eax") 0x5ae848 => mask,
                             in("edx") 1,
@@ -147,7 +147,7 @@ impl GetAssetList for asset::Background {
         &ide::BACKGROUNDS
     }
 
-    fn save(&self, exe: bool, mut out: impl Write) -> io::Result<()> {
+    fn save(&mut self, exe: bool, mut out: impl Write) -> io::Result<()> {
         out.write_u32::<LE>(710)?;
         if !exe {
             out.write_u32::<LE>(self.is_tileset.into())?;
@@ -172,7 +172,7 @@ impl GetAssetList for asset::Path {
         &ide::PATHS
     }
 
-    fn save(&self, exe: bool, mut out: impl Write) -> io::Result<()> {
+    fn save(&mut self, exe: bool, mut out: impl Write) -> io::Result<()> {
         out.write_u32::<LE>(530)?;
         out.write_u32::<LE>(self.connection)?;
         out.write_u32::<LE>(self.closed.into())?;
@@ -197,7 +197,7 @@ impl GetAssetList for asset::Script {
         &ide::SCRIPTS
     }
 
-    fn save(&self, _exe: bool, mut out: impl Write) -> io::Result<()> {
+    fn save(&mut self, _exe: bool, mut out: impl Write) -> io::Result<()> {
         out.write_u32::<LE>(800)?;
         write_string(&self.source, out)?;
         Ok(())
@@ -215,7 +215,7 @@ impl GetAssetList for asset::Font {
         &ide::FONTS
     }
 
-    fn save(&self, exe: bool, mut out: impl Write) -> io::Result<()> {
+    fn save(&mut self, exe: bool, mut out: impl Write) -> io::Result<()> {
         out.write_u32::<LE>(800)?;
         write_string(&self.sys_name, &mut out)?;
         out.write_u32::<LE>(self.size)?;
@@ -225,10 +225,7 @@ impl GetAssetList for asset::Font {
         out.write_u32::<LE>((self.range_start & 0xffff) | (charset << 16) | ((self.aa_level + 1) << 24))?;
         out.write_u32::<LE>(self.range_end)?;
         if exe {
-            unsafe {
-                // oh no
-                (*(self as *const Self as *mut Self)).render();
-            }
+            self.render(); // the only reason all these functions are &mut self
             for i in 0..256 {
                 out.write_u32::<LE>(self.s_x[i])?;
                 out.write_u32::<LE>(self.s_y[i])?;
@@ -260,7 +257,7 @@ impl GetAssetList for asset::Room {
         &ide::ROOMS
     }
 
-    fn save(&self, exe: bool, mut out: impl Write) -> io::Result<()> {
+    fn save(&mut self, exe: bool, mut out: impl Write) -> io::Result<()> {
         unsafe {
             let _: u32 = delphi_call!(0x6576fc, self); // clean unused assets
         }
@@ -409,14 +406,14 @@ fn save_frame(frame: &asset::Frame, mut out: impl Write) -> io::Result<()> {
 extern "fastcall" fn save_assets<T: GetAssetList>(mut stream: &mut TMemoryStream, exe: bool) -> bool {
     let asset_list = T::get_asset_list();
     stream.write_u32::<LE>(800).unwrap();
-    let assets = asset_list.assets();
+    let assets = asset_list.assets_mut();
     stream.write_u32::<LE>(assets.len() as _).unwrap();
     (assets, asset_list.names(), asset_list.timestamps())
         .into_par_iter()
         .map(|(asset, name, timestamp)| {
             let mut out = ZlibEncoder::new(Vec::new(), Compression::new(unsafe { DEFLATE_LEVEL }));
             out.write_u32::<LE>(asset.is_some().into()).unwrap();
-            if let Some(asset) = asset {
+            if let Some(asset) = asset.as_mut() {
                 write_string(name, &mut out).unwrap();
                 if !exe {
                     out.write_f64::<LE>(*timestamp).unwrap();
