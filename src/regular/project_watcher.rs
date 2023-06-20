@@ -222,7 +222,7 @@ pub fn setup_watcher(path: &mut PathBuf) {
     }
 }
 
-pub fn unwatch() {
+pub extern "C" fn unwatch() {
     WATCHER_CHANNEL.lock().1.try_iter().for_each(|_| ()); // clear channel
     unsafe {
         WATCHER = None;

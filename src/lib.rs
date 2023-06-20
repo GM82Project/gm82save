@@ -300,6 +300,20 @@ unsafe extern "fastcall" fn about_inj(about_dialog: *const *const usize) {
 }
 
 #[naked]
+unsafe extern "C" fn save_all_after_import() {
+    asm!(
+        // call original function
+        "mov eax, 0x71c3e0",
+        "call eax",
+
+        // force a re-save
+        "2: jmp {unwatch}",
+        unwatch = sym project_watcher::unwatch,
+        options(noreturn),
+    );
+}
+
+#[naked]
 unsafe extern "C" fn save_inj() {
     asm!(
         "mov ecx, ebp",
@@ -1873,6 +1887,9 @@ unsafe fn injector() {
         0xe9, // jmp [nothing yet]
     ]);
     patch_call(0x71be5a, about_inj as _);
+
+    // invalidate the cache after importing resources
+    patch_call(0x70ef38, save_all_after_import as _);
 
     // call save() instead of CStream.Create and the "save gmk" function
     let save_dest = 0x705cbd;
