@@ -1717,8 +1717,32 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
             room_path.push("rooms");
             room_path.push(ide::ROOMS.names()[room_id].to_os_string());
             let _: u32 = delphi_call!(0x51acd0, *(0x790100 as *const u32)); // hide main form
-            let _ = std::process::Command::new(editor_path).arg(&room_path).spawn().and_then(|mut c| c.wait());
+            let result = std::process::Command::new(editor_path).arg(&room_path).spawn().and_then(|mut c| c.wait());
             let _: u32 = delphi_call!(0x51acd8, *(0x790100 as *const u32)); // show main form
+            if !matches!(result.map(|s| s.success()), Ok(true)) {
+                let message = UStr::new(format!(
+                    "It looks like gm82room crashed. Would you like to load its changes? \
+                     If it crashed during saving, it is recommended to click \"No\" and save."
+                ));
+                let mut answer: i32;
+                asm!(
+                    "push 0",  // HelpFileName
+                    "push -1", // Y
+                    "push -1", // X
+                    "push 0",  // HelpCtx
+                    "call {}",
+                    in(reg) 0x4d437c, // MessageDlgPosHelp
+                    inlateout("eax") message.0 => answer,
+                    in("edx") 3, // DlgType
+                    in("ecx") 3, // Buttons
+                    clobber_abi("C"),
+                );
+                if answer != 6 {
+                    // update room timestamp so it re-saves
+                    let _: u32 = delphi_call!(0x6930cc, room_id);
+                    return 0
+                }
+            }
             {
                 let room_opt = &mut ide::ROOMS.assets_mut()[room_id];
                 let room = room_opt.as_mut().unwrap();
