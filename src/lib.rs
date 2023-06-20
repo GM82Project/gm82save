@@ -892,14 +892,12 @@ unsafe extern "C" fn timeline_form_add_events() {
         // call original function
         "mov ecx, 0x6f7fac",
         "call ecx",
-
         // get event list
         "mov eax, [ebx + 0x3d0]",
         // set its OnDblClick to open action
         "mov edx, 0x6f9860",
         "mov [eax + 0x118], edx",
         "mov [eax + 0x11c], ebx",
-
         "ret",
         options(noreturn),
     )

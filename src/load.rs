@@ -1181,12 +1181,10 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     let mut importing_old_version = false;
     read_txt(&path, |k, v| {
         match k {
-            "gm82_version" => {
-                match v.parse::<u8>()? {
-                    newer if newer > 5 => return Err(Error::OldGM82),
-                    older if older < 5 => importing_old_version = true,
-                    _ => (),
-                }
+            "gm82_version" => match v.parse::<u8>()? {
+                newer if newer > 5 => return Err(Error::OldGM82),
+                older if older < 5 => importing_old_version = true,
+                _ => (),
             },
             "gameid" => ide::GAME_ID.write(v.parse()?),
             "info_author" => ide::settings::INFO_AUTHOR.asg(v),
