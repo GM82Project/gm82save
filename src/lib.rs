@@ -1619,6 +1619,9 @@ unsafe extern "fastcall" fn dont_make_room_form(node: &TTreeNode) {
         || (*ide::PROJECT_PATH).as_slice().last().copied() != Some(b'2' as u16)
     {
         let _: u32 = delphi_call!(0x71d608, node);
+    } else {
+        // actually just rename
+        let _: u32 = delphi_call!(0x4ad8b0, node);
     }
 }
 
