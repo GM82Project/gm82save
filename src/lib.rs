@@ -269,6 +269,11 @@ unsafe extern "fastcall" fn stuff_to_do_on_project_init() {
     ide::TIMELINES.alloc(1);
     ide::OBJECTS.alloc(1);
     ide::ROOMS.alloc(1);
+    // make defaults more sensible
+    *ide::settings::F5_SAVE_F6_LOAD = false;
+    *ide::settings::F9_SCREENSHOT = false;
+    *ide::settings::VSYNC_AND_FORCE_CPU |= 1 << 31; // swap creation code order
+    *ide::settings::PRIORITY = 1;
     // refresh the gm82room checkbox
     refresh_gm82room_checkbox();
 }
