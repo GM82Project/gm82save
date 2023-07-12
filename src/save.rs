@@ -9,6 +9,7 @@ use crate::{
     ACTION_TOKEN, EXTRA_DATA, LAST_SAVE, PATH_FORM_UPDATED, SAW_APPLIES_TO_WARNING,
 };
 use itertools::Itertools;
+use png::Compression;
 use rayon::prelude::*;
 use std::{
     collections::{HashMap, HashSet},
@@ -118,6 +119,7 @@ fn save_frame(frame: &Frame, path: &std::path::Path) -> Result<()> {
     // set up encoder
     let mut f = open_file(path)?;
     let mut encoder = png::Encoder::new(&mut f, frame.width, frame.height);
+    encoder.set_compression(Compression::Default);
     encoder.set_color(png::ColorType::Rgba);
     encoder.set_filter(png::FilterType::NoFilter);
     let mut writer = encoder.write_header().map_err(err)?;
