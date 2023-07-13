@@ -907,13 +907,39 @@ unsafe extern "C" fn timeline_form_add_events() {
         "call ecx",
         // get event list
         "mov eax, [ebx + 0x3d0]",
-        // set its OnDblClick to open action
-        "mov edx, 0x6f9860",
+        // set its OnDblClick
+        "lea edx, {event_list_dblclick}",
         "mov [eax + 0x118], edx",
         "mov [eax + 0x11c], ebx",
         "ret",
+        event_list_dblclick = sym timeline_event_list_dblclick_inj,
         options(noreturn),
     )
+}
+
+unsafe extern "C" fn timeline_event_list_dblclick_inj() {
+    asm!(
+        "mov ecx, eax",
+        "jmp {}",
+        sym timeline_event_list_dblclick,
+        options(noreturn),
+    );
+}
+
+unsafe extern "fastcall" fn timeline_event_list_dblclick(timeline_form: *const u32) {
+    let event_list = timeline_form.add(0x3d0 / 4).read();
+    let mut screen_mouse_pos = [0u32; 2];
+    // TMouse.GetCursorPos
+    let _: u32 = delphi_call!(0x4fd580, *(0x788248 as *const u32), screen_mouse_pos.as_mut_ptr());
+    let mut client_mouse_pos = [0u32; 2];
+    // EventList.ScreenToClient
+    let _: u32 = delphi_call!(0x4ee1d0, event_list, screen_mouse_pos.as_ptr(), client_mouse_pos.as_mut_ptr());
+    // EventList.ItemAtPos
+    let id: i32 = delphi_call!(0x483b48, event_list, client_mouse_pos.as_mut_ptr(), 1);
+    if id >= 0 {
+        // TTimeLineForm.EditProperties1Click
+        let _: u32 = delphi_call!(0x6f9860, timeline_form);
+    }
 }
 
 #[naked]
@@ -946,8 +972,8 @@ unsafe extern "C" fn object_form_add_events() {
 
         // get event list
         "mov eax, [ebx + 0x3d4]",
-        // set its OnDblClick to open action
-        "mov edx, 0x6c77d0",
+        // set its OnDblClick
+        "lea edx, {object_dblclick}",
         "mov [eax + 0x118], edx",
         "mov [eax + 0x11c], ebx",
 
@@ -955,6 +981,7 @@ unsafe extern "C" fn object_form_add_events() {
         parent = sym object_open_parent,
         mask = sym object_open_mask,
         children = sym object_show_children_inj,
+        object_dblclick = sym object_event_list_dblclick_inj,
         options(noreturn),
     );
 }
@@ -1026,6 +1053,31 @@ unsafe extern "fastcall" fn object_show_children(object_form: *const i32) {
     }
     popup.popup_at_cursor_pos();
     let _: u32 = delphi_call!(0x62cde0, *RESULT_PTR);
+}
+
+unsafe extern "C" fn object_event_list_dblclick_inj() {
+    asm!(
+        "mov ecx, eax",
+        "jmp {}",
+        sym object_event_list_dblclick,
+        options(noreturn),
+    )
+}
+
+unsafe extern "fastcall" fn object_event_list_dblclick(object_form: *const u32) {
+    let event_list = object_form.add(0x3d4 / 4).read();
+    let mut screen_mouse_pos = [0u32; 2];
+    // TMouse.GetCursorPos
+    let _: u32 = delphi_call!(0x4fd580, *(0x788248 as *const u32), screen_mouse_pos.as_mut_ptr());
+    let mut client_mouse_pos = [0u32; 2];
+    // EventList.ScreenToClient
+    let _: u32 = delphi_call!(0x4ee1d0, event_list, screen_mouse_pos.as_ptr(), client_mouse_pos.as_mut_ptr());
+    // EventList.ItemAtPos
+    let id: i32 = delphi_call!(0x483b48, event_list, client_mouse_pos.as_mut_ptr(), 1);
+    if id >= 0 {
+        // TObjectForm.EditProperties1Click
+        let _: u32 = delphi_call!(0x6c77d0, object_form);
+    }
 }
 
 #[naked]
