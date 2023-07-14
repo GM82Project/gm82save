@@ -847,6 +847,54 @@ unsafe extern "C" fn update_background_icon_on_revert() {
 }
 
 #[naked]
+unsafe extern "C" fn background_form_add_events() {
+    asm!(
+        // call original function
+        "mov ecx, 0x64cdb4",
+        "call ecx",
+        // get clipboard button
+        "mov eax, [ebx + 0x39c]",
+        // set its OnClick
+        "lea edx, {clipboard}",
+        "mov [eax + 0x110], edx",
+        "mov [eax + 0x114], ebx",
+        "ret",
+        clipboard = sym create_background_from_clipboard_inj,
+        options(noreturn),
+    );
+}
+
+#[naked]
+unsafe extern "C" fn create_background_from_clipboard_inj() {
+    asm!(
+        "mov ecx, eax",
+        "jmp {}",
+        sym create_background_from_clipboard,
+        options(noreturn),
+    );
+}
+
+unsafe extern "fastcall" fn create_background_from_clipboard(background_form: *mut *mut asset::Background) {
+    let mut bitmap = delphi::TBitmap::new();
+    bitmap.SetPixelFormat(7);
+    if !bitmap.load_from_clipboard() {
+        // no image in clipboard
+        return
+    }
+    bitmap.SetPixelFormat(7);
+    let background = &mut *background_form.add(0x3f0 / 4).read();
+    // if the frame's size is 0,0 then there's no background
+    // otherwise if we decide to ask do so here
+    background.frame.assign_from_bitmap(&bitmap);
+    // notify observers
+    background_form.cast::<u8>().add(0x3fc).write(1);
+    let bg_index = background_form.add(0x400 / 4).cast::<i32>().read();
+    let _: u32 = delphi_call!(0x64dfe0, bg_index);
+    let _: u32 = delphi_call!(0x64e0cc, bg_index);
+    let _: u32 = delphi_call!(0x64cdb4, background_form);
+}
+
+#[naked]
 unsafe extern "C" fn dont_show_action_tooltip_if_event_is_null() {
     asm!(
         // if eax is not null, call CEvent.GetAction
@@ -2072,6 +2120,9 @@ unsafe fn injector() {
 
     // update room forms if first object is created
     patch_call(0x71cfa2, first_object_updates_room_forms as _);
+
+    // background from clipboard button
+    patch_call(0x64cbc3, background_form_add_events as _);
 
     // double clicking a timeline moment opens the first action
     patch_call(0x6f7f42, timeline_form_add_events as _);

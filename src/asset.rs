@@ -61,6 +61,10 @@ impl Frame {
         let _: u32 = delphi_call!(0x7026A4, self, file);
     }
 
+    pub unsafe fn assign_from_bitmap(&mut self, bitmap: &TBitmap) {
+        let _: u32 = delphi_call!(0x702324, self, bitmap);
+    }
+
     pub fn get_data(&self) -> &[u8] {
         unsafe { slice::from_raw_parts(self.data, (self.width * self.height * 4) as usize) }
     }

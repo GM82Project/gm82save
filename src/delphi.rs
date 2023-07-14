@@ -397,6 +397,45 @@ impl TBitmap {
     pub unsafe fn GetScanline(&self, row: u32) -> *const u8 {
         delphi_call!(0x462be8, self, row)
     }
+
+    #[naked]
+    pub unsafe extern "fastcall" fn load_from_clipboard(&mut self) -> bool {
+        asm!(
+            "push edi",
+            "push ebx",
+            // Clipboard
+            "mov edi, ecx",
+            "mov eax, 0x4895b4",
+            "call eax",
+            "mov ebx, eax",
+            // TClipboard.HasFormat
+            "mov dx, 2",
+            "mov ecx, 0x48957c",
+            "call ecx",
+            // return false if false
+            "test al, al",
+            "jz 2f",
+            // TClipboard.GetAsHandle
+            "mov eax, ebx",
+            "mov dx, 2",
+            "mov ecx, 0x489448",
+            "call ecx",
+            // TBitmap.LoadFromClipboardFormat
+            "push 0",
+            "mov ecx, eax",
+            "mov edx, 2",
+            "mov eax, edi",
+            "mov ebx, 0x46319c",
+            "call ebx",
+            "mov al, 1",
+            // exception handler
+            "2:",
+            "pop ebx",
+            "pop edi",
+            "ret",
+            options(noreturn),
+        )
+    }
 }
 
 #[repr(C)]
