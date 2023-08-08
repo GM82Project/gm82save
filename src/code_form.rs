@@ -18,55 +18,56 @@ enum CodeHolder {
 static mut CODE_FORMS: Option<HashMap<CodeHolder, (UStr, usize)>> = None;
 static mut INSTANCE_FORMS: Option<HashMap<*const Room, HashMap<usize, (UStr, usize)>>> = None;
 
-#[naked]
-unsafe extern "C" fn update_code() {
-    unsafe extern "fastcall" fn inj(object: *mut usize) {
-        let (holder, code) = match *object {
-            0x6564cc => (CodeHolder::Room(object.cast()), &mut (*object.cast::<Room>()).creation_code),
-            0x62cf48 => (CodeHolder::Trigger(object.cast()), &mut (*object.cast::<Trigger>()).condition),
-            0x70fd70 => (CodeHolder::Action(object.cast()), &mut (*object.cast::<Action>()).param_strings[0]),
-            _ => return,
-        };
-        if let Some((_, form)) = CODE_FORMS.as_ref().and_then(|forms| forms.get(&holder)) {
-            // mark as changed
-            (*form as *mut bool).add(0x440).write(true);
-            // save text
-            let _: u32 = delphi_call!(0x6b8444, (*form as *const usize).add(0x43c / 4).read(), code);
-            if *object == 0x70fd70 {
-                // it's an action, save the "applies to"
-                let action = object.cast::<Action>();
-                let self_check = (*form as *const *const *const usize).add(0x3c0 / 4).read();
-                let other_check = (*form as *const *const *const usize).add(0x3c4 / 4).read();
-                let self_checked: u32;
-                let other_checked: u32;
-                asm!(
-                    "call {}",
-                    in(reg) self_check.read().add(0xec / 4).read(),
-                    inlateout("eax") self_check => self_checked,
-                    in("edx") 1,
-                    clobber_abi("C"),
-                );
-                asm!(
-                    "call {}",
-                    in(reg) other_check.read().add(0xec / 4).read(),
-                    inlateout("eax") other_check => other_checked,
-                    in("edx") 1,
-                    clobber_abi("C"),
-                );
-                (*action).applies_to = if self_checked != 0 {
-                    -1
-                } else if other_checked != 0 {
-                    -2
-                } else {
-                    (*form as *const *const i32).add(0x3cc / 4).read().add(0xc / 4).read()
-                };
-            }
+unsafe extern "fastcall" fn update_code(object: *mut usize) {
+    let (holder, code) = match *object {
+        0x6564cc => (CodeHolder::Room(object.cast()), &mut (*object.cast::<Room>()).creation_code),
+        0x62cf48 => (CodeHolder::Trigger(object.cast()), &mut (*object.cast::<Trigger>()).condition),
+        0x70fd70 => (CodeHolder::Action(object.cast()), &mut (*object.cast::<Action>()).param_strings[0]),
+        _ => return,
+    };
+    if let Some((_, form)) = CODE_FORMS.as_ref().and_then(|forms| forms.get(&holder)) {
+        // mark as changed
+        (*form as *mut bool).add(0x440).write(true);
+        // save text
+        let _: u32 = delphi_call!(0x6b8444, (*form as *const usize).add(0x43c / 4).read(), code);
+        if *object == 0x70fd70 {
+            // it's an action, save the "applies to"
+            let action = object.cast::<Action>();
+            let self_check = (*form as *const *const *const usize).add(0x3c0 / 4).read();
+            let other_check = (*form as *const *const *const usize).add(0x3c4 / 4).read();
+            let self_checked: u32;
+            let other_checked: u32;
+            asm!(
+                "call {}",
+                in(reg) self_check.read().add(0xec / 4).read(),
+                inlateout("eax") self_check => self_checked,
+                in("edx") 1,
+                clobber_abi("C"),
+            );
+            asm!(
+                "call {}",
+                in(reg) other_check.read().add(0xec / 4).read(),
+                inlateout("eax") other_check => other_checked,
+                in("edx") 1,
+                clobber_abi("C"),
+            );
+            (*action).applies_to = if self_checked != 0 {
+                -1
+            } else if other_checked != 0 {
+                -2
+            } else {
+                (*form as *const *const i32).add(0x3cc / 4).read().add(0xc / 4).read()
+            };
         }
     }
+}
+
+#[naked]
+unsafe extern "C" fn update_code_inj() {
     asm!(
         "mov ecx, eax",
         "jmp {}",
-        sym inj,
+        sym update_code,
         options(noreturn),
     );
 }
@@ -196,7 +197,7 @@ unsafe fn create_code_form(
     let _: u32 = delphi_call!(0x6b83b8, editor, code);
     // editor OnChange event
     editor.add(0x2d4 / 4).write(holder as _);
-    editor.add(0x2d0 / 4).write(if is_instance { update_instance_code as _ } else { update_code as _ });
+    editor.add(0x2d0 / 4).write(if is_instance { update_instance_code as _ } else { update_code_inj as _ });
     // set up find box
     let _: u32 = delphi_call!(0x681d00, form);
     (UStr::from_ptr(&code).clone(), form as usize)
@@ -338,6 +339,26 @@ unsafe extern "C" fn room_delete_instance() {
 }
 
 #[naked]
+unsafe extern "C" fn room_safe_undo() {
+    unsafe extern "fastcall" fn inj(room: *mut Room) {
+        update_code(room.cast());
+        if let Some(all_forms) = INSTANCE_FORMS.as_mut() {
+            if let Some(forms) = all_forms.get_mut(&room.cast_const()) {
+                forms.retain(|&id, _| (*room).get_instances().iter().any(|i| i.id == id));
+            }
+        }
+    }
+    asm!(
+        "mov edx, 0x405a7c",
+        "call edx",
+        "mov ecx, [ebx + 0x61c]",
+        "jmp {}",
+        sym inj,
+        options(noreturn),
+    );
+}
+
+#[naked]
 unsafe extern "C" fn room_delete_all() {
     asm!(
         "push eax",
@@ -384,6 +405,9 @@ pub unsafe fn inject() {
     patch(0x658ab1, &[0xe9]);
     patch_call(0x658ab1, room_delete_instance as _);
     patch_call(0x658b14, room_delete_all as _);
+
+    // double check when undoing room
+    patch_call(0x6889b0, room_safe_undo as _);
 
     // close form when deleting assets
     patch(0x70fd58, &(destroy_action as usize).to_le_bytes());
