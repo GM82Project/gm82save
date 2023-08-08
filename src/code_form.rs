@@ -1,7 +1,7 @@
 use crate::{
     asset::{Action, Room, Trigger},
     delphi::UStr,
-    patch, patch_call,
+    ide, patch, patch_call,
 };
 use std::{
     arch::asm,
@@ -58,6 +58,24 @@ unsafe extern "fastcall" fn update_code(object: *mut usize) {
             } else {
                 (*form as *const *const i32).add(0x3cc / 4).read().add(0xc / 4).read()
             };
+        }
+        if *object == 0x62cf48 {
+            // it's a trigger, update the form
+            let trigger_form = (0x77f3fc as *const *const *const *const usize).read();
+            if !trigger_form.is_null() {
+                let list_box = trigger_form.add(0x388 / 4).read();
+                let mut list_id: usize;
+                asm!(
+                    "call {}",
+                    in(reg) list_box.read().add(0xec / 4).read(),
+                    inlateout("eax") list_box => list_id,
+                    clobber_abi("C"),
+                );
+                let trigger_id = list_box.add(0x3dc / 4 + list_id).cast::<usize>().read();
+                if ide::get_triggers()[trigger_id].as_ref().map(|t| t.as_ptr()) == Some(object.cast_const().cast()) {
+                    let _: u32 = delphi_call!(0x6bc118, trigger_form, list_id);
+                }
+            }
         }
     }
 }
