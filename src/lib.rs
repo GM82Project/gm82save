@@ -1,4 +1,5 @@
 #![feature(naked_functions)]
+#![feature(option_get_or_insert_default)]
 
 #[cfg(not(all(windows, target_arch = "x86")))]
 compile_error!("this tool only works on windows 32-bit");
@@ -6,6 +7,7 @@ compile_error!("this tool only works on windows 32-bit");
 mod asset;
 #[macro_use]
 mod delphi;
+mod code_form;
 mod compiler;
 mod events;
 mod font_render;
@@ -2207,6 +2209,9 @@ unsafe fn injector() {
     // check if extensions need updating when drawing code
     patch(0x6ab18c, &[0xe9]);
     patch_call(0x6ab18c, maybe_reload_extensions_when_typing as _);
+
+    // code form stuff
+    code_form::inject();
 
     // code editor don't resize on maximize
     // script resize
