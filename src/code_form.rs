@@ -95,7 +95,7 @@ unsafe extern "C" fn close_code() {
             });
             if !found_regular_form {
                 if let Some(forms) = INSTANCE_FORMS.as_mut() {
-                    for (room, map) in forms {
+                    for (room, map) in forms.iter_mut() {
                         map.retain(|&id, f| {
                             if f.1 == form {
                                 if revert {
@@ -111,6 +111,7 @@ unsafe extern "C" fn close_code() {
                             }
                         })
                     }
+                    forms.retain(|_, m| !m.is_empty());
                 }
             }
         }
