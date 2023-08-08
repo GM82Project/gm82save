@@ -93,26 +93,26 @@ unsafe extern "C" fn close_code() {
                     true
                 }
             });
-            if !found_regular_form {
-                if let Some(forms) = INSTANCE_FORMS.as_mut() {
-                    for (room, map) in forms.iter_mut() {
-                        map.retain(|&id, f| {
-                            if f.1 == form {
-                                if revert {
-                                    if let Some(inst) =
-                                        (*room.cast_mut()).get_instances_mut().iter_mut().filter(|i| i.id == id).next()
-                                    {
-                                        inst.creation_code = f.0.clone();
-                                    }
+        }
+        if !found_regular_form {
+            if let Some(forms) = INSTANCE_FORMS.as_mut() {
+                for (room, map) in forms.iter_mut() {
+                    map.retain(|&id, f| {
+                        if f.1 == form {
+                            if revert {
+                                if let Some(inst) =
+                                    (*room.cast_mut()).get_instances_mut().iter_mut().filter(|i| i.id == id).next()
+                                {
+                                    inst.creation_code = f.0.clone();
                                 }
-                                false
-                            } else {
-                                true
                             }
-                        })
-                    }
-                    forms.retain(|_, m| !m.is_empty());
+                            false
+                        } else {
+                            true
+                        }
+                    })
                 }
+                forms.retain(|_, m| !m.is_empty());
             }
         }
     }
@@ -160,7 +160,7 @@ unsafe fn create_code_form(
     // SetText
     let _: u32 = delphi_call!(0x4ee6d8, form, title);
     // SetVisible applies_to
-    let _: u32 = delphi_call!(0x4ee5c0, form, u32::from(applies_to.is_some()));
+    let _: u32 = delphi_call!(0x4ee5c0, form.add(0x3b8 / 4).read(), u32::from(applies_to.is_some()));
     if let Some(applies_to) = applies_to {
         // SetVisible WhoName
         let _: u32 = delphi_call!(0x4ee5c0, form.add(0x3cc / 4).read(), u32::from(applies_to >= 0));
@@ -271,15 +271,20 @@ unsafe extern "C" fn open_trigger_code() {
 
 #[naked]
 unsafe extern "C" fn open_instance_code() {
-    // TODO double check fastcall stack order
     unsafe extern "fastcall" fn inj(title: *const u16, room: &Room, code: *const u16, id: usize) {
-        let form = create_code_form(code, None, title, true, room as *const _ as _, true);
-        INSTANCE_FORMS.get_or_insert_default().entry(room).or_default().insert(id, form);
+        match INSTANCE_FORMS.get_or_insert_default().entry(room).or_default().entry(id) {
+            Entry::Occupied(entry) => {
+                let _: u32 = delphi_call!(0x4ee948, entry.get().1);
+            },
+            Entry::Vacant(entry) => {
+                entry.insert(create_code_form(code, None, title, true, room as *const _ as _, true));
+            },
+        }
     }
     asm!(
         "mov edx, [ebx + 0x61c]",
-        "push dword ptr [ebp - 4]",
         "push dword ptr [ebp - 0x10]",
+        "push dword ptr [ebp - 4]",
         "call {}",
         "ret 8",
         sym inj,
