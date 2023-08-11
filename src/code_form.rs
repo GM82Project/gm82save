@@ -435,7 +435,7 @@ pub unsafe fn inject() {
     // close form
     patch(0x682a42, &[0x2f]);
     patch(0x682a4b, &[0x26]);
-    patch(0x682a6b, &[0x0b]);
+    patch(0x682a6b, &[0x0a]);
     patch(0x682a72, &[
         0x33, 0xc0, // xor eax, eax
         0xb0, 0x06, // mov al, 6
