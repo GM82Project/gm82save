@@ -2440,6 +2440,9 @@ unsafe fn injector() {
     patch_call(0x6c7512, properly_update_object_timestamp_right_click as _);
     patch_call(0x6f95e6, properly_update_timeline_timestamp_right_click as _);
 
+    // don't show save/discard question when deleting object
+    patch(0x62ca28, &[0x90; 5]);
+
     // update timestamp properly in mask form
     unsafe fn patch_timestamp_mask(dest: usize) {
         patch(dest, &[0xe8, 0, 0, 0, 0, 0x90, 0x90, 0x90]);
