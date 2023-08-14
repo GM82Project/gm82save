@@ -314,7 +314,6 @@ unsafe extern "C" fn open_instance_code() {
 unsafe extern "C" fn destroy_action(_: u32, action: &Action) {
     if let Some(forms) = CODE_FORMS.as_mut() {
         if let Some(form) = forms.remove(&CodeHolder::Action(action)) {
-            let _: u32 = delphi_call!(0x51a7e8, form.1);
             let _: u32 = delphi_call!(0x405a7c, form.1);
         }
     }
@@ -323,7 +322,6 @@ unsafe extern "C" fn destroy_action(_: u32, action: &Action) {
 unsafe extern "fastcall" fn clear_all_instances_in_room(room: *const Room) {
     if let Some(forms) = INSTANCE_FORMS.as_mut().and_then(|forms| forms.remove(&room)) {
         for (_, form) in forms {
-            let _: u32 = delphi_call!(0x51a7e8, form.1);
             let _: u32 = delphi_call!(0x405a7c, form.1);
         }
     }
@@ -336,7 +334,6 @@ unsafe extern "C" fn room_delete_instance() {
         if let Some(form) =
             INSTANCE_FORMS.as_mut().and_then(|forms| forms.get_mut(&room)).and_then(|forms| forms.remove(&inst_id))
         {
-            let _: u32 = delphi_call!(0x51a7e8, form.1);
             let _: u32 = delphi_call!(0x405a7c, form.1);
         }
     }
@@ -393,7 +390,6 @@ unsafe extern "C" fn room_delete_all() {
 unsafe extern "C" fn destroy_room(_: u32, room: &Room) {
     if let Some(forms) = CODE_FORMS.as_mut() {
         if let Some(form) = forms.remove(&CodeHolder::Room(room)) {
-            let _: u32 = delphi_call!(0x51a7e8, form.1);
             let _: u32 = delphi_call!(0x405a7c, form.1);
         }
     }
@@ -403,7 +399,6 @@ unsafe extern "C" fn destroy_room(_: u32, room: &Room) {
 unsafe extern "C" fn destroy_trigger(_: u32, trigger: &Trigger) {
     if let Some(forms) = CODE_FORMS.as_mut() {
         if let Some(form) = forms.remove(&CodeHolder::Trigger(trigger)) {
-            let _: u32 = delphi_call!(0x51a7e8, form.1);
             let _: u32 = delphi_call!(0x405a7c, form.1);
         }
     }
