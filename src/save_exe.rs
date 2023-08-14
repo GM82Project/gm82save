@@ -209,7 +209,11 @@ fn write_event(event: &mut asset::Event, mut out: impl Write) -> io::Result<()> 
     out.write_u32::<LE>(event.action_count)?;
     for action in event.get_actions_mut() {
         // define action from library
-        let _: u32 = unsafe { delphi_call!(0x710544, action) };
+        unsafe {
+            let lib_id = action.lib_id;
+            let act_id = action.id;
+            action.fill_in(lib_id, act_id);
+        }
         out.write_u32::<LE>(440)?;
         out.write_u32::<LE>(action.lib_id)?;
         out.write_u32::<LE>(action.id)?;
