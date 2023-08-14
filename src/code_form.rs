@@ -91,6 +91,22 @@ unsafe extern "C" fn update_code_inj() {
 }
 
 #[naked]
+unsafe extern "C" fn check_all_closing() {
+    asm!(
+        "mov eax, 0x682a4a",
+        // original check: form.savechanges
+        "cmp byte ptr [ebx + 0x441], 0",
+        "jnz 2f",
+        // new check: closing all?
+        "mov ecx, 0x77f448",
+        "cmp byte ptr [ecx], 0",
+        // return
+        "2: jmp eax",
+        options(noreturn),
+    );
+}
+
+#[naked]
 unsafe extern "C" fn close_code() {
     unsafe extern "fastcall" fn inj(form: usize, response: i32) {
         let revert = response != 6;
@@ -429,6 +445,8 @@ pub unsafe fn inject() {
 
     // close form
     patch(0x682a42, &[0x2f]);
+    patch(0x682a43, &[0xe9, 0, 0, 0, 0, 0x90, 0x90]);
+    patch_call(0x682a43, check_all_closing as _);
     patch(0x682a4b, &[0x26]);
     patch(0x682a6b, &[0x0a]);
     patch(0x682a72, &[
