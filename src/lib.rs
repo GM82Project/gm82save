@@ -24,9 +24,11 @@ use crate::{
     ide::get_triggers,
     regular::{extension_watcher::update_extensions, project_watcher},
     save::GetAsset,
+    save_exe::GetAssetList,
 };
 use ide::AssetListTrait;
 use lazy_static::lazy_static;
+use rayon::prelude::*;
 use regex::Regex;
 use std::{
     arch::asm,
@@ -1586,6 +1588,28 @@ unsafe extern "fastcall" fn add_three_newest(items: &TMenuItem, ty: u32, ebp: *c
 }
 
 #[naked]
+unsafe extern "C" fn get_asset_from_name_unicase<T: GetAssetList>() {
+    unsafe extern "fastcall" fn inj<T: GetAssetList>(name: *const u16) -> i32 {
+        let name = UStr::from_ptr(&name);
+        T::get_asset_list()
+            .names()
+            .par_iter()
+            .enumerate()
+            .find_map_first(|(i, n)| {
+                let res: i32 = delphi_call!(0x415924, name.0, n.0);
+                (res == 0).then(|| i as i32)
+            })
+            .unwrap_or(-1)
+    }
+    asm!(
+        "mov ecx, eax",
+        "jmp {}",
+        sym inj::<T>,
+        options(noreturn),
+    );
+}
+
+#[naked]
 unsafe extern "C" fn room_form_inj() {
     asm!(
         "mov ecx, eax",
@@ -2384,6 +2408,17 @@ unsafe fn injector() {
     patch_call(0x71c6a0, get_treenode_count_and_preserve_resource_type as _);
     patch(0x71c6dd, &[0xe9]);
     patch_call(0x71c6dd, add_three_newest_inj as _);
+
+    // case insensitive ctrl-r
+    patch_call(0x6e144a, get_asset_from_name_unicase::<asset::Object> as _);
+    patch_call(0x6e1460, get_asset_from_name_unicase::<asset::Room> as _);
+    patch_call(0x6e1476, get_asset_from_name_unicase::<asset::Sprite> as _);
+    patch_call(0x6e148c, get_asset_from_name_unicase::<asset::Sound> as _);
+    patch_call(0x6e149f, get_asset_from_name_unicase::<asset::Background> as _);
+    patch_call(0x6e14b2, get_asset_from_name_unicase::<asset::Path> as _);
+    patch_call(0x6e14c5, get_asset_from_name_unicase::<asset::Font> as _);
+    patch_call(0x6e14d8, get_asset_from_name_unicase::<asset::Timeline> as _);
+    patch_call(0x6e14eb, get_asset_from_name_unicase::<asset::Script> as _);
 
     // update timestamps when setting name
     unsafe fn patch_timestamps(dest: usize) {
