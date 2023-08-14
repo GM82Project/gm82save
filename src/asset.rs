@@ -406,6 +406,10 @@ impl Event {
     pub fn get_actions(&self) -> &[DelphiBox<Action>] {
         unsafe { self.actions.get_unchecked(..self.action_count as usize) }
     }
+
+    pub fn get_actions_mut(&mut self) -> &mut [DelphiBox<Action>] {
+        unsafe { self.actions.get_unchecked_mut(..self.action_count as usize) }
+    }
 }
 
 #[repr(C)]

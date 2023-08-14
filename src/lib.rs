@@ -2419,11 +2419,14 @@ unsafe fn injector() {
     patch(0x4199fb, &[0xe9]);
     patch_call(0x4199fb, reset_if_time_went_backwards as _);
 
+    patch_call(0x6cd928, save_exe::save_assets_inj::<asset::Sound> as usize);
     patch_call(0x6cd943, save_exe::save_assets_inj::<asset::Sprite> as usize);
     patch_call(0x6cd95e, save_exe::save_assets_inj::<asset::Background> as usize);
     patch_call(0x06cd979, save_exe::save_assets_inj::<asset::Path> as usize);
     patch_call(0x6cd994, save_exe::save_assets_inj::<asset::Script> as usize);
     patch_call(0x6cd9af, save_exe::save_assets_inj::<asset::Font> as usize);
+    patch_call(0x6cd9ca, save_exe::save_assets_inj::<asset::Timeline> as usize);
+    patch_call(0x6cd9e1, save_exe::save_assets_inj::<asset::Object> as usize);
     patch_call(0x6cd9f8, save_exe::save_assets_inj::<asset::Room> as usize);
 
     patch_call(0x6ce104, save_exe::write_encrypted_gamedata_inj as usize);

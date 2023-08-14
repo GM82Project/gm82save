@@ -204,6 +204,107 @@ impl GetAssetList for asset::Script {
     }
 }
 
+fn write_event(event: &mut asset::Event, mut out: impl Write) -> io::Result<()> {
+    out.write_u32::<LE>(400)?;
+    out.write_u32::<LE>(event.action_count)?;
+    for action in event.get_actions_mut() {
+        // define action from library
+        let _: u32 = unsafe { delphi_call!(0x710544, action) };
+        out.write_u32::<LE>(440)?;
+        out.write_u32::<LE>(action.lib_id)?;
+        out.write_u32::<LE>(action.id)?;
+        out.write_u32::<LE>(action.action_kind)?;
+        out.write_u32::<LE>(action.can_be_relative.into())?;
+        out.write_u32::<LE>(action.is_condition.into())?;
+        out.write_u32::<LE>(action.applies_to_something.into())?;
+        out.write_u32::<LE>(action.execution_type)?;
+        write_string(&action.fn_name, &mut out)?;
+        write_string(&action.fn_code, &mut out)?;
+        out.write_u32::<LE>(action.param_count)?;
+        out.write_u32::<LE>(8)?;
+        for ty in action.param_types {
+            out.write_u32::<LE>(ty)?;
+        }
+        out.write_i32::<LE>(action.applies_to)?;
+        out.write_u32::<LE>(action.is_relative.into())?;
+        out.write_u32::<LE>(8)?;
+        for param in &action.param_strings {
+            write_string(param, &mut out)?;
+        }
+        out.write_u32::<LE>(action.invert_condition.into())?;
+    }
+    Ok(())
+}
+
+impl GetAssetList for asset::Object {
+    fn get_asset_list() -> &'static dyn AssetListTrait<Self> {
+        &ide::OBJECTS
+    }
+
+    fn save(&mut self, _exe: bool, mut out: impl Write) -> io::Result<()> {
+        // make sure everything exists
+        let _: u32 = unsafe { delphi_call!(0x704b30, self) };
+        out.write_u32::<LE>(430)?;
+        out.write_i32::<LE>(self.sprite_index)?;
+        out.write_u32::<LE>(self.solid.into())?;
+        out.write_u32::<LE>(self.visible.into())?;
+        out.write_i32::<LE>(self.depth)?;
+        out.write_u32::<LE>(self.persistent.into())?;
+        out.write_i32::<LE>(self.parent_index)?;
+        out.write_i32::<LE>(self.mask_index.into())?;
+        out.write_u32::<LE>(11)?;
+        for events in &mut self.events {
+            // note: gm saves them backwards, might as well replicate lol
+            for (i, event) in events.iter_mut().enumerate().rev() {
+                if event.action_count > 0 {
+                    out.write_u32::<LE>(i as _)?;
+                    write_event(event, &mut out)?;
+                }
+            }
+            out.write_i32::<LE>(-1)?;
+        }
+        Ok(())
+    }
+}
+
+impl GetAssetList for asset::Timeline {
+    fn get_asset_list() -> &'static dyn AssetListTrait<Self> {
+        &ide::TIMELINES
+    }
+
+    fn save(&mut self, _exe: bool, mut out: impl Write) -> io::Result<()> {
+        out.write_u32::<LE>(500)?;
+        out.write_u32::<LE>(self.moment_count as _)?;
+        for (&time, event) in self.moment_times.iter().zip(self.moment_events.iter_mut()) {
+            out.write_u32::<LE>(time)?;
+            write_event(event, &mut out)?;
+        }
+        Ok(())
+    }
+}
+
+impl GetAssetList for asset::Sound {
+    fn get_asset_list() -> &'static dyn AssetListTrait<Self> {
+        &ide::SOUNDS
+    }
+
+    fn save(&mut self, _exe: bool, mut out: impl Write) -> io::Result<()> {
+        out.write_u32::<LE>(800)?;
+        out.write_u32::<LE>(self.kind)?;
+        write_string(&self.extension, &mut out)?;
+        write_string(&self.source, &mut out)?;
+        out.write_u32::<LE>(self.data.is_some().into())?;
+        if let Some(data) = self.data.as_ref() {
+            write_buffer(data.get_slice(), &mut out)?;
+        }
+        out.write_u32::<LE>(self.effects)?;
+        out.write_f64::<LE>(self.volume)?;
+        out.write_f64::<LE>(self.pan)?;
+        out.write_u32::<LE>(self.preload.into())?;
+        Ok(())
+    }
+}
+
 static mut OLD_DPI: u32 = 96;
 
 impl GetAssetList for asset::Font {
