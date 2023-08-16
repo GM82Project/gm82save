@@ -18,6 +18,48 @@ enum CodeHolder {
 static mut CODE_FORMS: Option<HashMap<CodeHolder, (UStr, usize)>> = None;
 static mut INSTANCE_FORMS: Option<HashMap<*const Room, HashMap<usize, (UStr, usize)>>> = None;
 
+#[naked]
+unsafe extern "fastcall" fn trigger_disable_condition_memo() {
+    unsafe extern "fastcall" fn inj(memo: *const *const usize, trigger: *const Trigger) {
+        asm!(
+            "call [{}]",
+            in(reg) memo.read().add(0x74 / 4),
+            in("eax") memo,
+            in("dl") u8::from(
+                CODE_FORMS.as_ref().map(|forms| !forms.contains_key(&CodeHolder::Trigger(trigger))).unwrap_or(true),
+            ),
+        );
+    }
+    asm!(
+        "push eax",
+        "mov ecx, 0x4ee6d8",
+        "call ecx",
+        "pop ecx",
+        "mov edx, esi",
+        "jmp {}",
+        sym inj,
+        options(noreturn),
+    );
+}
+
+unsafe fn update_trigger_form(trigger: *const Trigger) {
+    let trigger_form = (0x77f3fc as *const *const *const *const usize).read();
+    if !trigger_form.is_null() {
+        let list_box = trigger_form.add(0x388 / 4).read();
+        let mut list_id: usize;
+        asm!(
+            "call {}",
+            in(reg) list_box.read().add(0xec / 4).read(),
+            inlateout("eax") list_box => list_id,
+            clobber_abi("C"),
+        );
+        let trigger_id = list_box.add(0x3dc / 4 + list_id).cast::<usize>().read();
+        if ide::get_triggers()[trigger_id].as_ref().map(|t| t.as_ptr()) == Some(trigger) {
+            let _: u32 = delphi_call!(0x6bc118, trigger_form, list_id);
+        }
+    }
+}
+
 unsafe extern "fastcall" fn update_code(object: *mut usize) {
     let (holder, code) = match *object {
         0x6564cc => (CodeHolder::Room(object.cast()), &mut (*object.cast::<Room>()).creation_code),
@@ -59,24 +101,6 @@ unsafe extern "fastcall" fn update_code(object: *mut usize) {
                 (*form as *const *const i32).add(0x3cc / 4).read().add(0xc / 4).read()
             };
         }
-        if *object == 0x62cf48 {
-            // it's a trigger, update the form
-            let trigger_form = (0x77f3fc as *const *const *const *const usize).read();
-            if !trigger_form.is_null() {
-                let list_box = trigger_form.add(0x388 / 4).read();
-                let mut list_id: usize;
-                asm!(
-                    "call {}",
-                    in(reg) list_box.read().add(0xec / 4).read(),
-                    inlateout("eax") list_box => list_id,
-                    clobber_abi("C"),
-                );
-                let trigger_id = list_box.add(0x3dc / 4 + list_id).cast::<usize>().read();
-                if ide::get_triggers()[trigger_id].as_ref().map(|t| t.as_ptr()) == Some(object.cast_const().cast()) {
-                    let _: u32 = delphi_call!(0x6bc118, trigger_form, list_id);
-                }
-            }
-        }
     }
 }
 
@@ -112,11 +136,15 @@ unsafe extern "C" fn close_code() {
         let revert = response != 6;
         let mut found_regular_form = false;
         if let Some(forms) = CODE_FORMS.as_mut() {
+            let mut my_trigger = None;
             forms.retain(|holder, f| {
                 if f.1 == form {
                     found_regular_form = true;
                     let code = match holder {
-                        CodeHolder::Trigger(trigger) => &mut (*trigger.cast_mut()).condition,
+                        CodeHolder::Trigger(trigger) => {
+                            my_trigger = Some(*trigger);
+                            &mut (*trigger.cast_mut()).condition
+                        },
                         CodeHolder::Room(room) => &mut (*room.cast_mut()).creation_code,
                         CodeHolder::Action(action) => &mut (*action.cast_mut()).param_strings[0],
                     };
@@ -128,6 +156,9 @@ unsafe extern "C" fn close_code() {
                     true
                 }
             });
+            if let Some(trigger) = my_trigger {
+                update_trigger_form(trigger);
+            }
         }
         if !found_regular_form {
             if let Some(forms) = INSTANCE_FORMS.as_mut() {
@@ -294,6 +325,7 @@ unsafe extern "C" fn open_trigger_code() {
         open_or_insert(CodeHolder::Trigger(trigger), || {
             create_code_form(trigger.condition.0, None, title, true, trigger as *const _ as _, false)
         });
+        update_trigger_form(trigger);
     }
     asm!(
         "mov edx, edi",
@@ -442,6 +474,9 @@ pub unsafe fn inject() {
     patch(0x70fd58, &(destroy_action as usize).to_le_bytes());
     patch(0x62cf30, &(destroy_trigger as usize).to_le_bytes());
     patch(0x6564b4, &(destroy_room as usize).to_le_bytes());
+
+    // disable condition memo when code form is open
+    patch_call(0x6bc183, trigger_disable_condition_memo as _);
 
     // close form
     patch(0x682a42, &[0x2f]);
