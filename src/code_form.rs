@@ -1,8 +1,11 @@
 use crate::{
-    asset::{Action, Room, Trigger},
+    asset::{Action, Event, Room, Timeline, Trigger},
     delphi::UStr,
-    ide, patch, patch_call,
+    ide,
+    ide::AssetListTrait,
+    patch, patch_call,
 };
+use itertools::Itertools;
 use std::{
     arch::asm,
     collections::{hash_map::Entry, HashMap},
@@ -281,12 +284,61 @@ unsafe fn open_or_insert(holder: CodeHolder, create: impl FnOnce() -> (UStr, usi
 
 #[naked]
 unsafe extern "C" fn open_code_action() {
-    unsafe extern "fastcall" fn inj(title: *const u16, action: &Action) {
+    unsafe extern "fastcall" fn inj(
+        title: *const u16,
+        action: &Action,
+        form_ebx: *const usize,
+        form_esi: *const usize,
+    ) {
+        enum ThingForm {
+            Object(*const usize),
+            Timeline(*const usize),
+        }
+        let form = match *form_esi {
+            0x6c3530 => ThingForm::Object(form_esi),
+            0x6f6a40 => ThingForm::Timeline(form_esi),
+            _ => match *form_ebx {
+                0x6c3530 => ThingForm::Object(form_ebx),
+                0x6f6a40 => ThingForm::Timeline(form_ebx),
+                _ => unreachable!(),
+            },
+        };
+        let title = match form {
+            ThingForm::Object(form) => {
+                let object_index = form.add(0x46c / 4).read();
+                let object_name = ide::OBJECTS.names()[object_index].clone();
+                let event_type = form.add(0x8180 / 4).read();
+                let event_number = form.add(0x8184 / 4).read();
+                let event = form.add(0x817c / 4).cast::<&Event>().read();
+                let action_id =
+                    event.get_actions().iter().find_position(|act| act.as_ptr() == action as *const _).unwrap().0;
+                let mut event_name = UStr::default();
+                let _: u32 = delphi_call!(0x6d0df0, event_type, event_number, &mut event_name);
+                object_name
+                    + UStr::new(" - ")
+                    + event_name
+                    + UStr::new(format!(" - Action {} - ", action_id + 1))
+                    + UStr::from_ptr(&title)
+            },
+            ThingForm::Timeline(form) => {
+                let timeline_index = form.add(0x430 / 4).read();
+                let timeline_name = ide::TIMELINES.names()[timeline_index].clone();
+                let timeline = form.add(0x420 / 4).cast::<&Timeline>().read();
+                let event = form.add(0x434 / 4).cast::<&Event>().read();
+                let moment_id =
+                    timeline.moment_events.iter().find_position(|e| e.as_ptr() == event as *const _).unwrap().0;
+                let action_id =
+                    event.get_actions().iter().find_position(|a| a.as_ptr() == action as *const _).unwrap().0;
+                timeline_name
+                    + UStr::new(format!(" - Step {} - Action {} - ", timeline.moment_times[moment_id], action_id + 1))
+                    + UStr::from_ptr(&title)
+            },
+        };
         open_or_insert(CodeHolder::Action(action), || {
             create_code_form(
                 action.param_strings[0].0,
                 Some(action.applies_to),
-                title,
+                title.0,
                 action.action_kind != 6,
                 action as *const _ as _,
                 false,
@@ -295,6 +347,8 @@ unsafe extern "C" fn open_code_action() {
     }
     asm!(
         "mov edx, dword ptr [esi]",
+        "push dword ptr [ebp - 0x1c]",
+        "push dword ptr [ebp + 0xc]",
         "call {}",
         "mov al, 1",
         "ret 8",
@@ -305,12 +359,14 @@ unsafe extern "C" fn open_code_action() {
 
 #[naked]
 unsafe extern "C" fn open_room_code() {
-    unsafe extern "fastcall" fn inj(title: *const u16, room: &Room) {
+    unsafe extern "fastcall" fn inj(room_id: usize, room: &Room) {
+        let title = ide::ROOMS.names()[room_id].clone() + UStr::new(" - Room Creation Code");
         open_or_insert(CodeHolder::Room(room), || {
-            create_code_form(room.creation_code.0, None, title, true, room as *const _ as _, false)
+            create_code_form(room.creation_code.0, None, title.0, true, room as *const _ as _, false)
         });
     }
     asm!(
+        "mov ecx, [ebx + 0x630]",
         "mov edx, [ebx + 0x61c]",
         "call {}",
         "ret 8",
@@ -350,8 +406,8 @@ unsafe extern "C" fn open_instance_code() {
     }
     asm!(
         "mov edx, [ebx + 0x61c]",
-        "push dword ptr [ebp - 0x10]",
-        "push dword ptr [ebp - 4]",
+        "push dword ptr [ebp - 0x10]", // id
+        "push dword ptr [ebp - 4]", // code
         "call {}",
         "ret 8",
         sym inj,
