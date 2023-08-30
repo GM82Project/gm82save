@@ -1,4 +1,5 @@
 #![feature(naked_functions)]
+#![feature(option_get_or_insert_default)]
 
 #[cfg(not(all(windows, target_arch = "x86")))]
 compile_error!("this tool only works on windows 32-bit");
@@ -6,6 +7,7 @@ compile_error!("this tool only works on windows 32-bit");
 mod asset;
 #[macro_use]
 mod delphi;
+mod code_form;
 mod compiler;
 mod events;
 mod font_render;
@@ -1130,6 +1132,59 @@ unsafe extern "fastcall" fn object_event_list_dblclick(object_form: *const u32) 
     }
 }
 
+unsafe extern "fastcall" fn confirm_before_deleting_action(action_id: usize, event: *const asset::Event) -> usize {
+    if let Some(action) = event.as_ref().and_then(|event| event.get_actions().get(action_id)) {
+        if action.param_count > 0 {
+            let message = UStr::new(format!("Are you sure you want to delete this action?"));
+            let mut answer: i32;
+            asm!(
+                "push 0",  // HelpFileName
+                "push -1", // Y
+                "push -1", // X
+                "push 0",  // HelpCtx
+                "call {}",
+                in(reg) 0x4d437c, // MessageDlgPosHelp
+                inlateout("eax") message.0 => answer,
+                in("edx") 3, // DlgType
+                in("ecx") 3, // Buttons
+                clobber_abi("C"),
+            );
+            if answer != 6 {
+                return -1i32 as usize
+            }
+        }
+    }
+    action_id
+}
+
+macro_rules! deleting_action_inj {
+    ($name:ident, $mov:literal) => {
+        #[naked]
+        unsafe extern "fastcall" fn $name() {
+            asm!(
+                // call original function
+                "call [edx + 0xec]",
+                // call confirm_before_deleting_action
+                "mov ecx, eax",
+                $mov,
+                "call {}",
+                "cmp eax, -1",
+                "jne 2f",
+                "add esp, 4",
+                "pop edi",
+                "pop esi",
+                "pop ebx",
+                "2: ret",
+                sym confirm_before_deleting_action,
+                options(noreturn),
+            );
+        }
+    }
+}
+
+deleting_action_inj!(confirm_before_deleting_action_object, "mov edx, [esi + 0x817c]");
+deleting_action_inj!(confirm_before_deleting_action_timeline, "mov edx, [esi + 0x434]");
+
 #[naked]
 unsafe extern "C" fn object_clean_collide_events_inj() {
     asm!(
@@ -2154,6 +2209,13 @@ unsafe fn injector() {
     // go to parent by clicking on parent button
     patch_call(0x6c515e, object_form_add_events as _);
 
+    // ask to confirm when deleting actions with content
+    // call <...>; nop
+    patch(0x6c7999, &[0xe8, 0, 0, 0, 0, 0x90]);
+    patch_call(0x6c7999, confirm_before_deleting_action_object as _);
+    patch(0x6f9a31, &[0xe8, 0, 0, 0, 0, 0x90]);
+    patch_call(0x6f9a31, confirm_before_deleting_action_timeline as _);
+
     // clean collision events and mark as modified when deleting objects
     patch_call(0x62ca82, object_clean_collide_events_inj as _);
 
@@ -2231,6 +2293,9 @@ unsafe fn injector() {
     // check if extensions need updating when drawing code
     patch(0x6ab18c, &[0xe9]);
     patch_call(0x6ab18c, maybe_reload_extensions_when_typing as _);
+
+    // code form stuff
+    code_form::inject();
 
     // code editor don't resize on maximize
     // script resize
@@ -2434,6 +2499,9 @@ unsafe fn injector() {
     patch_call(0x6f94c3, properly_update_timeline_timestamp_drag_drop as _);
     patch_call(0x6c7512, properly_update_object_timestamp_right_click as _);
     patch_call(0x6f95e6, properly_update_timeline_timestamp_right_click as _);
+
+    // don't show save/discard question when deleting object
+    patch(0x62ca28, &[0x90; 5]);
 
     // update timestamp properly in mask form
     unsafe fn patch_timestamp_mask(dest: usize) {

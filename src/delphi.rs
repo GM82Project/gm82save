@@ -725,6 +725,24 @@ impl Clone for UStr {
     }
 }
 
+impl std::ops::Add<UStr> for UStr {
+    type Output = UStr;
+
+    fn add(mut self, rhs: UStr) -> Self::Output {
+        self.push_ustr(&rhs);
+        self
+    }
+}
+
+impl std::ops::Add<&UStr> for UStr {
+    type Output = UStr;
+
+    fn add(mut self, rhs: &UStr) -> Self::Output {
+        self.push_ustr(rhs);
+        self
+    }
+}
+
 impl Drop for UStr {
     fn drop(&mut self) {
         unsafe { UStrClr(self) }
