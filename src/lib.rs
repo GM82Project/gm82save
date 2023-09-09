@@ -1158,12 +1158,15 @@ unsafe extern "fastcall" fn confirm_before_deleting_action(action_id: usize, eve
 }
 
 macro_rules! deleting_action_inj {
-    ($name:ident, $mov:literal) => {
+    ($name:ident, $test:literal, $mov:literal) => {
         #[naked]
         unsafe extern "fastcall" fn $name() {
             asm!(
                 // call original function
                 "call [edx + 0xec]",
+                // if we're cutting, don't ask
+                $test,
+                "je 2f",
                 // call confirm_before_deleting_action
                 "mov ecx, eax",
                 $mov,
@@ -1182,8 +1185,16 @@ macro_rules! deleting_action_inj {
     }
 }
 
-deleting_action_inj!(confirm_before_deleting_action_object, "mov edx, [esi + 0x817c]");
-deleting_action_inj!(confirm_before_deleting_action_timeline, "mov edx, [esi + 0x434]");
+deleting_action_inj!(
+    confirm_before_deleting_action_object,
+    "cmp dword ptr [esp + 0x10], 0x6c7873",
+    "mov edx, [esi + 0x817c]"
+);
+deleting_action_inj!(
+    confirm_before_deleting_action_timeline,
+    "cmp dword ptr [esp + 0x10], 0x6f9903",
+    "mov edx, [esi + 0x434]"
+);
 
 #[naked]
 unsafe extern "C" fn object_clean_collide_events_inj() {
