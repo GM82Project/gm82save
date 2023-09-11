@@ -11,6 +11,10 @@ use std::{
     collections::{hash_map::Entry, HashMap},
 };
 
+type AssetId = usize;
+type InstanceId = usize;
+type CodeFormPointer = usize;
+
 #[derive(PartialEq, Eq, Hash)]
 enum CodeHolder {
     Action(*const Action),
@@ -18,8 +22,10 @@ enum CodeHolder {
     Trigger(*const Trigger),
 }
 
-static mut CODE_FORMS: Option<HashMap<CodeHolder, (UStr, usize)>> = None;
-static mut INSTANCE_FORMS: Option<HashMap<*const Room, HashMap<usize, (UStr, usize)>>> = None;
+// asset id is bitwise not'd for timelines
+static mut CODE_FORMS: Option<HashMap<CodeHolder, (UStr, CodeFormPointer, AssetId)>> = None;
+
+static mut INSTANCE_FORMS: Option<HashMap<*const Room, (AssetId, HashMap<InstanceId, (UStr, CodeFormPointer)>)>> = None;
 
 #[naked]
 unsafe extern "fastcall" fn trigger_disable_condition_memo() {
@@ -70,7 +76,7 @@ unsafe extern "fastcall" fn update_code(object: *mut usize) {
         0x70fd70 => (CodeHolder::Action(object.cast()), &mut (*object.cast::<Action>()).param_strings[0]),
         _ => return,
     };
-    if let Some((_, form)) = CODE_FORMS.as_ref().and_then(|forms| forms.get(&holder)) {
+    if let Some((_, form, _)) = CODE_FORMS.as_ref().and_then(|forms| forms.get(&holder)) {
         // mark as changed
         (*form as *mut bool).add(0x440).write(true);
         // save text
@@ -165,7 +171,7 @@ unsafe extern "C" fn close_code() {
         }
         if !found_regular_form {
             if let Some(forms) = INSTANCE_FORMS.as_mut() {
-                for (room, map) in forms.iter_mut() {
+                for (room, (_, map)) in forms.iter_mut() {
                     map.retain(|&id, f| {
                         if f.1 == form {
                             if revert {
@@ -181,7 +187,7 @@ unsafe extern "C" fn close_code() {
                         }
                     })
                 }
-                forms.retain(|_, m| !m.is_empty());
+                forms.retain(|_, (_, m)| !m.is_empty());
             }
         }
     }
@@ -199,7 +205,7 @@ unsafe extern "C" fn update_instance_code() {
     unsafe extern "fastcall" fn inj(room: *mut Room) {
         if let Some(forms) = INSTANCE_FORMS.as_ref().and_then(|forms| forms.get(&room.cast_const())) {
             for inst in (*room).get_instances_mut() {
-                if let Some(form) = forms.get(&inst.id) {
+                if let Some(form) = forms.1.get(&inst.id) {
                     // honestly fuckin sure just mark all of them as changed idc
                     (form.1 as *mut bool).add(0x440).write(true);
                     let _: u32 =
@@ -271,7 +277,7 @@ unsafe fn create_code_form(
     (UStr::from_ptr(&code).clone(), form as usize)
 }
 
-unsafe fn open_or_insert(holder: CodeHolder, create: impl FnOnce() -> (UStr, usize)) {
+unsafe fn open_or_insert(holder: CodeHolder, create: impl FnOnce() -> (UStr, CodeFormPointer, AssetId)) {
     match CODE_FORMS.get_or_insert_default().entry(holder) {
         Entry::Occupied(entry) => {
             let _: u32 = delphi_call!(0x4ee948, entry.get().1);
@@ -303,7 +309,7 @@ unsafe extern "C" fn open_code_action() {
                 _ => unreachable!(),
             },
         };
-        let title = match form {
+        let (title, asset_id) = match form {
             ThingForm::Object(form) => {
                 let object_index = form.add(0x46c / 4).read();
                 let object_name = ide::OBJECTS.names()[object_index].clone();
@@ -314,11 +320,14 @@ unsafe extern "C" fn open_code_action() {
                     event.get_actions().iter().find_position(|act| act.as_ptr() == action as *const _).unwrap().0;
                 let mut event_name = UStr::default();
                 let _: u32 = delphi_call!(0x6d0df0, event_type, event_number, &mut event_name);
-                object_name
-                    + UStr::new(" - ")
-                    + event_name
-                    + UStr::new(format!(" - Action {} - ", action_id + 1))
-                    + UStr::from_ptr(&title)
+                (
+                    object_name
+                        + UStr::new(" - ")
+                        + event_name
+                        + UStr::new(format!(" - Action {} - ", action_id + 1))
+                        + UStr::from_ptr(&title),
+                    object_index,
+                )
             },
             ThingForm::Timeline(form) => {
                 let timeline_index = form.add(0x430 / 4).read();
@@ -329,20 +338,28 @@ unsafe extern "C" fn open_code_action() {
                     timeline.moment_events.iter().find_position(|e| e.as_ptr() == event as *const _).unwrap().0;
                 let action_id =
                     event.get_actions().iter().find_position(|a| a.as_ptr() == action as *const _).unwrap().0;
-                timeline_name
-                    + UStr::new(format!(" - Step {} - Action {} - ", timeline.moment_times[moment_id], action_id + 1))
-                    + UStr::from_ptr(&title)
+                (
+                    timeline_name
+                        + UStr::new(format!(
+                            " - Step {} - Action {} - ",
+                            timeline.moment_times[moment_id],
+                            action_id + 1
+                        ))
+                        + UStr::from_ptr(&title),
+                    !timeline_index,
+                )
             },
         };
         open_or_insert(CodeHolder::Action(action), || {
-            create_code_form(
+            let (code, form) = create_code_form(
                 action.param_strings[0].0,
                 Some(action.applies_to),
                 title.0,
                 action.action_kind != 6,
                 action as *const _ as _,
                 false,
-            )
+            );
+            (code, form, asset_id)
         });
     }
     asm!(
@@ -362,7 +379,9 @@ unsafe extern "C" fn open_room_code() {
     unsafe extern "fastcall" fn inj(room_id: usize, room: &Room) {
         let title = ide::ROOMS.names()[room_id].clone() + UStr::new(" - Room Creation Code");
         open_or_insert(CodeHolder::Room(room), || {
-            create_code_form(room.creation_code.0, None, title.0, true, room as *const _ as _, false)
+            let (code, form) =
+                create_code_form(room.creation_code.0, None, title.0, true, room as *const _ as _, false);
+            (code, form, room_id)
         });
     }
     asm!(
@@ -379,7 +398,9 @@ unsafe extern "C" fn open_room_code() {
 unsafe extern "C" fn open_trigger_code() {
     unsafe extern "fastcall" fn inj(title: *const u16, trigger: &Trigger) {
         open_or_insert(CodeHolder::Trigger(trigger), || {
-            create_code_form(trigger.condition.0, None, title, true, trigger as *const _ as _, false)
+            let (code, form) =
+                create_code_form(trigger.condition.0, None, title, true, trigger as *const _ as _, false);
+            (code, form, 0)
         });
         update_trigger_form(trigger);
     }
@@ -394,8 +415,14 @@ unsafe extern "C" fn open_trigger_code() {
 
 #[naked]
 unsafe extern "C" fn open_instance_code() {
-    unsafe extern "fastcall" fn inj(title: *const u16, room: &Room, code: *const u16, id: usize) {
-        match INSTANCE_FORMS.get_or_insert_default().entry(room).or_default().entry(id) {
+    unsafe extern "fastcall" fn inj(title: *const u16, room: &Room, code: *const u16, inst_id: usize, room_id: usize) {
+        match INSTANCE_FORMS
+            .get_or_insert_default()
+            .entry(room)
+            .or_insert_with(|| (room_id, HashMap::new()))
+            .1
+            .entry(inst_id)
+        {
             Entry::Occupied(entry) => {
                 let _: u32 = delphi_call!(0x4ee948, entry.get().1);
             },
@@ -406,7 +433,8 @@ unsafe extern "C" fn open_instance_code() {
     }
     asm!(
         "mov edx, [ebx + 0x61c]",
-        "push dword ptr [ebp - 0x10]", // id
+        "push dword ptr [ebx + 0x630]", // room id
+        "push dword ptr [ebp - 0x10]", // instance id
         "push dword ptr [ebp - 4]", // code
         "call {}",
         "ret 8",
@@ -425,7 +453,7 @@ unsafe extern "C" fn destroy_action(_: u32, action: &Action) {
 
 unsafe extern "fastcall" fn clear_all_instances_in_room(room: *const Room) {
     if let Some(forms) = INSTANCE_FORMS.as_mut().and_then(|forms| forms.remove(&room)) {
-        for (_, form) in forms {
+        for (_, form) in forms.1 {
             let _: u32 = delphi_call!(0x405a7c, form.1);
         }
     }
@@ -436,7 +464,7 @@ unsafe extern "C" fn room_delete_instance() {
     unsafe extern "fastcall" fn inj(room: *const Room, inst_number: usize) {
         let inst_id = (*room).get_instances()[inst_number].id;
         if let Some(form) =
-            INSTANCE_FORMS.as_mut().and_then(|forms| forms.get_mut(&room)).and_then(|forms| forms.remove(&inst_id))
+            INSTANCE_FORMS.as_mut().and_then(|forms| forms.get_mut(&room)).and_then(|(_, forms)| forms.remove(&inst_id))
         {
             let _: u32 = delphi_call!(0x405a7c, form.1);
         }
@@ -462,7 +490,7 @@ unsafe extern "C" fn room_safe_undo() {
     unsafe extern "fastcall" fn inj(room: *mut Room) {
         update_code(room.cast());
         if let Some(all_forms) = INSTANCE_FORMS.as_mut() {
-            if let Some(forms) = all_forms.get_mut(&room.cast_const()) {
+            if let Some((_, forms)) = all_forms.get_mut(&room.cast_const()) {
                 forms.retain(|&id, _| (*room).get_instances().iter().any(|i| i.id == id));
             }
         }
