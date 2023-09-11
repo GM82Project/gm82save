@@ -76,13 +76,28 @@ unsafe extern "fastcall" fn update_code(object: *mut usize) {
         0x70fd70 => (CodeHolder::Action(object.cast()), &mut (*object.cast::<Action>()).param_strings[0]),
         _ => return,
     };
-    if let Some((_, form, _)) = CODE_FORMS.as_ref().and_then(|forms| forms.get(&holder)) {
+    if let Some((_, form, asset_id)) = CODE_FORMS.as_ref().and_then(|forms| forms.get(&holder)) {
         // mark as changed
         (*form as *mut bool).add(0x440).write(true);
         // save text
         let _: u32 = delphi_call!(0x6b8444, (*form as *const usize).add(0x43c / 4).read(), code);
-        if *object == 0x70fd70 {
-            // it's an action, save the "applies to"
+        if *object == 0x62cf48 {
+            // it's a trigger
+            let _: u32 = delphi_call!(0x6bcb60);
+        } else if *object == 0x6564cc {
+            // it's a room
+            let _: u32 = delphi_call!(0x6930cc, *asset_id);
+        } else if *object == 0x70fd70 {
+            // it's an action
+            // mark the object/timeline as updated
+            if (*asset_id as isize) >= 0 {
+                // it's an object
+                let _: u32 = delphi_call!(0x62cd2c, *asset_id);
+            } else {
+                // it's a timeline
+                let _: u32 = delphi_call!(0x6fa7b0, *asset_id);
+            }
+            // save the "applies to"
             let action = object.cast::<Action>();
             let self_check = (*form as *const *const *const usize).add(0x3c0 / 4).read();
             let other_check = (*form as *const *const *const usize).add(0x3c4 / 4).read();
@@ -146,8 +161,8 @@ unsafe extern "C" fn close_code() {
         let mut found_regular_form = false;
         if let Some(forms) = CODE_FORMS.as_mut() {
             let mut my_trigger = None;
-            forms.retain(|holder, f| {
-                if f.1 == form {
+            forms.retain(|holder, (original_code, f, asset_id)| {
+                if *f == form {
                     found_regular_form = true;
                     let code = match holder {
                         CodeHolder::Trigger(trigger) => {
@@ -158,7 +173,24 @@ unsafe extern "C" fn close_code() {
                         CodeHolder::Action(action) => &mut (*action.cast_mut()).param_strings[0],
                     };
                     if revert {
-                        *code = f.0.clone();
+                        *code = original_code.clone();
+                        match holder {
+                            CodeHolder::Action(_) => {
+                                if (*asset_id as isize) >= 0 {
+                                    // it's an object
+                                    let _: u32 = delphi_call!(0x62cd2c, *asset_id);
+                                } else {
+                                    // it's a timeline
+                                    let _: u32 = delphi_call!(0x6fa7b0, *asset_id);
+                                }
+                            },
+                            CodeHolder::Room(_) => {
+                                let _: u32 = delphi_call!(0x6930cc, *asset_id);
+                            },
+                            CodeHolder::Trigger(_) => {
+                                let _: u32 = delphi_call!(0x6bcb60);
+                            },
+                        }
                     }
                     false
                 } else {
@@ -203,15 +235,17 @@ unsafe extern "C" fn close_code() {
 #[naked]
 unsafe extern "C" fn update_instance_code() {
     unsafe extern "fastcall" fn inj(room: *mut Room) {
-        if let Some(forms) = INSTANCE_FORMS.as_ref().and_then(|forms| forms.get(&room.cast_const())) {
+        if let Some((room_id, forms)) = INSTANCE_FORMS.as_ref().and_then(|forms| forms.get(&room.cast_const())) {
             for inst in (*room).get_instances_mut() {
-                if let Some(form) = forms.1.get(&inst.id) {
+                if let Some(form) = forms.get(&inst.id) {
                     // honestly fuckin sure just mark all of them as changed idc
                     (form.1 as *mut bool).add(0x440).write(true);
                     let _: u32 =
                         delphi_call!(0x6b8444, (form.1 as *const usize).add(0x43c / 4).read(), &mut inst.creation_code);
                 }
             }
+            // update room
+            let _: u32 = delphi_call!(0x6930cc, *room_id);
         }
     }
     asm!(
