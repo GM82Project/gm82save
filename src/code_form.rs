@@ -580,6 +580,12 @@ pub unsafe fn inject() {
     patch_call(0x6fefdf, open_code_action as _);
     patch_call(0x68aea0, open_instance_code as _);
 
+    // don't mark as updated when simply opening a form
+    patch(0x6c781d, &[0xeb]);
+    patch(0x6f98ad, &[0xeb]);
+    patch(0x689f3d, &[0xeb]);
+    patch(0x68aeca, &[0xeb]);
+
     // close form when deleting instances
     patch(0x658ab1, &[0xe9]);
     patch_call(0x658ab1, room_delete_instance as _);
