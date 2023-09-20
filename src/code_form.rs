@@ -95,7 +95,7 @@ unsafe extern "fastcall" fn update_code(object: *mut usize) {
                 let _: u32 = delphi_call!(0x62cd2c, *asset_id);
             } else {
                 // it's a timeline
-                let _: u32 = delphi_call!(0x6fa7b0, *asset_id);
+                let _: u32 = delphi_call!(0x6fa7b0, !*asset_id);
             }
             // save the "applies to"
             let action = object.cast::<Action>();
@@ -181,7 +181,7 @@ unsafe extern "C" fn close_code() {
                                     let _: u32 = delphi_call!(0x62cd2c, *asset_id);
                                 } else {
                                     // it's a timeline
-                                    let _: u32 = delphi_call!(0x6fa7b0, *asset_id);
+                                    let _: u32 = delphi_call!(0x6fa7b0, !*asset_id);
                                 }
                             },
                             CodeHolder::Room(_) => {
