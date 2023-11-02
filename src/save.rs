@@ -69,6 +69,9 @@ fn filename_invalid(s: &str) -> Option<u8> {
     if s == "." || s == ".." || s.as_bytes().last().copied() == Some(b'.') {
         return Some(b'.')
     }
+    if s.trim().is_empty() {
+        return Some(b' ')
+    }
     for c in b"<>:\"/\\|?*" {
         if s.as_bytes().contains(c) {
             return Some(*c)

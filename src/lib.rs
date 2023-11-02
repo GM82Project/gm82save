@@ -83,7 +83,13 @@ impl std::fmt::Display for Error {
             Self::DuplicateAsset(n) => write!(f, "multiple assets named {}", n),
             Self::DuplicateIncludedFile(n) => write!(f, "multiple included files named {}", n),
             Self::DuplicateTrigger(n) => write!(f, "multiple triggers named {}", n),
-            Self::BadAssetName(n, c) => write!(f, "asset name {n} may not contain character {c}"),
+            Self::BadAssetName(n, c) => {
+                if *c == '.' || *c == ' ' {
+                    write!(f, "asset name \"{n}\" is illegal")
+                } else {
+                    write!(f, "asset name {n} may not contain character {c}")
+                }
+            },
             Self::BadIncludedFileName(n, c) => write!(f, "included file name {n} may not contain character {c}"),
             Self::BadTriggerName(n, c) => write!(f, "trigger file name {n} may not contain character {c}"),
             Self::OldGM82 => write!(f, "this project was made with a newer version of gm82save, please update"),
