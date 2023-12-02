@@ -767,6 +767,21 @@ unsafe extern "fastcall" fn check_gm_processes(name: usize, value: u32) {
     }
 }
 
+unsafe extern "stdcall" fn try_clipboard_a_few_times(clipboard_window: usize) -> usize {
+    #[link(name = "kernel32")]
+    extern "system" {
+        fn OpenClipboard(clipboard_window: usize) -> usize;
+    }
+    // try 10 times
+    for _ in 0..10 {
+        match OpenClipboard(clipboard_window) {
+            0 => std::thread::sleep(std::time::Duration::from_millis(20)),
+            success => return success,
+        }
+    }
+    0
+}
+
 #[naked]
 unsafe extern "C" fn image_editor_dont_error_when_switching_tool() {
     asm!(
@@ -2180,6 +2195,9 @@ unsafe fn injector() {
     // but do refresh icon when changes aren't saved
     patch_call(0x6f5152, update_sprite_icon_on_revert as _);
     patch_call(0x64d66a, update_background_icon_on_revert as _);
+
+    // attempt to fix clipboard sometimes getting a permission denied error
+    patch_call(0x488bb4, try_clipboard_a_few_times as _);
 
     // fix memory leak in image editor
     patch_call(0x643bd0, free_image_editor_bitmap as _);
