@@ -275,6 +275,8 @@ unsafe fn create_code_form(
         let _: u32 = delphi_call!(0x4ee5c0, form.add(0x3cc / 4).read(), u32::from(applies_to >= 0));
         // SetVisible WhoMenuBtn
         let _: u32 = delphi_call!(0x4ee5c0, form.add(0x3bc / 4).read(), u32::from(applies_to >= 0));
+        // set tag
+        (form as *mut *mut i32).add(0x3cc / 4).read().add(0xc / 4).write(applies_to);
         // get object name
         let applies_to_name = UStr::default();
         let _: u32 = delphi_call!(0x62cabc, applies_to, &applies_to_name);
