@@ -139,6 +139,19 @@ unsafe extern "C" fn update_code_inj() {
 }
 
 #[naked]
+unsafe extern "C" fn update_applies_to() {
+    asm!(
+        "mov eax, dword ptr [ebx + 0x43c]",
+        "mov ecx, dword ptr [eax + 0x2d4]",
+        "test ecx, ecx",
+        "jne {}",
+        "ret",
+        sym update_code,
+        options(noreturn),
+    )
+}
+
+#[naked]
 unsafe extern "C" fn check_all_closing() {
     asm!(
         "mov eax, 0x682a4a",
@@ -587,6 +600,12 @@ pub unsafe fn inject() {
     patch(0x6f98ad, &[0xeb]);
     patch(0x689f3d, &[0xeb]);
     patch(0x68aeca, &[0xeb]);
+
+    // update when "applies to" buttons clicked
+    patch(0x681b21, &[0xe8, 0, 0, 0, 0, 0x90, 0x90]);
+    patch_call(0x681b21, update_applies_to as _);
+    patch(0x681b73, &[0xe8, 0, 0, 0, 0, 0x90, 0x90]);
+    patch_call(0x681b73, update_applies_to as _);
 
     // close form when deleting instances
     patch(0x658ab1, &[0xe9]);
