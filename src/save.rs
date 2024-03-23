@@ -396,6 +396,10 @@ unsafe fn save_event<F: Write>(ev: &Event, name: &str, file: &mut F) -> Result<(
         writeln!(file, "*/")?;
         if action.action_kind == 7 {
             // code
+            let code = action.param_strings[0].try_decode()?;
+            if (code.starts_with("#define") || code.contains("\n#define")) {
+                return Err(Error::Other("events should not contain #define".to_string()))
+            }
             write_gml(file, &action.param_strings[0])?;
         }
     }
