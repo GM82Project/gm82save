@@ -1,0 +1,2 @@
+[build]
+default-target = "i686-pc-windows-gnu"

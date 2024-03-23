@@ -37,7 +37,7 @@ use std::{
     io::Write,
     os::windows::process::CommandExt,
     path::PathBuf,
-    ptr,
+    ptr::{self, addr_of, addr_of_mut},
     time::SystemTime,
 };
 
@@ -209,7 +209,7 @@ static mut LAST_SAVE: f64 = 0.0;
 fn update_timestamp() {
     unsafe {
         SAVE_END = SystemTime::now();
-        delphi::Now(&mut LAST_SAVE);
+        delphi::Now(addr_of_mut!(LAST_SAVE));
     }
 }
 
@@ -2443,43 +2443,43 @@ unsafe fn injector() {
     // read ShowProgress from reg as int
     patch(0x7170f7, &[0x33, 0xd2]);
     patch(0x7170fe, &[0xe8, 0xcd, 0xfc, 0xff, 0xff, 0xa3]);
-    patch(0x717104, &(&DEFAULT_ROOM_WIDTH as *const u32 as usize as u32).to_le_bytes());
+    patch(0x717104, &(addr_of!(DEFAULT_ROOM_WIDTH) as *const u32 as usize as u32).to_le_bytes());
     // read NoWebsite from reg as int
     patch(0x71799d, &[0xe8, 0x2e, 0xf4, 0xff, 0xff, 0xa3]);
-    patch(0x7179a3, &(&DEFAULT_ROOM_HEIGHT as *const u32 as usize as u32).to_le_bytes());
+    patch(0x7179a3, &(addr_of!(DEFAULT_ROOM_HEIGHT) as *const u32 as usize as u32).to_le_bytes());
     // read NewsBrowser from reg as int
     patch(0x7179bf, &[0xe8, 0x0c, 0xf4, 0xff, 0xff, 0xe8]);
     patch_call(0x7179c4, fix_broken_room_size as _);
     // write ShowProgress to reg as int
     patch(0x718bac, &[0x8b, 0x15, 0x2c, 0xa8, 0x79, 0x00, 0x90]);
     patch(0x718bb9, &[0x43, 0xe0]);
-    patch(0x718bae, &(&DEFAULT_ROOM_WIDTH as *const u32 as usize as u32).to_le_bytes());
+    patch(0x718bae, &(addr_of!(DEFAULT_ROOM_WIDTH) as *const u32 as usize as u32).to_le_bytes());
     // write NoWebsite to reg as int
     patch(0x71908e, &[0x8b, 0x15, 0x81, 0xa9, 0x79, 0x00, 0x90]);
     patch(0x71909b, &[0x61, 0xdb]);
-    patch(0x719090, &(&DEFAULT_ROOM_HEIGHT as *const u32 as usize as u32).to_le_bytes());
+    patch(0x719090, &(addr_of!(DEFAULT_ROOM_HEIGHT) as *const u32 as usize as u32).to_le_bytes());
     // write NewsBrowser to reg as int
     patch(0x7190b0, &[0x8b, 0x15, 0x83, 0xa9, 0x79, 0x00, 0x90]);
     patch(0x7190bd, &[0x3f, 0xdb]);
-    patch(0x7190b2, &(&DEFAULT_ROOM_SPEED as *const u32 as usize as u32).to_le_bytes());
+    patch(0x7190b2, &(addr_of!(DEFAULT_ROOM_SPEED) as *const u32 as usize as u32).to_le_bytes());
     // write ShowProgress to form as ValueEdit
     patch(0x71a272, &[0x8b, 0x15, 0x2c, 0xa8, 0x79, 0x00, 0xe8, 0xe3, 0x64, 0xe1, 0xff, 0x90, 0x90, 0x90, 0x90]);
-    patch(0x71a274, &(&DEFAULT_ROOM_WIDTH as *const u32 as usize as u32).to_le_bytes());
+    patch(0x71a274, &(addr_of!(DEFAULT_ROOM_WIDTH) as *const u32 as usize as u32).to_le_bytes());
     // write NoWebsite to form as ValueEdit
     patch(0x71a4ec, &[0x8b, 0x15, 0x81, 0xa9, 0x79, 0x00, 0xe8, 0x69, 0x62, 0xe1, 0xff, 0x90, 0x90, 0x90, 0x90]);
-    patch(0x71a4ee, &(&DEFAULT_ROOM_HEIGHT as *const u32 as usize as u32).to_le_bytes());
+    patch(0x71a4ee, &(addr_of!(DEFAULT_ROOM_HEIGHT) as *const u32 as usize as u32).to_le_bytes());
     // write NewsBrowser to form as ValueEdit
     patch(0x71a51d, &[0x8b, 0x15, 0x83, 0xa9, 0x79, 0x00, 0xe8, 0x38, 0x62, 0xe1, 0xff, 0x90, 0x90, 0x90, 0x90]);
-    patch(0x71a51f, &(&DEFAULT_ROOM_SPEED as *const u32 as usize as u32).to_le_bytes());
+    patch(0x71a51f, &(addr_of!(DEFAULT_ROOM_SPEED) as *const u32 as usize as u32).to_le_bytes());
     // read ShowProgress from form as ValueEdit
     patch(0x71a777, &[0x8b, 0x80, 0xa0, 0x02, 0x00, 0x00, 0xa3, 0x2c, 0xa8, 0x79, 0x00, 0x90, 0x90]);
-    patch(0x71a77e, &(&DEFAULT_ROOM_WIDTH as *const u32 as usize as u32).to_le_bytes());
+    patch(0x71a77e, &(addr_of!(DEFAULT_ROOM_WIDTH) as *const u32 as usize as u32).to_le_bytes());
     // read NoWebsite from form as ValueEdit
     patch(0x71a93f, &[0x8b, 0x80, 0xa0, 0x02, 0x00, 0x00, 0xa3, 0x81, 0xa9, 0x79, 0x00, 0x90, 0x90]);
-    patch(0x71a946, &(&DEFAULT_ROOM_HEIGHT as *const u32 as usize as u32).to_le_bytes());
+    patch(0x71a946, &(addr_of!(DEFAULT_ROOM_HEIGHT) as *const u32 as usize as u32).to_le_bytes());
     // read NewsBrowser from form as ValueEdit
     patch(0x71a96b, &[0x8b, 0x80, 0xa0, 0x02, 0x00, 0x00, 0xa3, 0x83, 0xa9, 0x79, 0x00, 0x90, 0x90]);
-    patch(0x71a972, &(&DEFAULT_ROOM_SPEED as *const u32 as usize as u32).to_le_bytes());
+    patch(0x71a972, &(addr_of!(DEFAULT_ROOM_SPEED) as *const u32 as usize as u32).to_le_bytes());
     // update menu box
     patch_call(0x71aaf7, close_preferences_form as usize);
 

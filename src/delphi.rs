@@ -792,7 +792,7 @@ pub unsafe fn DynArraySetLength<T>(a: *mut *mut T, type_info: *const u8, dimensi
     );
 }
 
-pub fn Now(out: &mut f64) {
+pub fn Now(out: *mut f64) {
     unsafe {
         asm!(
             "call {call}",

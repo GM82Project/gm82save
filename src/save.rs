@@ -13,7 +13,6 @@ use png::Compression;
 use rayon::prelude::*;
 use std::{
     collections::{HashMap, HashSet},
-    convert::TryFrom,
     fs::File,
     io::{BufWriter, Write},
     path::PathBuf,
