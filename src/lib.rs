@@ -2515,6 +2515,27 @@ unsafe fn injector() {
     patch_call(0x6e14d8, get_asset_from_name_unicase::<asset::Timeline> as _);
     patch_call(0x6e14eb, get_asset_from_name_unicase::<asset::Script> as _);
 
+    // case insensitive name conflicts
+    patch_call(0x6d25f8, get_asset_from_name_unicase::<asset::Sprite> as _);
+    patch_call(0x6d2631, get_asset_from_name_unicase::<asset::Sound> as _);
+    patch_call(0x6d266a, get_asset_from_name_unicase::<asset::Background> as _);
+    patch_call(0x6d26a3, get_asset_from_name_unicase::<asset::Path> as _);
+    patch_call(0x06d26dc, get_asset_from_name_unicase::<asset::Script> as _);
+    patch_call(0x6d2715, get_asset_from_name_unicase::<asset::Font> as _);
+    patch_call(0x6d274e, get_asset_from_name_unicase::<asset::Timeline> as _);
+    patch_call(0x6d2787, get_asset_from_name_unicase::<asset::Object> as _);
+    patch_call(0x6d27c0, get_asset_from_name_unicase::<asset::Room> as _);
+
+    patch_call(0x6d2832, get_asset_from_name_unicase::<asset::Sprite> as _);
+    patch_call(0x6d2867, get_asset_from_name_unicase::<asset::Sound> as _);
+    patch_call(0x6d289c, get_asset_from_name_unicase::<asset::Background> as _);
+    patch_call(0x6d28d1, get_asset_from_name_unicase::<asset::Path> as _);
+    patch_call(0x6d2906, get_asset_from_name_unicase::<asset::Script> as _);
+    patch_call(0x6d293b, get_asset_from_name_unicase::<asset::Font> as _);
+    patch_call(0x6d2970, get_asset_from_name_unicase::<asset::Timeline> as _);
+    patch_call(0x6d29a5, get_asset_from_name_unicase::<asset::Object> as _);
+    patch_call(0x6d29da, get_asset_from_name_unicase::<asset::Room> as _);
+
     // update timestamps when setting name
     unsafe fn patch_timestamps(dest: usize) {
         patch(dest, &[0x8b, 0xc3, 0xe8, 0xe0, 0x00, 0x00, 0x00]);
