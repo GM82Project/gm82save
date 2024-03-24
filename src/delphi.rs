@@ -668,14 +668,16 @@ impl UStr {
         let s = s.as_ref();
         // if it takes more than one WTF-16 u16, it will DEFINITELY take more than one WTF-8 u8
         let guess_len = s.len();
-        unsafe {
-            UStrSetLength(&mut out, guess_len);
-            let mut real_len = 0;
-            for (dst, src) in slice::from_raw_parts_mut(out.0, guess_len).iter_mut().zip(s.encode_wide()) {
-                *dst = src;
-                real_len += 1;
+        if guess_len != 0 {
+            unsafe {
+                UStrSetLength(&mut out, guess_len);
+                let mut real_len = 0;
+                for (dst, src) in slice::from_raw_parts_mut(out.0, guess_len).iter_mut().zip(s.encode_wide()) {
+                    *dst = src;
+                    real_len += 1;
+                }
+                UStrSetLength(&mut out, real_len);
             }
-            UStrSetLength(&mut out, real_len);
         }
         out
     }
