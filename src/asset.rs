@@ -276,7 +276,7 @@ pub struct Path {
     pub connection: u32,
     pub closed: bool,
     pub precision: u32,
-    padding: u128,
+    padding: [u8; 16],
     pub path_editor_room_background: i32,
     pub snap_x: u32,
     pub snap_y: u32,
