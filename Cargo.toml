@@ -26,9 +26,9 @@ ctor = "0.2.0"
 flate2 = { version = "1.0", default-features = false, features = ["zlib-ng-compat"] }
 itertools = "0.10"
 lazy_static = "1.4.0"
-notify = "5.0.0"
+notify = { git = "https://github.com/skyfloogle/notify.git", branch = "update-windows-sys" }
 once_cell = "1.10.0"
-parking_lot = "0.12.0"
+parking_lot = { git = "https://github.com/Amanieu/parking_lot.git", branch = "master" }
 png = "0.17"
 rayon = "1.5"
 regex = { version = "1.5.5", default-features = false, features = ["std"] }
