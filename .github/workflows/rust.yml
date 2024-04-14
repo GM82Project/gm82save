@@ -17,12 +17,10 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions-rs/toolchain@v1
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@nightly
       with:
-        target: i686-win7-windows-msvc
-        toolchain: nightly
-        default: true
+        targets: i686-win7-windows-msvc
     - name: Build
       run: cargo build --release --verbose
     - name: Upload artifact
