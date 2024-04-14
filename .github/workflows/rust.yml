@@ -24,9 +24,9 @@ jobs:
         toolchain: nightly
         default: true
     - name: Build
-      run: cargo build --release --verbose
+      run: cargo build -Zbuild-std="std,panic_abort" --release --verbose --target=i686-win7-windows-msvc
     - name: Upload artifact
       uses: actions/upload-artifact@v3
       with:
         name: gm82save
-        path: target/i686-pc-windows-msvc/release/gm82save.dll
+        path: target/i686-win7-windows-msvc/release/gm82save.dll
