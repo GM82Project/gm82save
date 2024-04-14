@@ -509,6 +509,30 @@ unsafe extern "fastcall" fn make_new_folder(_: u32, path_ptr: *const u16) {
 }
 
 #[naked]
+unsafe extern "C" fn install_extensions_to_exedir_if_possible() {
+    unsafe extern "fastcall" fn inj(out: &mut UStr, localappdata: *const u16) {
+        let mut exe_path = PathBuf::from(std::env::args().next().unwrap());
+        exe_path.pop();
+        exe_path.push("extensions");
+        if !matches!(std::fs::metadata(&exe_path).map(|md| md.permissions().readonly()), Ok(false)) {
+            // exe path's extensions are read only, give up and use localappdata
+            let _: u32 = delphi_call!(0x407f0c, out, localappdata);
+        } else {
+            // add a trailing slash
+            exe_path.push("");
+            let exe_path_ustr = UStr::new(exe_path);
+            let _: u32 = delphi_call!(0x407f0c, out, exe_path_ustr.0);
+        }
+    }
+    asm!(
+        "mov ecx, eax",
+        "jmp {}",
+        sym inj,
+        options(noreturn),
+    );
+}
+
+#[naked]
 unsafe extern "C" fn fix_tile_null_pointer() {
     asm!(
         "mov edx, 0x64e048",
@@ -2176,6 +2200,9 @@ unsafe fn injector() {
     patch(0x6dfbec, &[b'2']);
     // save new .gm82 projects to subfolder when using "save as" dialog
     patch_call(0x6e06b3, make_new_folder as _);
+
+    // install extensions to own directory if possible
+    patch_call(0x713cdf, install_extensions_to_exedir_if_possible as _);
 
     // fix stupid null pointer error
     patch(0x68ef02, &[0xe9]);
