@@ -24,7 +24,7 @@ jobs:
     - name: Build
       run: cargo build -Zbuild-std="std,panic_abort" --release --verbose --target=i686-win7-windows-msvc
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: gm82save
         path: target/i686-win7-windows-msvc/release/gm82save.dll
