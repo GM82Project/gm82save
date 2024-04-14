@@ -19,8 +19,6 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@nightly
-      with:
-        targets: i686-win7-windows-msvc
     - name: Build
       run: cargo build --release --verbose
     - name: Upload artifact
