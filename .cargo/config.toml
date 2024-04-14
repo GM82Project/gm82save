@@ -1,5 +1,6 @@
 [build]
-target="i686-pc-windows-msvc"
+build-stage = 1
+target="i686-win7-windows-msvc"
 
 [target.i686-pc-windows-msvc]
 rustflags = ["-Ctarget-feature=+crt-static"]
