@@ -22,7 +22,7 @@ jobs:
       with:
         components: rust-src
     - name: Build
-      run: cargo build -Zbuild-std=std,panic_abort --release --verbose
+      run: cargo build -Zbuild-std="std,panic_abort" --release --verbose
     - name: Upload artifact
       uses: actions/upload-artifact@v3
       with:
