@@ -144,9 +144,9 @@ unsafe extern "C" fn save_creation_code_flag() {
         "mov ecx, 0x52f12c", // WriteInteger (for uninitialized args)
         "call ecx",
         "test bl, bl", // if exe
-        "jz 1f",
+        "jz 2f",
         "bt word ptr [0x77f54e], 15", // if force cpu
-        "jnc 1f",
+        "jnc 2f",
         // write webgl
         "mov eax, esi",      // gmk stream
         "xor edx, edx",      // 0 (webgl)
@@ -158,7 +158,7 @@ unsafe extern "C" fn save_creation_code_flag() {
         "mov ecx, 0x52f240", // WriteBoolean
         "call ecx",
         // exit
-        "1: ret",
+        "2: ret",
         options(noreturn),
     );
 }

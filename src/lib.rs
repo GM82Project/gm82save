@@ -830,7 +830,7 @@ unsafe extern "C" fn free_image_editor_bitmap() {
         "mov eax, dword ptr [eax + 0x708]",
         // check if it exists
         "test eax, eax",
-        "jz 1f",
+        "jz 2f",
         // free it
         "mov edx, 0x405a7c",
         "call edx",
@@ -838,7 +838,7 @@ unsafe extern "C" fn free_image_editor_bitmap() {
         "mov eax, dword ptr [esi]",
         "xor edx, edx",
         "mov dword ptr [eax + 0x708], edx",
-        "1: ret",
+        "2: ret",
         options(noreturn),
     );
 }
