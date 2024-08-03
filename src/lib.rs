@@ -27,6 +27,7 @@ use crate::{
     save_exe::GetAssetList,
 };
 use ide::AssetListTrait;
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use rayon::prelude::*;
 use regex::Regex;
@@ -151,6 +152,25 @@ fn show_message(msg: impl AsRef<OsStr>) {
     unsafe {
         delphi::ShowMessage(&UStr::new(msg));
     }
+}
+
+fn show_question(message: &UStr) -> i32 {
+    let mut answer: i32;
+    unsafe {
+        asm!(
+            "push 0",  // HelpFileName
+            "push -1", // Y
+            "push -1", // X
+            "push 0",  // HelpCtx
+            "call {}",
+            in(reg) 0x4d437c, // MessageDlgPosHelp
+            inlateout("eax") message.0 => answer,
+            in("edx") 3, // DlgType
+            in("ecx") 3, // Buttons
+            clobber_abi("C"),
+        );
+    }
+    answer
 }
 
 #[cfg(not(feature = "smooth_progress_bar"))]
@@ -533,6 +553,74 @@ unsafe extern "C" fn install_extensions_to_exedir_if_possible() {
 }
 
 #[naked]
+unsafe extern "C" fn move_extensions_from_localappdata_to_exedir() {
+    unsafe extern "fastcall" fn inj() {
+        let mut exe_path = PathBuf::from(std::env::args().next().unwrap());
+        exe_path.pop();
+        exe_path.push("extensions");
+        if matches!(std::fs::metadata(&exe_path).map(|md| md.permissions().readonly()), Ok(false)) {
+            // we can write to the exe path :)
+            // ensure it exists
+            let _ = std::fs::create_dir_all(&exe_path);
+            let appdata_path = unsafe { UStr::from_ptr(&*(0x78898c as *const *const u16)) };
+            let appdata_path = PathBuf::from(appdata_path.to_os_string());
+            // list filenames and check whether we should proceed
+            if let Ok(iter) = std::fs::read_dir(&appdata_path) {
+                let filenames = iter
+                    .filter_map(|x| x.ok())
+                    .map(|x| x.file_name().to_string_lossy().into_owned())
+                    .take(30)
+                    .join("\n");
+                if filenames.is_empty() {
+                    return
+                }
+                let message = format!("These extension files need to be cleaned up:\n\n{filenames}\n\nProceed?");
+                let answer = show_question(&UStr::new(message));
+                if answer != 6 {
+                    return
+                }
+            } else {
+                return
+            }
+            // perform operation
+            if let Ok(iter) = std::fs::read_dir(appdata_path) {
+                for item in iter.filter_map(|x| x.ok()) {
+                    if matches!(item.file_type().map(|i| i.is_file()), Ok(true)) {
+                        let appdata_item = item.path();
+                        exe_path.push(item.file_name());
+                        if exe_path.is_file() {
+                            // overwrite
+                            if let Ok(exe_modified) = exe_path.metadata().and_then(|m| m.modified()) {
+                                if let Ok(appdata_modified) = appdata_item.metadata().and_then(|m| m.modified()) {
+                                    if exe_modified > appdata_modified {
+                                        // exe is newer, delete appdata
+                                        let _ = std::fs::remove_file(appdata_item);
+                                    } else {
+                                        // appdata is newer, copy over
+                                        let _ = std::fs::rename(appdata_item, &exe_path);
+                                    }
+                                }
+                            }
+                        } else {
+                            // there is no exe item, so copy it over
+                            let _ = std::fs::rename(appdata_item, &exe_path);
+                        }
+                        exe_path.pop();
+                    }
+                }
+            }
+        }
+    }
+    asm!(
+        "mov ecx, 0x408d1c",
+        "call ecx",
+        "jmp {}",
+        sym inj,
+        options(noreturn),
+    );
+}
+
+#[naked]
 unsafe extern "C" fn fix_tile_null_pointer() {
     asm!(
         "mov edx, 0x64e048",
@@ -782,7 +870,7 @@ unsafe extern "fastcall" fn gm82_file_association(reg: u32) {
 
 unsafe extern "fastcall" fn check_gm_processes(name: usize, value: u32) {
     let system = sysinfo::System::new_with_specifics(
-        sysinfo::RefreshKind::new().with_processes(sysinfo::ProcessRefreshKind::new())
+        sysinfo::RefreshKind::new().with_processes(sysinfo::ProcessRefreshKind::new()),
     );
     let path = std::env::current_exe().unwrap();
     if system.processes().iter().filter(|(_, p)| p.exe() == Some(&path)).count() <= 1 {
@@ -1180,19 +1268,7 @@ unsafe extern "fastcall" fn confirm_before_deleting_action(action_id: usize, eve
     if let Some(action) = event.as_ref().and_then(|event| event.get_actions().get(action_id)) {
         if action.param_count > 0 {
             let message = UStr::new(format!("Are you sure you want to delete this action?"));
-            let mut answer: i32;
-            asm!(
-                "push 0",  // HelpFileName
-                "push -1", // Y
-                "push -1", // X
-                "push 0",  // HelpCtx
-                "call {}",
-                in(reg) 0x4d437c, // MessageDlgPosHelp
-                inlateout("eax") message.0 => answer,
-                in("edx") 3, // DlgType
-                in("ecx") 3, // Buttons
-                clobber_abi("C"),
-            );
+            let answer = show_question(&message);
             if answer != 6 {
                 return -1i32 as usize
             }
@@ -1974,19 +2050,7 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
                     "It looks like gm82room crashed. Would you like to load its changes? \
                      If it crashed during saving, it is recommended to click \"No\" and save."
                 ));
-                let mut answer: i32;
-                asm!(
-                    "push 0",  // HelpFileName
-                    "push -1", // Y
-                    "push -1", // X
-                    "push 0",  // HelpCtx
-                    "call {}",
-                    in(reg) 0x4d437c, // MessageDlgPosHelp
-                    inlateout("eax") message.0 => answer,
-                    in("edx") 3, // DlgType
-                    in("ecx") 3, // Buttons
-                    clobber_abi("C"),
-                );
+                let answer = show_question(&message);
                 if answer != 6 {
                     // update room timestamp so it re-saves
                     let _: u32 = delphi_call!(0x6930cc, room_id);
@@ -2202,6 +2266,8 @@ unsafe fn injector() {
 
     // install extensions to own directory if possible
     patch_call(0x713cdf, install_extensions_to_exedir_if_possible as _);
+
+    patch_call(0x712a9a, move_extensions_from_localappdata_to_exedir as _);
 
     // fix stupid null pointer error
     patch(0x68ef02, &[0xe9]);

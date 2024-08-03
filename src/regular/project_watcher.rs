@@ -41,19 +41,7 @@ unsafe extern "fastcall" fn show_message_and_reload() {
                    Unsaved changes will be lost.\r\n\
                    If you click \"No\", saving will overwrite any foreign changes.",
     ));
-    let mut answer: i32;
-    asm!(
-        "push 0",  // HelpFileName
-        "push -1", // Y
-        "push -1", // X
-        "push 0",  // HelpCtx
-        "call {}",
-        in(reg) 0x4d437c, // MessageDlgPosHelp
-        inlateout("eax") message.0 => answer,
-        in("edx") 3, // DlgType
-        in("ecx") 3, // Buttons
-        clobber_abi("C"),
-    );
+    let answer = crate::show_question(&message);
     if answer == 6 {
         // yes -> reload project
         // but first, close all modals
