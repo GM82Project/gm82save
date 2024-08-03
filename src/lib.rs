@@ -581,7 +581,7 @@ unsafe extern "C" fn move_extensions_from_localappdata_to_exedir() {
                 if filenames.is_empty() {
                     return
                 }
-                let message = format!("These extension files need to be cleaned up:\n\n{filenames}\n\nProceed?");
+                let message = format!("These extension files need to be moved to the install folder:\n\n{filenames}\n\nProceed?");
                 let answer = show_question(&UStr::new(message));
                 if answer != 6 {
                     return
@@ -2274,7 +2274,14 @@ unsafe fn injector() {
     // install extensions to own directory if possible
     patch_call(0x713cdf, install_extensions_to_exedir_if_possible as _);
 
+    // move extensions to exedir from localappdata
     patch_call(0x712a9a, move_extensions_from_localappdata_to_exedir as _);
+
+    // don't create localappdata folders
+    patch(0x71288c, &[0xeb]);
+    patch(0x7128fa, &[0xeb]);
+    patch(0x712968, &[0xeb]);
+    patch(0x5d05db, &[0xeb]);
 
     // fix stupid null pointer error
     patch(0x68ef02, &[0xe9]);
