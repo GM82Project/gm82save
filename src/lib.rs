@@ -68,15 +68,22 @@ pub enum Error {
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        fn fmt_path(p: &PathBuf) -> impl std::fmt::Display + '_ {
+            let mut components = p.components();
+            for _ in 0..components.clone().count().saturating_sub(3) {
+                components.next();
+            }
+            components.as_path().display()
+        }
         match self {
             Self::IoError(e) => write!(f, "io error: {}", e),
-            Self::FileIoError(e, p) => write!(f, "io error in file {}: {}", p.to_string_lossy(), e),
-            Self::DirIoError(e, p) => write!(f, "io error in directory {}: {}", p.to_string_lossy(), e),
-            Self::PngDecodeError(p, e) => write!(f, "couldn't decode image {}: {}", p.to_string_lossy(), e),
+            Self::FileIoError(e, p) => write!(f, "io error in file {}: {}", fmt_path(p), e),
+            Self::DirIoError(e, p) => write!(f, "io error in directory {}: {}", fmt_path(p), e),
+            Self::PngDecodeError(p, e) => write!(f, "couldn't decode image {}: {}", fmt_path(p), e),
             Self::UnicodeError(s) => write!(f, "couldn't encode {}", s),
             Self::AssetNotFound(s, t, src) => write!(f, "couldn't find {} {} (from {})", t, s, src),
-            Self::SyntaxError(p) => write!(f, "syntax error in file {}", p.to_string_lossy()),
-            Self::UnknownKey(p, k) => write!(f, "unknown key in {}: {:?}", p.to_string_lossy(), k),
+            Self::SyntaxError(p) => write!(f, "syntax error in file {}", fmt_path(p)),
+            Self::UnknownKey(p, k) => write!(f, "unknown key in {}: {:?}", fmt_path(p), k),
             Self::UnknownAction(lib_id, act_id) => write!(f, "unknown action {} in lib with id {}", act_id, lib_id),
             Self::ParseIntError(e) => write!(f, "integer parse error: {}", e),
             Self::ParseFloatError(e) => write!(f, "float parse error: {}", e),
