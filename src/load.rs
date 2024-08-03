@@ -937,7 +937,10 @@ unsafe fn load_game_information(path: &mut PathBuf) -> Result<()> {
     path.push("game_information.txt");
     read_txt(&path, |k, v| {
         match k {
-            "color" => editor.colour = v.parse()?,
+            "color" => {
+                // TControl.SetColor
+                let _: u32 = delphi_call!(0x4ee858, editor, v.parse::<u32>()?);
+            },
             "new_window" => NEW_WINDOW.write(v.parse::<u8>()? != 0),
             "caption" => CAPTION.asg(v),
             "left" => LEFT.write(v.parse()?),
