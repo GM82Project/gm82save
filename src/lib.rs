@@ -2444,6 +2444,9 @@ unsafe fn injector() {
         b'L', 0, b'e', 0, b'v', 0, b'e', 0, b'l', 0,
     ]);
 
+    // set default HideWait to false
+    patch(0x717119, &[0x33, 0xd2]);
+
     // use zlib-ng for compression
     patch(0x52f34c, &[0xe9]);
     patch_call(0x52f34c, deflate_inj as _);
