@@ -619,7 +619,8 @@ unsafe extern "C" fn move_extensions_from_localappdata_to_exedir() {
                 if filenames.is_empty() {
                     return
                 }
-                let message = format!("These extension files need to be moved to the install folder:\n\n{filenames}\n\nProceed?");
+                let message =
+                    format!("These extension files need to be moved to the install folder:\n\n{filenames}\n\nProceed?");
                 let answer = show_question(&UStr::new(message));
                 if answer != 6 {
                     return

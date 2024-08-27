@@ -1344,20 +1344,21 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     {
         // get font list
         let font_list: u32 = delphi_call!(0x6fb55c);
-        let mut message = String::new();
+        let mut missing_fonts = HashSet::new();
         for font in ide::FONTS.assets().iter().filter_map(Option::as_ref) {
             let index: i32 = delphi_call!(0x43ee44, font_list, font.sys_name.0);
             if index < 0 {
-                if message.is_empty() {
-                    message = "Warning: this game uses the following fonts, which are not installed:".to_string();
-                }
-                message += "\n";
-                message += &font.sys_name.to_os_string().into_string().unwrap();
+                missing_fonts.insert(font.sys_name.clone());
             }
         }
         // free font list
         let _: u32 = delphi_call!(0x405a7c, font_list);
-        if !message.is_empty() {
+        if !missing_fonts.is_empty() {
+            let mut message = "Warning: this game uses the following fonts, which are not installed:".to_string();
+            for font in missing_fonts {
+                message += "\n";
+                message += &font.to_os_string().into_string().unwrap();
+            }
             show_message(message);
         }
     }

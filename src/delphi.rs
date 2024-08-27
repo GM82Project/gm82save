@@ -745,6 +745,20 @@ impl std::ops::Add<&UStr> for UStr {
     }
 }
 
+impl std::hash::Hash for UStr {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.as_slice().hash(state);
+    }
+}
+
+impl PartialEq for UStr {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_slice() == other.as_slice()
+    }
+}
+
+impl Eq for UStr {}
+
 impl Drop for UStr {
     fn drop(&mut self) {
         unsafe { UStrClr(self) }
