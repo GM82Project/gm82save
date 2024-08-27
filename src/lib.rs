@@ -560,6 +560,44 @@ unsafe extern "C" fn install_extensions_to_exedir_if_possible() {
 }
 
 #[naked]
+unsafe extern "C" fn uninstall_from_exedir_too() {
+    asm!(
+        "call dword ptr [ecx + 0x38]",
+        "push 0",
+        "push 0",
+        // get exe path
+        "lea edx, dword ptr [esp + 4]",
+        "mov ecx, 0x520290", // TApplication.GetExeName (firt arg unnecessary)
+        "call ecx",
+        // extract path
+        "mov eax, dword ptr [esp + 4]",
+        "mov edx, esp",
+        "mov ecx, 0x41735c", // ExtractFilePath
+        "call ecx",
+        // concat "extensions\"
+        "mov eax, esp",
+        "mov edx, 0x712dec",
+        "mov ecx, 0x4082dc", // @UStrCat
+        "call ecx",
+        // add to list
+        "mov edx, dword ptr [esp]",
+        "mov eax, dword ptr [ebp - 0x10]",
+        "mov ecx, dword ptr [eax]",
+        "call dword ptr [ecx + 0x38]",
+        // cleanup strings
+        "mov eax, esp",
+        "mov edx, 2",
+        "mov ecx, 0x406e80", // @LStrArrayClr
+        "call ecx",
+        // return
+        "add esp, 8",
+        "mov dl, 1",
+        "ret",
+        options(noreturn),
+    );
+}
+
+#[naked]
 unsafe extern "C" fn move_extensions_from_localappdata_to_exedir() {
     unsafe extern "fastcall" fn inj() {
         let mut exe_path = PathBuf::from(std::env::args().next().unwrap());
@@ -2273,6 +2311,10 @@ unsafe fn injector() {
 
     // install extensions to own directory if possible
     patch_call(0x713cdf, install_extensions_to_exedir_if_possible as _);
+
+    // uninstall extensions from own directory
+    patch(0x71428c, &[0xe8]);
+    patch_call(0x71428c, uninstall_from_exedir_too as _);
 
     // move extensions to exedir from localappdata
     patch_call(0x712a9a, move_extensions_from_localappdata_to_exedir as _);
