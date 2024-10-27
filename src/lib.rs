@@ -1147,6 +1147,7 @@ unsafe extern "C" fn timeline_form_add_events() {
     )
 }
 
+#[naked]
 unsafe extern "C" fn timeline_event_list_dblclick_inj() {
     asm!(
         "mov ecx, eax",
@@ -1285,6 +1286,7 @@ unsafe extern "fastcall" fn object_show_children(object_form: *const i32) {
     let _: u32 = delphi_call!(0x62cde0, *RESULT_PTR);
 }
 
+#[naked]
 unsafe extern "C" fn object_event_list_dblclick_inj() {
     asm!(
         "mov ecx, eax",
