@@ -1,7 +1,7 @@
 #![allow(non_snake_case, dead_code)]
 
 use std::{
-    arch::asm,
+    arch::{asm, naked_asm},
     ffi::{OsStr, OsString},
     os::windows::ffi::{OsStrExt, OsStringExt},
     ptr, slice,
@@ -400,7 +400,7 @@ impl TBitmap {
 
     #[naked]
     pub unsafe extern "fastcall" fn load_from_clipboard(&mut self) -> bool {
-        asm!(
+        naked_asm!(
             "push edi",
             "push ebx",
             // Clipboard
@@ -433,7 +433,6 @@ impl TBitmap {
             "pop ebx",
             "pop edi",
             "ret",
-            options(noreturn),
         )
     }
 }

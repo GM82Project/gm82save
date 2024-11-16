@@ -1,11 +1,16 @@
 use crate::{
-    asset, delphi, delphi::TMemoryStream, ide, regular::extension_watcher::update_extensions, AssetListTrait,
-    InstanceExtra, TileExtra, UStr, DEFLATE_LEVEL, EXTRA_DATA,
+    AssetListTrait, DEFLATE_LEVEL, EXTRA_DATA, InstanceExtra, TileExtra, UStr, asset, delphi, delphi::TMemoryStream,
+    ide, regular::extension_watcher::update_extensions,
 };
-use byteorder::{WriteBytesExt, LE};
-use flate2::{write::ZlibEncoder, Compression};
+use byteorder::{LE, WriteBytesExt};
+use flate2::{Compression, write::ZlibEncoder};
 use rayon::prelude::*;
-use std::{arch::asm, io, io::Write, ptr, slice};
+use std::{
+    arch::{asm, naked_asm},
+    io,
+    io::Write,
+    ptr, slice,
+};
 
 pub trait GetAssetList: Sync + 'static {
     fn get_asset_list() -> &'static dyn AssetListTrait<Self>;
@@ -538,21 +543,19 @@ extern "fastcall" fn save_assets<T: GetAssetList>(mut stream: &mut TMemoryStream
 
 #[naked]
 pub unsafe extern "C" fn save_assets_inj<T: GetAssetList>() {
-    asm!(
+    naked_asm!(
         "mov ecx, eax",
         "jmp {save_assets}",
         save_assets = sym save_assets::<T>,
-        options(noreturn),
     );
 }
 
 #[naked]
 pub unsafe extern "C" fn write_encrypted_gamedata_inj() {
-    asm!(
+    naked_asm!(
         "mov ecx, eax",
         "jmp {}",
         sym write_encrypted_gamedata,
-        options(noreturn),
     )
 }
 

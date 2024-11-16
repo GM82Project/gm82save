@@ -1,12 +1,13 @@
 use crate::{
+    ACTION_TOKEN, EXTRA_DATA, Error, GMLLines, InstanceExtra, LAST_SAVE, PATH_FORM_UPDATED, Result,
+    SAW_APPLIES_TO_WARNING, TileExtra,
     asset::*,
     delphi,
-    delphi::{advance_progress_form, DelphiBox, TTreeNode, UStr},
+    delphi::{DelphiBox, TTreeNode, UStr, advance_progress_form},
     events, ide,
     ide::AssetListTrait,
     regular::project_watcher,
-    run_while_updating_bar, show_message, update_timestamp, Error, GMLLines, InstanceExtra, Result, TileExtra,
-    ACTION_TOKEN, EXTRA_DATA, LAST_SAVE, PATH_FORM_UPDATED, SAW_APPLIES_TO_WARNING,
+    run_while_updating_bar, show_message, update_timestamp,
 };
 use itertools::Itertools;
 use png::Compression;

@@ -1,11 +1,11 @@
 use crate::delphi::UStr;
-use notify::{recommended_watcher, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher, recommended_watcher};
 use once_cell::unsync::Lazy;
 use parking_lot::Mutex;
 use std::{
     env::args,
     path::PathBuf,
-    sync::mpsc::{channel, Receiver, Sender},
+    sync::mpsc::{Receiver, Sender, channel},
     time::{Duration, SystemTime},
 };
 

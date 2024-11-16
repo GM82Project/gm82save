@@ -7,8 +7,8 @@ use crate::{
 };
 use itertools::Itertools;
 use std::{
-    arch::asm,
-    collections::{hash_map::Entry, HashMap},
+    arch::{asm, naked_asm},
+    collections::{HashMap, hash_map::Entry},
 };
 
 type AssetId = usize;
@@ -39,7 +39,7 @@ unsafe extern "fastcall" fn trigger_disable_condition_memo() {
             ),
         );
     }
-    asm!(
+    naked_asm!(
         "push eax",
         "mov ecx, 0x4ee6d8",
         "call ecx",
@@ -47,7 +47,6 @@ unsafe extern "fastcall" fn trigger_disable_condition_memo() {
         "mov edx, esi",
         "jmp {}",
         sym inj,
-        options(noreturn),
     );
 }
 
@@ -130,30 +129,28 @@ unsafe extern "fastcall" fn update_code(object: *mut usize) {
 
 #[naked]
 unsafe extern "C" fn update_code_inj() {
-    asm!(
+    naked_asm!(
         "mov ecx, eax",
         "jmp {}",
         sym update_code,
-        options(noreturn),
     );
 }
 
 #[naked]
 unsafe extern "C" fn update_applies_to() {
-    asm!(
+    naked_asm!(
         "mov eax, dword ptr [ebx + 0x43c]",
         "mov ecx, dword ptr [eax + 0x2d4]",
         "test ecx, ecx",
         "jne {}",
         "ret",
         sym update_code,
-        options(noreturn),
     )
 }
 
 #[naked]
 unsafe extern "C" fn check_all_closing() {
-    asm!(
+    naked_asm!(
         "mov eax, 0x682a4a",
         // original check: form.savechanges
         "cmp byte ptr [ebx + 0x441], 0",
@@ -163,7 +160,6 @@ unsafe extern "C" fn check_all_closing() {
         "cmp byte ptr [ecx], 0",
         // return
         "2: jmp eax",
-        options(noreturn),
     );
 }
 
@@ -236,12 +232,11 @@ unsafe extern "C" fn close_code() {
             }
         }
     }
-    asm!(
+    naked_asm!(
         "mov edx, eax",
         "mov ecx, ebx",
         "jmp {}",
         sym inj,
-        options(noreturn),
     );
 }
 
@@ -261,11 +256,10 @@ unsafe extern "C" fn update_instance_code() {
             let _: u32 = delphi_call!(0x6930cc, *room_id);
         }
     }
-    asm!(
+    naked_asm!(
         "mov ecx, eax",
         "jmp {}",
         sym inj,
-        options(noreturn),
     );
 }
 
@@ -411,7 +405,7 @@ unsafe extern "C" fn open_code_action() {
             (code, form, asset_id)
         });
     }
-    asm!(
+    naked_asm!(
         "mov edx, dword ptr [esi]",
         "push dword ptr [ebp - 0x1c]",
         "push dword ptr [ebp + 0xc]",
@@ -419,7 +413,6 @@ unsafe extern "C" fn open_code_action() {
         "mov al, 1",
         "ret 8",
         sym inj,
-        options(noreturn),
     );
 }
 
@@ -433,13 +426,12 @@ unsafe extern "C" fn open_room_code() {
             (code, form, room_id)
         });
     }
-    asm!(
+    naked_asm!(
         "mov ecx, [ebx + 0x630]",
         "mov edx, [ebx + 0x61c]",
         "call {}",
         "ret 8",
         sym inj,
-        options(noreturn),
     );
 }
 
@@ -453,12 +445,11 @@ unsafe extern "C" fn open_trigger_code() {
         });
         update_trigger_form(trigger);
     }
-    asm!(
+    naked_asm!(
         "mov edx, edi",
         "call {}",
         "ret 8",
         sym inj,
-        options(noreturn),
     );
 }
 
@@ -480,7 +471,7 @@ unsafe extern "C" fn open_instance_code() {
             },
         }
     }
-    asm!(
+    naked_asm!(
         "mov edx, [ebx + 0x61c]",
         "push dword ptr [ebx + 0x630]", // room id
         "push dword ptr [ebp - 0x10]", // instance id
@@ -488,7 +479,6 @@ unsafe extern "C" fn open_instance_code() {
         "call {}",
         "ret 8",
         sym inj,
-        options(noreturn),
     );
 }
 
@@ -518,7 +508,7 @@ unsafe extern "C" fn room_delete_instance() {
             let _: u32 = delphi_call!(0x405a7c, form.1);
         }
     }
-    asm!(
+    naked_asm!(
         "push esi",
         "push edi",
         "push ebp",
@@ -530,7 +520,6 @@ unsafe extern "C" fn room_delete_instance() {
         "mov eax, 0x658ab6",
         "jmp eax",
         sym inj,
-        options(noreturn),
     )
 }
 
@@ -544,19 +533,18 @@ unsafe extern "C" fn room_safe_undo() {
             }
         }
     }
-    asm!(
+    naked_asm!(
         "mov edx, 0x405a7c",
         "call edx",
         "mov ecx, [ebx + 0x61c]",
         "jmp {}",
         sym inj,
-        options(noreturn),
     );
 }
 
 #[naked]
 unsafe extern "C" fn room_delete_all() {
-    asm!(
+    naked_asm!(
         "push eax",
         "mov ecx, eax",
         "call {}",
@@ -564,7 +552,6 @@ unsafe extern "C" fn room_delete_all() {
         "mov edx, 0x657b48",
         "jmp edx",
         sym clear_all_instances_in_room,
-        options(noreturn),
     )
 }
 

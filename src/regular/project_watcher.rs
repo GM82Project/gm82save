@@ -1,13 +1,13 @@
-use crate::{ide, show_message, UStr, SAVE_END};
-use notify::{recommended_watcher, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use crate::{SAVE_END, UStr, ide, show_message};
+use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher, recommended_watcher};
 use once_cell::unsync::Lazy;
 use parking_lot::Mutex;
 use std::{
-    arch::asm,
+    arch::naked_asm,
     path::PathBuf,
     sync::{
-        mpsc::{channel, Receiver, Sender},
         Once,
+        mpsc::{Receiver, Sender, channel},
     },
 };
 
@@ -51,7 +51,7 @@ unsafe extern "fastcall" fn show_message_and_reload() {
         static mut OLD_ONCLOSE_SENDER: usize = 0;
         #[naked]
         unsafe extern "C" fn put_old_onclose_back() {
-            asm!(
+            naked_asm!(
                 "mov edx, {}",
                 "mov [eax + 0x2f0], edx",
                 "mov edx, {}",
@@ -59,7 +59,6 @@ unsafe extern "fastcall" fn show_message_and_reload() {
                 "ret",
                 sym OLD_ONCLOSE,
                 sym OLD_ONCLOSE_SENDER,
-                options(noreturn),
             );
         }
         unsafe extern "fastcall" fn instead_of_idle() {

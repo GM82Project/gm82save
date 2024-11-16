@@ -1,4 +1,4 @@
-use crate::{asset::Font, delphi::TBitmap, UStr};
+use crate::{UStr, asset::Font, delphi::TBitmap};
 use std::{ptr, slice};
 
 #[repr(C)]
@@ -139,13 +139,12 @@ impl Font {
         c: u32,
         x: u32,
     ) {
-        std::arch::asm!(
+        std::arch::naked_asm!(
             "mov eax, ecx",
             "pop ecx",
             "xchg ecx, [esp]",
             "push 0x5a7b54", // copy glyph onto font atlas
             "ret",
-            options(noreturn),
         );
     }
 

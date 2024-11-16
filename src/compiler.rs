@@ -1,17 +1,19 @@
-use super::{patch, patch_call, InstanceExtra, TileExtra, EXTRA_DATA};
-use crate::{ide, ide::AssetListTrait, UStr};
+use super::{EXTRA_DATA, InstanceExtra, TileExtra, patch, patch_call};
+use crate::{UStr, ide, ide::AssetListTrait};
 use lazy_static::lazy_static;
 use rayon::prelude::*;
 use regex::Regex;
-use std::{arch::asm, collections::HashSet};
+use std::{
+    arch::{asm, naked_asm},
+    collections::HashSet,
+};
 
 #[naked]
 unsafe extern "C" fn compile_constants_inj() {
-    asm!(
+    naked_asm!(
         "mov ecx, eax",
         "jmp {}",
         sym compile_constants,
-        options(noreturn),
     );
 }
 
@@ -111,7 +113,7 @@ unsafe extern "fastcall" fn compile_constants(stream: usize) -> bool {
 #[naked]
 unsafe extern "C" fn save_82_if_exe() {
     // only saves settings version 825 when saving an exe with the creation code flag set
-    asm!(
+    naked_asm!(
         "mov edx, 825",
         "mov ecx, 800",
         "test bl, bl", // if exe
@@ -119,13 +121,12 @@ unsafe extern "C" fn save_82_if_exe() {
         "bt word ptr [0x77f54e], 15", // if force cpu
         "cmovnc edx, ecx",
         "ret",
-        options(noreturn),
     );
 }
 
 #[naked]
 unsafe extern "C" fn save_bool_if_exe() {
-    asm!(
+    naked_asm!(
         "push esi",
         "mov esi, 0x52f240", // WriteBoolean
         "mov ecx, 0x52f12c", // WriteInteger
@@ -134,13 +135,12 @@ unsafe extern "C" fn save_bool_if_exe() {
         "call ecx",
         "pop esi",
         "ret",
-        options(noreturn),
     );
 }
 
 #[naked]
 unsafe extern "C" fn save_creation_code_flag() {
-    asm!(
+    naked_asm!(
         "mov ecx, 0x52f12c", // WriteInteger (for uninitialized args)
         "call ecx",
         "test bl, bl", // if exe
@@ -159,20 +159,18 @@ unsafe extern "C" fn save_creation_code_flag() {
         "call ecx",
         // exit
         "2: ret",
-        options(noreturn),
     );
 }
 
 #[naked]
 unsafe extern "C" fn save_room_version_inj() {
-    asm!(
+    naked_asm!(
         "mov cl, byte ptr [esp]",
         "call {}",
         "mov edx, eax",
         "mov eax, 0x658372",
         "jmp eax",
         sym save_room_version,
-        options(noreturn),
     );
 }
 
@@ -182,7 +180,7 @@ unsafe extern "fastcall" fn save_room_version(exe: bool) -> u32 {
 
 #[naked]
 unsafe extern "C" fn save_instance_extra_inj() {
-    asm!(
+    naked_asm!(
         "mov ecx, ebx", // file
         "mov eax, dword ptr [edi + 0x2f4]", // instance list
         "mov edx, dword ptr [eax + ebp*0x8 + 0xc]", // instance id
@@ -195,13 +193,12 @@ unsafe extern "C" fn save_instance_extra_inj() {
         "dec dword ptr [esp + 0x4]",
         "jmp eax",
         sym save_instance_extra,
-        options(noreturn),
     );
 }
 
 #[naked]
 unsafe extern "C" fn save_tile_extra_inj() {
-    asm!(
+    naked_asm!(
         "mov ecx, ebx", // file
         "mov eax, dword ptr [edi + 0x2fc]", // tile list
         "mov edx, dword ptr [eax + ebp*0x8 + 0x20]", // tile id
@@ -214,7 +211,6 @@ unsafe extern "C" fn save_tile_extra_inj() {
         "dec dword ptr [esp + 0x4]",
         "jmp eax",
         sym save_tile_extra,
-        options(noreturn),
     );
 }
 

@@ -1,12 +1,12 @@
 use crate::{
+    ACTION_TOKEN, EXTRA_DATA, Error, GMLLines, InstanceExtra, PATH_FORM_UPDATED, Result, TileExtra,
     asset::*,
     delphi,
-    delphi::{advance_progress_form, DelphiBox, UStr},
+    delphi::{DelphiBox, UStr, advance_progress_form},
     events, ide,
     ide::AssetListTrait,
     regular::project_watcher,
-    run_while_updating_bar, show_message, update_timestamp, Error, GMLLines, InstanceExtra, Result, TileExtra,
-    ACTION_TOKEN, EXTRA_DATA, PATH_FORM_UPDATED,
+    run_while_updating_bar, show_message, update_timestamp,
 };
 use itertools::izip;
 use parking_lot::Mutex;
