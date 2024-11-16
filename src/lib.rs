@@ -1,4 +1,8 @@
 #![feature(naked_functions)]
+#![allow(
+    static_mut_refs,
+    reason = "For a mostly single-threaded codebase, this is too much hassle. Just be careful in multi-threaded parts."
+)]
 
 #[cfg(not(all(windows, target_arch = "x86")))]
 compile_error!("this tool only works on windows 32-bit");
