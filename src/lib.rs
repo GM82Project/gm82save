@@ -895,7 +895,7 @@ unsafe extern "fastcall" fn gm82_file_association(reg: u32) {
 
 unsafe extern "fastcall" fn check_gm_processes(name: usize, value: u32) {
     let system = sysinfo::System::new_with_specifics(
-        sysinfo::RefreshKind::new().with_processes(sysinfo::ProcessRefreshKind::new()),
+        sysinfo::RefreshKind::nothing().with_processes(sysinfo::ProcessRefreshKind::nothing()),
     );
     let path = std::env::current_exe().unwrap();
     if system.processes().iter().filter(|(_, p)| p.exe() == Some(&path)).count() <= 1 {
