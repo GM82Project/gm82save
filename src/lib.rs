@@ -3,6 +3,10 @@
     static_mut_refs,
     reason = "For a mostly single-threaded codebase, this is too much hassle. Just be careful in multi-threaded parts."
 )]
+#![allow(
+    unsafe_op_in_unsafe_fn,
+    reason = "Unsafe is practically implied here, no point in cluttering the codebase with unsafe blocks."
+)]
 
 #[cfg(not(all(windows, target_arch = "x86")))]
 compile_error!("this tool only works on windows 32-bit");
@@ -905,7 +909,7 @@ unsafe extern "fastcall" fn check_gm_processes(name: usize, value: u32) {
 
 unsafe extern "stdcall" fn try_clipboard_a_few_times(clipboard_window: usize) -> usize {
     #[link(name = "kernel32")]
-    extern "system" {
+    unsafe extern "system" {
         fn OpenClipboard(clipboard_window: usize) -> usize;
     }
     // try 10 times
@@ -2123,7 +2127,7 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
                 .iter()
                 .zip(ide::PATHS.assets())
                 .zip(ide::PATHS.names())
-                .filter(|((&f, _), _)| f != 0)
+                .filter(|&((&f, _), _)| f != 0)
                 .filter_map(|((f, o), n)| o.as_ref().map(|p| (f, p, n)))
             {
                 (*((form + 0x444) as *const *mut asset::Path)).as_mut().map(|p| p.assign(path));
@@ -2162,7 +2166,7 @@ unsafe fn patch(dest: usize, source: &[u8]) {
     type BOOL = i32;
     type HANDLE = isize;
     #[link(name = "kernel32")]
-    extern "system" {
+    unsafe extern "system" {
         fn VirtualProtect(
             lpaddress: *mut c_void,
             dwsize: usize,

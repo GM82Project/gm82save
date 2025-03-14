@@ -46,7 +46,7 @@ struct ABC {
 }
 
 #[link(name = "gdi32")]
-extern "system" {
+unsafe extern "system" {
     fn GetTextMetricsW(hdc: usize, text_metrics: &mut TEXTMETRICSW) -> u32;
     fn GetGlyphOutlineW(
         hdc: usize,
@@ -61,7 +61,7 @@ extern "system" {
 }
 
 #[link(name = "kernel32")]
-extern "system" {
+unsafe extern "system" {
     fn GetACP() -> u32;
     fn MultiByteToWideChar(
         CodePage: u32,
