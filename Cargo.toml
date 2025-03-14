@@ -23,7 +23,7 @@ time = "0.3"
 byteorder = "1.5"
 crossbeam-channel = { version = "0.5", optional = true }
 ctor = "0.4"
-flate2 = { version = "1.1", default-features = false, features = ["zlib-ng-compat"] }
+flate2 = { version = "1.1", default-features = false, features = ["zlib-rs"] }
 itertools = "0.14"
 lazy_static = "1.5"
 notify = "8.0"
