@@ -1,6 +1,9 @@
 use crate::{
-    AssetListTrait, DEFLATE_LEVEL, EXTRA_DATA, InstanceExtra, TileExtra, UStr, asset, delphi, delphi::TMemoryStream,
-    ide, regular::extension_watcher::update_extensions,
+    AssetListTrait, DEFLATE_LEVEL, EXTRA_DATA, InstanceExtra, TileExtra, UStr, asset,
+    delphi::{self, TMemoryStream},
+    ide,
+    regular::extension_watcher::update_extensions,
+    save::GetAsset,
 };
 use byteorder::{LE, WriteBytesExt};
 use flate2::{Compression, write::ZlibEncoder};
@@ -547,6 +550,114 @@ pub unsafe extern "C" fn save_assets_inj<T: GetAssetList>() {
         "mov ecx, eax",
         "jmp {save_assets}",
         save_assets = sym save_assets::<T>,
+    );
+}
+
+#[naked]
+pub unsafe extern "C" fn write_event_tables() {
+    extern "fastcall" fn inj(stream: &mut TMemoryStream) -> bool {
+        let resource_tree_res: u32 = unsafe { delphi_call!(0x71de7c, stream, 1) };
+        if resource_tree_res == 0 {
+            return false
+        }
+
+        fn obj_has_event(obj: &asset::Object, event_type: usize, event_number: usize) -> bool {
+            let mut obj_opt = Some(obj);
+            while let Some(obj) = obj_opt {
+                if obj.has_direct_event(event_type, event_number) {
+                    return true
+                }
+                obj_opt = ide::OBJECTS.assets().get_asset(obj.parent_index);
+            }
+            false
+        }
+
+        #[repr(C)]
+        struct CollisionPair {
+            me: usize,
+            other: usize,
+        }
+        // same table sizes as used by game maker
+        let mut event_holders = [
+            vec![Vec::new(); 1],
+            vec![Vec::new(); 1],
+            vec![Vec::new(); 13],
+            vec![Vec::new(); 17],
+            Vec::new(),
+            vec![Vec::new(); 129],
+            vec![Vec::new(); 129],
+            vec![Vec::new(); 129],
+            vec![Vec::new(); 1],
+            vec![Vec::new(); 129],
+            vec![Vec::new(); 129],
+            vec![Vec::new(); ide::get_triggers().len()],
+        ];
+        let mut collision_holders = Vec::new();
+        for (obj_id, obj) in ide::OBJECTS.assets().iter().enumerate().filter_map(|(i, o)| o.as_deref().map(|o| (i, o)))
+        {
+            for (event_type, type_holder) in event_holders.iter_mut().enumerate() {
+                if event_type != 4 {
+                    // not collision
+                    for (event_number, event_holder) in type_holder.iter_mut().enumerate() {
+                        if obj_has_event(obj, event_type, event_number) {
+                            event_holder.push(obj_id);
+                        }
+                    }
+                } else {
+                    // collision
+                    for other_id in 0..obj.events[4].len() {
+                        if ide::OBJECTS.assets().get(other_id).is_some() {
+                            if obj_has_event(obj, event_type, other_id) {
+                                collision_holders.push(CollisionPair { me: obj_id, other: other_id });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut encoder =
+            flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::new(unsafe { DEFLATE_LEVEL }));
+        if event_holders
+            .iter()
+            .try_for_each(|holder| {
+                encoder.write_u32::<LE>(holder.len() as u32)?;
+                holder.iter().try_for_each(|event| {
+                    encoder.write_u32::<LE>(event.len() as u32)?;
+                    event.iter().try_for_each(|&obj| encoder.write_u32::<LE>(obj as u32))
+                })
+            })
+            .is_err()
+        {
+            return false
+        }
+
+        if encoder.write_u32::<LE>(collision_holders.len() as u32).is_err() {
+            return false
+        }
+
+        if collision_holders
+            .iter()
+            .try_for_each(|pair| {
+                encoder.write_u32::<LE>(pair.me as u32)?;
+                encoder.write_u32::<LE>(pair.other as u32)
+            })
+            .is_err()
+        {
+            return false
+        }
+
+        let data = if let Ok(x) = encoder.finish() { x } else { return false };
+
+        if stream.write_u32::<LE>(data.len() as u32).is_err() {
+            return false
+        }
+        stream.write_all(&data).is_ok()
+    }
+    naked_asm!(
+        "mov ecx, eax",
+        "jmp {}",
+        sym inj,
     );
 }
 

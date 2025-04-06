@@ -459,6 +459,10 @@ impl Object {
         unsafe { delphi_box!(0x7049a8, 0x704428) }
     }
 
+    pub fn has_direct_event(&self, ev_type: usize, ev_numb: usize) -> bool {
+        self.events.get(ev_type).and_then(|x| x.get(ev_numb)).filter(|x| x.action_count > 0).is_some()
+    }
+
     pub fn get_event(&mut self, ev_type: usize, ev_numb: usize) -> &mut Event {
         unsafe {
             let event: *mut Event = delphi_call!(0x704d74, self, ev_type, ev_numb);

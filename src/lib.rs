@@ -2680,5 +2680,7 @@ unsafe fn injector() {
     patch_call(0x6cd9e1, save_exe::save_assets_inj::<asset::Object> as usize);
     patch_call(0x6cd9f8, save_exe::save_assets_inj::<asset::Room> as usize);
 
+    patch_call(0x6cda40, save_exe::write_event_tables as usize);
+
     patch_call(0x6ce104, save_exe::write_encrypted_gamedata_inj as usize);
 }
