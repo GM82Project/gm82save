@@ -572,6 +572,16 @@ pub unsafe extern "C" fn write_event_tables() {
             false
         }
 
+        fn obj_has_collision_event(obj: &asset::Object, mut other_id: usize) -> bool {
+            while let Some(other) = ide::OBJECTS.assets().get_asset(other_id as i32) {
+                if obj_has_event(obj, 4, other_id) {
+                    return true
+                }
+                other_id = other.parent_index as usize;
+            }
+            false
+        }
+
         #[repr(C)]
         struct CollisionPair {
             me: usize,
@@ -603,15 +613,14 @@ pub unsafe extern "C" fn write_event_tables() {
                             event_holder.push(obj_id);
                         }
                     }
-                } else {
-                    // collision
-                    for other_id in 0..obj.events[4].len() {
-                        if ide::OBJECTS.assets().get(other_id).is_some() {
-                            if obj_has_event(obj, event_type, other_id) {
-                                collision_holders.push(CollisionPair { me: obj_id, other: other_id });
-                            }
-                        }
-                    }
+                }
+            }
+            // collision
+            for (other_id, other_obj) in
+                ide::OBJECTS.assets().iter().enumerate().skip(obj_id).filter_map(|(i, o)| o.as_deref().map(|o| (i, o)))
+            {
+                if obj_has_collision_event(obj, other_id) || obj_has_collision_event(other_obj, obj_id) {
+                    collision_holders.push(CollisionPair { me: obj_id, other: other_id });
                 }
             }
         }
