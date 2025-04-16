@@ -27,7 +27,7 @@ static mut CODE_FORMS: Option<HashMap<CodeHolder, (UStr, CodeFormPointer, AssetI
 
 static mut INSTANCE_FORMS: Option<HashMap<*const Room, (AssetId, HashMap<InstanceId, (UStr, CodeFormPointer)>)>> = None;
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "fastcall" fn trigger_disable_condition_memo() {
     unsafe extern "fastcall" fn inj(memo: *const *const usize, trigger: *const Trigger) {
         asm!(
@@ -127,7 +127,7 @@ unsafe extern "fastcall" fn update_code(object: *mut usize) {
     }
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn update_code_inj() {
     naked_asm!(
         "mov ecx, eax",
@@ -136,7 +136,7 @@ unsafe extern "C" fn update_code_inj() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn update_applies_to() {
     naked_asm!(
         "mov eax, dword ptr [ebx + 0x43c]",
@@ -148,7 +148,7 @@ unsafe extern "C" fn update_applies_to() {
     )
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn check_all_closing() {
     naked_asm!(
         "mov eax, 0x682a4a",
@@ -163,7 +163,7 @@ unsafe extern "C" fn check_all_closing() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn close_code() {
     unsafe extern "fastcall" fn inj(form: usize, response: i32) {
         let revert = response != 6;
@@ -240,7 +240,7 @@ unsafe extern "C" fn close_code() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn update_instance_code() {
     unsafe extern "fastcall" fn inj(room: *mut Room) {
         if let Some((room_id, forms)) = INSTANCE_FORMS.as_ref().and_then(|forms| forms.get(&room.cast_const())) {
@@ -331,7 +331,7 @@ unsafe fn open_or_insert(holder: CodeHolder, create: impl FnOnce() -> (UStr, Cod
     }
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn open_code_action() {
     unsafe extern "fastcall" fn inj(
         title: *const u16,
@@ -416,7 +416,7 @@ unsafe extern "C" fn open_code_action() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn open_room_code() {
     unsafe extern "fastcall" fn inj(room_id: usize, room: &Room) {
         let title = ide::ROOMS.names()[room_id].clone() + UStr::new(" - Room Creation Code");
@@ -435,7 +435,7 @@ unsafe extern "C" fn open_room_code() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn open_trigger_code() {
     unsafe extern "fastcall" fn inj(title: *const u16, trigger: &Trigger) {
         open_or_insert(CodeHolder::Trigger(trigger), || {
@@ -453,7 +453,7 @@ unsafe extern "C" fn open_trigger_code() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn open_instance_code() {
     unsafe extern "fastcall" fn inj(title: *const u16, room: &Room, code: *const u16, inst_id: usize, room_id: usize) {
         match INSTANCE_FORMS
@@ -498,7 +498,7 @@ unsafe extern "fastcall" fn clear_all_instances_in_room(room: *const Room) {
     }
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn room_delete_instance() {
     unsafe extern "fastcall" fn inj(room: *const Room, inst_number: usize) {
         let inst_id = (*room).get_instances()[inst_number].id;
@@ -523,7 +523,7 @@ unsafe extern "C" fn room_delete_instance() {
     )
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn room_safe_undo() {
     unsafe extern "fastcall" fn inj(room: *mut Room) {
         update_code(room.cast());
@@ -542,7 +542,7 @@ unsafe extern "C" fn room_safe_undo() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn room_delete_all() {
     naked_asm!(
         "push eax",

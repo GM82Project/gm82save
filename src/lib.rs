@@ -247,7 +247,7 @@ fn update_timestamp() {
     }
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn reset_if_time_went_backwards() {
     naked_asm!(
         "movsd xmm0, qword ptr [{last_save}]", // load last save
@@ -355,7 +355,7 @@ unsafe extern "fastcall" fn about_inj(about_dialog: *const *const usize) {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn save_all_after_import() {
     naked_asm!(
         // call original function
@@ -368,7 +368,7 @@ unsafe extern "C" fn save_all_after_import() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn save_inj() {
     naked_asm!(
         "mov ecx, ebp",
@@ -413,7 +413,7 @@ unsafe extern "fastcall" fn save(proj_path: &UStr, stream_ptr: *mut u32) -> u16 
     }
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn load_inj() {
     naked_asm!(
         "mov ecx, ebp",
@@ -454,7 +454,7 @@ unsafe extern "fastcall" fn load(proj_path: &UStr, stream_ptr: *mut u32, result_
     true
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn stuff_to_do_on_ide_start() {
     unsafe extern "C" fn inj() {
         regular::init();
@@ -480,7 +480,7 @@ unsafe extern "fastcall" fn start_shader_compiler() {
     }
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn load_recent_project_and_maybe_compile() {
     unsafe extern "C" fn inj() {
         let mut args = std::env::args().peekable();
@@ -504,7 +504,7 @@ unsafe extern "C" fn load_recent_project_and_maybe_compile() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn gm81_or_gm82_inj() {
     naked_asm!(
         "mov ecx, eax",
@@ -535,7 +535,7 @@ unsafe extern "fastcall" fn make_new_folder(_: u32, path_ptr: *const u16) {
     project_watcher::unwatch();
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn install_extensions_to_exedir_if_possible() {
     unsafe extern "fastcall" fn inj(out: &mut UStr, localappdata: *const u16) {
         let mut exe_path = PathBuf::from(std::env::args().next().unwrap());
@@ -558,7 +558,7 @@ unsafe extern "C" fn install_extensions_to_exedir_if_possible() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn uninstall_from_exedir_too() {
     naked_asm!(
         "call dword ptr [ecx + 0x38]",
@@ -595,7 +595,7 @@ unsafe extern "C" fn uninstall_from_exedir_too() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn move_extensions_from_localappdata_to_exedir() {
     unsafe extern "fastcall" fn inj() {
         let mut exe_path = PathBuf::from(std::env::args().next().unwrap());
@@ -663,7 +663,7 @@ unsafe extern "C" fn move_extensions_from_localappdata_to_exedir() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn fix_tile_null_pointer() {
     naked_asm!(
         "mov edx, 0x64e048",
@@ -676,7 +676,7 @@ unsafe extern "C" fn fix_tile_null_pointer() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn inflate_inj() {
     naked_asm!(
         "mov ecx, eax",
@@ -699,7 +699,7 @@ unsafe extern "fastcall" fn inflate(src: &delphi::TMemoryStream) -> delphi::Delp
     return dst
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn deflate_inj() {
     naked_asm!(
         "mov ecx, eax",
@@ -719,7 +719,7 @@ unsafe extern "fastcall" fn deflate(dst: &mut delphi::TMemoryStream, src: &delph
 
 static mut DEFLATE_LEVEL: u32 = 6; // default
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn build_small() {
     naked_asm!(
         "mov ecx, 9",
@@ -730,7 +730,7 @@ unsafe extern "C" fn build_small() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn build_fast() {
     naked_asm!(
         "mov ecx, 0x79a998",
@@ -742,7 +742,7 @@ unsafe extern "C" fn build_fast() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn reset_compression() {
     naked_asm!(
         "mov ecx, 6",
@@ -788,7 +788,7 @@ unsafe fn freshen_room_ids(room: &mut asset::Room) {
     }
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn setup_unicode_parse_inj() {
     naked_asm!(
         "mov ecx, edi",
@@ -799,7 +799,7 @@ unsafe extern "C" fn setup_unicode_parse_inj() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn teardown_unicode_parse_inj() {
     naked_asm!(
         "mov ecx, 810",
@@ -818,7 +818,7 @@ unsafe extern "fastcall" fn setup_unicode_parse(version: i32) {
     patch(0x52f0c5, &cp);
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn properly_update_object_timestamp_drag_drop() {
     naked_asm!(
         "mov eax, [esi + 0x46c]", // TObjectForm.index
@@ -827,7 +827,7 @@ unsafe extern "C" fn properly_update_object_timestamp_drag_drop() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn properly_update_timeline_timestamp_drag_drop() {
     naked_asm!(
         "mov eax, [esi + 0x430]", // TTimeLineForm.index
@@ -836,7 +836,7 @@ unsafe extern "C" fn properly_update_timeline_timestamp_drag_drop() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn properly_update_object_timestamp_right_click() {
     naked_asm!(
         // show action modal
@@ -854,7 +854,7 @@ unsafe extern "C" fn properly_update_object_timestamp_right_click() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn properly_update_timeline_timestamp_right_click() {
     naked_asm!(
         // show action modal
@@ -872,7 +872,7 @@ unsafe extern "C" fn properly_update_timeline_timestamp_right_click() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn update_sprite_mask_timestamp() {
     naked_asm!(
         "mov eax, [ebx+0x42c]", // TMaskForm.theindex
@@ -881,7 +881,7 @@ unsafe extern "C" fn update_sprite_mask_timestamp() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn gm82_file_association_inj() {
     naked_asm!(
         "mov ecx, eax",
@@ -922,7 +922,7 @@ unsafe extern "stdcall" fn try_clipboard_a_few_times(clipboard_window: usize) ->
     0
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn image_editor_dont_error_when_switching_tool() {
     naked_asm!(
         // set mouse down global to -1
@@ -934,7 +934,7 @@ unsafe extern "C" fn image_editor_dont_error_when_switching_tool() {
     )
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn free_image_editor_bitmap() {
     naked_asm!(
         // call free on TheBitmap
@@ -957,7 +957,7 @@ unsafe extern "C" fn free_image_editor_bitmap() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn copy_origin_on_new() {
     naked_asm!(
         "mov ecx, [eax+0xc]",
@@ -969,7 +969,7 @@ unsafe extern "C" fn copy_origin_on_new() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn floor_st0() {
     naked_asm!(
         // move the return address and put st0 on the stack before it so it's like an argument
@@ -983,7 +983,7 @@ unsafe extern "C" fn floor_st0() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn update_sprite_icon_on_revert() {
     naked_asm!(
         "mov ecx, 0x6f5980", // set sprite name (original function)
@@ -994,7 +994,7 @@ unsafe extern "C" fn update_sprite_icon_on_revert() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn update_background_icon_on_revert() {
     naked_asm!(
         "mov ecx, 0x64de98", // set background name (original function)
@@ -1005,7 +1005,7 @@ unsafe extern "C" fn update_background_icon_on_revert() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn background_form_add_events() {
     naked_asm!(
         // call original function
@@ -1022,7 +1022,7 @@ unsafe extern "C" fn background_form_add_events() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn create_background_from_clipboard_inj() {
     naked_asm!(
         "mov ecx, eax",
@@ -1051,7 +1051,7 @@ unsafe extern "fastcall" fn create_background_from_clipboard(background_form: *m
     let _: u32 = delphi_call!(0x64cdb4, background_form);
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn dont_show_action_tooltip_if_event_is_null() {
     naked_asm!(
         // if eax is not null, call CEvent.GetAction
@@ -1067,7 +1067,7 @@ unsafe extern "C" fn dont_show_action_tooltip_if_event_is_null() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn first_object_updates_room_forms() {
     naked_asm!(
         // get number of objects in resource tree
@@ -1102,7 +1102,7 @@ unsafe extern "C" fn first_object_updates_room_forms() {
     )
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn timeline_form_add_events() {
     naked_asm!(
         // call original function
@@ -1119,7 +1119,7 @@ unsafe extern "C" fn timeline_form_add_events() {
     )
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn timeline_event_list_dblclick_inj() {
     naked_asm!(
         "mov ecx, eax",
@@ -1144,7 +1144,7 @@ unsafe extern "fastcall" fn timeline_event_list_dblclick(timeline_form: *const u
     }
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn object_form_add_events() {
     naked_asm!(
         // call original function
@@ -1187,7 +1187,7 @@ unsafe extern "C" fn object_form_add_events() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn object_open_parent() {
     naked_asm!(
         // get theobject from form
@@ -1200,7 +1200,7 @@ unsafe extern "C" fn object_open_parent() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn object_open_mask() {
     naked_asm!(
         // get theobject from form
@@ -1213,7 +1213,7 @@ unsafe extern "C" fn object_open_mask() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn object_show_children_inj() {
     naked_asm!(
         "mov ecx, eax",
@@ -1253,7 +1253,7 @@ unsafe extern "fastcall" fn object_show_children(object_form: *const i32) {
     let _: u32 = delphi_call!(0x62cde0, *RESULT_PTR);
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn object_event_list_dblclick_inj() {
     naked_asm!(
         "mov ecx, eax",
@@ -1293,7 +1293,7 @@ unsafe extern "fastcall" fn confirm_before_deleting_action(action_id: usize, eve
 
 macro_rules! deleting_action_inj {
     ($name:ident, $test:literal, $mov:literal) => {
-        #[naked]
+        #[unsafe(naked)]
         unsafe extern "fastcall" fn $name() {
             naked_asm!(
                 // call original function
@@ -1329,7 +1329,7 @@ deleting_action_inj!(
     "mov edx, [esi + 0x434]"
 );
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn object_clean_collide_events_inj() {
     naked_asm!(
         "mov ecx, eax",
@@ -1352,7 +1352,7 @@ unsafe extern "fastcall" fn object_clean_collide_events(obj: &mut asset::Object,
     }
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn object_clean_triggers_inj() {
     naked_asm!(
         "mov ecx, ebx",
@@ -1378,7 +1378,7 @@ unsafe extern "fastcall" fn object_clean_triggers(trigger_id: usize) {
     }
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn path_form_mouse_wheel_inj() {
     naked_asm!(
         // call TPathForm.Create
@@ -1393,7 +1393,7 @@ unsafe extern "C" fn path_form_mouse_wheel_inj() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn path_form_mouse_wheel() {
     naked_asm!(
         // check handled flag
@@ -1429,7 +1429,7 @@ unsafe extern "C" fn path_form_mouse_wheel() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn path_room_change_forces_room_editor_save() {
     naked_asm!(
         "mov ecx, 0x720560", // draw form
@@ -1442,7 +1442,7 @@ unsafe extern "C" fn path_room_change_forces_room_editor_save() {
 
 static mut PATH_FORM_UPDATED: bool = false;
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn maybe_reload_extensions_when_typing() {
     naked_asm!(
         "mov [ebp-8], eax",
@@ -1453,7 +1453,7 @@ unsafe extern "C" fn maybe_reload_extensions_when_typing() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn code_editor_dont_resize_if_maximized() {
     naked_asm!(
         // are we maximized?
@@ -1466,7 +1466,7 @@ unsafe extern "C" fn code_editor_dont_resize_if_maximized() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn code_editor_better_resize() {
     naked_asm!(
         // are we maximized?
@@ -1480,7 +1480,7 @@ unsafe extern "C" fn code_editor_better_resize() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn code_editor_middle_click() {
     naked_asm!(
         // push return address
@@ -1524,7 +1524,7 @@ unsafe extern "fastcall" fn code_editor_script_hint(name: *const u16, out: &mut 
     }
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn completion_script_args_inj() {
     naked_asm!(
         "mov ecx, eax",
@@ -1561,7 +1561,7 @@ unsafe extern "fastcall" fn completion_script_args(script_id: usize, out: &mut U
     *out = UStr(0x6baf10 as _);
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn write_number_on_actions() {
     naked_asm!(
         // call original function
@@ -1605,7 +1605,7 @@ unsafe extern "C" fn write_number_on_actions() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn regen_temp_folder_when_making_file() {
     naked_asm!(
         "mov ecx, 0x407660",
@@ -1617,7 +1617,7 @@ unsafe extern "C" fn regen_temp_folder_when_making_file() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn get_temp_folder_but_also_regen_it() {
     naked_asm!(
         //UStrAsg temp_directory to the output
@@ -1631,7 +1631,7 @@ unsafe extern "C" fn get_temp_folder_but_also_regen_it() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn trace_date_inj() {
     naked_asm!(
         // keep first two args
@@ -1706,12 +1706,12 @@ unsafe extern "fastcall" fn patch_error_box(caption: *const u16, text: *const u1
     }
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn get_treenode_count_and_preserve_resource_type() {
     naked_asm!("mov ecx, 0x4ad490", "call ecx", "mov [esp], edi", "mov ecx, 0x71c6a5", "jmp ecx",)
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn add_three_newest_inj() {
     naked_asm!(
         // add a line
@@ -1769,7 +1769,7 @@ unsafe extern "fastcall" fn add_three_newest(items: &TMenuItem, ty: u32, ebp: *c
     };
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn get_asset_from_name_unicase<T: GetAssetList>() {
     unsafe extern "fastcall" fn inj<T: GetAssetList>(name: *const u16) -> i32 {
         let name = UStr::from_ptr(&name);
@@ -1790,7 +1790,7 @@ unsafe extern "C" fn get_asset_from_name_unicase<T: GetAssetList>() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn room_form_inj() {
     naked_asm!(
         "mov ecx, eax",
@@ -1799,7 +1799,7 @@ unsafe extern "C" fn room_form_inj() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn room_size() {
     naked_asm!(
         "mov eax, {width}",
@@ -1826,7 +1826,7 @@ unsafe extern "C" fn room_size() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn fix_broken_room_size() {
     naked_asm!(
         // we already have speed in eax so do that one first
@@ -1854,7 +1854,7 @@ static mut DEFAULT_ROOM_WIDTH: u32 = 800;
 static mut DEFAULT_ROOM_HEIGHT: u32 = 608;
 static mut DEFAULT_ROOM_SPEED: u32 = 50;
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn rename_room_inj() {
     naked_asm!(
         "mov ecx, ebx",
@@ -1910,7 +1910,7 @@ fn fix_instances_when_renaming_room(room: &mut asset::Room, old_name: &str, new_
     }
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn dont_make_room_form_inj() {
     naked_asm!(
         "mov ecx, eax",
@@ -1932,7 +1932,7 @@ unsafe extern "fastcall" fn dont_make_room_form(node: &TTreeNode) {
     }
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn show_instance_id_inj() {
     naked_asm!(
         "mov ecx, eax",

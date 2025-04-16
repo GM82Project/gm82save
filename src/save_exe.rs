@@ -544,7 +544,7 @@ extern "fastcall" fn save_assets<T: GetAssetList>(mut stream: &mut TMemoryStream
     true
 }
 
-#[naked]
+#[unsafe(naked)]
 pub unsafe extern "C" fn save_assets_inj<T: GetAssetList>() {
     naked_asm!(
         "mov ecx, eax",
@@ -553,7 +553,7 @@ pub unsafe extern "C" fn save_assets_inj<T: GetAssetList>() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 pub unsafe extern "C" fn write_event_tables() {
     extern "fastcall" fn inj(stream: &mut TMemoryStream) -> bool {
         let resource_tree_res: u32 = unsafe { delphi_call!(0x71de7c, stream, 1) };
@@ -670,7 +670,7 @@ pub unsafe extern "C" fn write_event_tables() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 pub unsafe extern "C" fn write_encrypted_gamedata_inj() {
     naked_asm!(
         "mov ecx, eax",

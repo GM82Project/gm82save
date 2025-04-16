@@ -8,7 +8,7 @@ use std::{
     collections::HashSet,
 };
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn compile_constants_inj() {
     naked_asm!(
         "mov ecx, eax",
@@ -110,7 +110,7 @@ unsafe extern "fastcall" fn compile_constants(stream: usize) -> bool {
     true
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn save_82_if_exe() {
     // only saves settings version 825 when saving an exe with the creation code flag set
     naked_asm!(
@@ -124,7 +124,7 @@ unsafe extern "C" fn save_82_if_exe() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn save_bool_if_exe() {
     naked_asm!(
         "push esi",
@@ -138,7 +138,7 @@ unsafe extern "C" fn save_bool_if_exe() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn save_creation_code_flag() {
     naked_asm!(
         "mov ecx, 0x52f12c", // WriteInteger (for uninitialized args)
@@ -162,7 +162,7 @@ unsafe extern "C" fn save_creation_code_flag() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn save_room_version_inj() {
     naked_asm!(
         "mov cl, byte ptr [esp]",
@@ -178,7 +178,7 @@ unsafe extern "fastcall" fn save_room_version(exe: bool) -> u32 {
     if exe && EXTRA_DATA.is_some() { 811 } else { 541 }
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn save_instance_extra_inj() {
     naked_asm!(
         "mov ecx, ebx", // file
@@ -196,7 +196,7 @@ unsafe extern "C" fn save_instance_extra_inj() {
     );
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn save_tile_extra_inj() {
     naked_asm!(
         "mov ecx, ebx", // file

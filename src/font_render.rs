@@ -128,7 +128,7 @@ impl Font {
         }
     }
 
-    #[naked]
+    #[unsafe(naked)]
     unsafe extern "fastcall" fn copy_glyph_onto_atlas(
         &mut self,
         format: u32,

@@ -398,7 +398,7 @@ impl TBitmap {
         delphi_call!(0x462be8, self, row)
     }
 
-    #[naked]
+    #[unsafe(naked)]
     pub unsafe extern "fastcall" fn load_from_clipboard(&mut self) -> bool {
         naked_asm!(
             "push edi",

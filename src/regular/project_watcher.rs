@@ -49,7 +49,7 @@ unsafe extern "fastcall" fn show_message_and_reload() {
         // so that instead of idling after each form is closed, it closes the next form
         static mut OLD_ONCLOSE: usize = 0;
         static mut OLD_ONCLOSE_SENDER: usize = 0;
-        #[naked]
+        #[unsafe(naked)]
         unsafe extern "C" fn put_old_onclose_back() {
             naked_asm!(
                 "mov edx, {}",
