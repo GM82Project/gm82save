@@ -32,6 +32,6 @@ parking_lot = "0.12.3"
 png = "0.17"
 rayon = "1.10"
 regex = { version = "1.11", default-features = false, features = ["std"] }
-sysinfo = "0.33"
+sysinfo = "0.34"
 time = "0.3"
 unicase = "2.8"
