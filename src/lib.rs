@@ -1,4 +1,3 @@
-#![feature(naked_functions)]
 #![allow(
     static_mut_refs,
     reason = "For a mostly single-threaded codebase, this is too much hassle. Just be careful in multi-threaded parts."
