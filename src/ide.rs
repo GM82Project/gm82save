@@ -13,12 +13,12 @@ type TypeInfoPtr = usize;
 macro_rules! get_member {
     (pub $n:ident, $t:ty, $p:ident) => {
         pub fn $n(&self) -> &[$t] {
-            unsafe { (*self.0).$p.get_unchecked(self.range()) }
+            unsafe { (&(*self.0).$p).get_unchecked(self.range()) }
         }
     };
     ($n:ident, $t:ty, $p:ident) => {
         fn $n(&self) -> &[$t] {
-            unsafe { (*self.0).$p.get_unchecked(self.range()) }
+            unsafe { (&(*self.0).$p).get_unchecked(self.range()) }
         }
     };
 }
@@ -26,12 +26,12 @@ macro_rules! get_member {
 macro_rules! get_member_mut {
     (pub $n:ident, $t:ty, $p:ident) => {
         pub fn $n(&self) -> &'static mut [$t] {
-            unsafe { (*self.0).$p.get_unchecked_mut(self.range()) }
+            unsafe { (&mut (*self.0).$p).get_unchecked_mut(self.range()) }
         }
     };
     ($n:ident, $t:ty, $p:ident) => {
         fn $n(&self) -> &'static mut [$t] {
-            unsafe { (*self.0).$p.get_unchecked_mut(self.range()) }
+            unsafe { (&mut (*self.0).$p).get_unchecked_mut(self.range()) }
         }
     };
 }
@@ -400,11 +400,11 @@ pub fn initialize_project() {
 macro_rules! read_array {
     ($n:ident, $nm:ident, $t:ty, $p:expr, $c:expr) => {
         pub fn $n<'a>() -> &'a [$t] {
-            unsafe { $p.get_unchecked(..$c) }
+            unsafe { (&$p).get_unchecked(..$c) }
         }
 
         pub fn $nm<'a>() -> &'a mut [$t] {
-            unsafe { $p.get_unchecked_mut(..$c) }
+            unsafe { (&mut $p).get_unchecked_mut(..$c) }
         }
     };
 }
