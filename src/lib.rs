@@ -28,6 +28,7 @@ mod stub;
 use crate::{
     delphi::{TMenuItem, TTreeNode, UStr},
     ide::get_triggers,
+    load::UStrPtr,
     regular::{extension_watcher::update_extensions, project_watcher},
     save::GetAsset,
     save_exe::GetAssetList,
@@ -446,6 +447,7 @@ unsafe extern "fastcall" fn load(proj_path: &UStr, stream_ptr: *mut u32, result_
         delphi::close_progress_form();
         show_message(format!("Failed to load: {}", e));
         ide::initialize_project();
+        ide::PROJECT_PATH.asg("");
     } else {
         delphi::close_progress_form();
         result_ptr.write(true);
@@ -521,7 +523,6 @@ unsafe extern "fastcall" fn gm81_or_gm82(s: *const u16) -> i32 {
 }
 
 unsafe extern "fastcall" fn make_new_folder(_: u32, path_ptr: *const u16) {
-    use load::UStrPtr;
     let path_delphi = UStr::from_ptr(&path_ptr);
     let mut path: PathBuf = path_delphi.to_os_string().into();
     // .gm82 works in the ui but rust doesn't get it so check for that specifically
