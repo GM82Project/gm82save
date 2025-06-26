@@ -209,14 +209,17 @@ impl Sprite {
         delphi_call!(0x5b401c, self)
     }
 
-    pub fn alloc_frames(&mut self, count: usize) -> &mut [DelphiBox<Frame>] {
+    pub fn alloc_frames(&mut self, count: usize) {
         self.frames.alloc_fill(count, Frame::new);
         self.frame_count = count;
-        unsafe { self.frames.get_unchecked_mut(..self.frame_count) }
     }
 
     pub fn get_frames(&self) -> &[DelphiBox<Frame>] {
         unsafe { self.frames.get_unchecked(..self.frame_count as usize) }
+    }
+
+    pub fn get_frames_mut(&mut self) -> &mut [DelphiBox<Frame>] {
+        unsafe { self.frames.get_unchecked_mut(..self.frame_count as usize) }
     }
 
     pub unsafe fn register_thumb(&self, bg_col: [u8; 3]) -> i32 {

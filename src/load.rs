@@ -319,7 +319,7 @@ unsafe fn load_sprite(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<Del
     path.push("sprite.txt");
     read_txt(&path, |k, v| {
         match k {
-            "frames" => sp.frame_count = v.parse()?,
+            "frames" => sp.alloc_frames(v.parse()?),
             "origin_x" => sp.origin_x = v.parse()?,
             "origin_y" => sp.origin_y = v.parse()?,
             "collision_shape" => sp.collision_shape = v.parse()?,
@@ -335,8 +335,7 @@ unsafe fn load_sprite(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<Del
         Ok(())
     })?;
     path.pop();
-    let frame_count = sp.frame_count as usize;
-    for (i, f) in sp.alloc_frames(frame_count).iter_mut().enumerate() {
+    for (i, f) in sp.get_frames_mut().iter_mut().enumerate() {
         path.push(format!("{}.png", i));
         load_frame(&path, f)?;
         path.pop();
