@@ -185,7 +185,7 @@ impl Font {
                     // vector font, use GetGlyphOutlineW to get character dimensions
                     let out =
                         GetGlyphOutlineW(hdc, self.s_chr[c], format, &mut glyph_metrics, 0, ptr::null_mut(), &matrix);
-                    if out != u32::MAX {
+                    if out as i32 >= 0 {
                         max_buffer_size = max_buffer_size.max(out);
                         self.s_w[c] = glyph_metrics.gmBlackBoxX;
                         self.s_h[c] = (text_metrics.tmAscent as i32 + glyph_metrics.gmBlackBoxY as i32
