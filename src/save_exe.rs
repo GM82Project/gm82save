@@ -488,7 +488,7 @@ impl GetAssetList for asset::Room {
 fn write_string(s_wide: &UStr, mut out: impl Write) -> io::Result<()> {
     unsafe {
         let mut s_utf8: *const usize = ptr::null();
-        let _: u32 = delphi_call!(0x40810c, &mut s_utf8, s_wide.0, 0xfde9);
+        let _: u32 = delphi_call!(0x40810c, &mut s_utf8, s_wide.as_ptr(), 0xfde9);
         if s_utf8.is_null() {
             out.write_u32::<LE>(0)?;
         } else {

@@ -178,7 +178,7 @@ fn show_question(message: &UStr) -> i32 {
             "push 0",  // HelpCtx
             "call {}",
             in(reg) 0x4d437c, // MessageDlgPosHelp
-            inlateout("eax") message.0 => answer,
+            inlateout("eax") message.as_ptr() => answer,
             in("edx") 3, // DlgType
             in("ecx") 3, // Buttons
             clobber_abi("C"),
@@ -332,26 +332,26 @@ unsafe extern "fastcall" fn save_preferences_inj() {
 }
 
 unsafe extern "fastcall" fn load_preferences() {
-    let autosave_name = UStr::new("AutoSave");
-    let sounds_name = UStr::new("SoundsInMediaPlayer");
-    let compatible_exes_name = UStr::new("CompatibleExes");
+    let autosave_name = ustr!("AutoSave");
+    let sounds_name = ustr!("SoundsInMediaPlayer");
+    let compatible_exes_name = ustr!("CompatibleExes");
     // load as bool
-    let autosave: u32 = delphi_call!(0x716d20, autosave_name.0, 0);
-    let sounds: u32 = delphi_call!(0x716d20, sounds_name.0, 0);
-    let compatible_exes: u32 = delphi_call!(0x716d20, compatible_exes_name.0, 0);
+    let autosave: u32 = delphi_call!(0x716d20, autosave_name.as_ptr(), 0);
+    let sounds: u32 = delphi_call!(0x716d20, sounds_name.as_ptr(), 0);
+    let compatible_exes: u32 = delphi_call!(0x716d20, compatible_exes_name.as_ptr(), 0);
     AUTOSAVE_ON_BUILD = (autosave as u8) != 0;
     MEDIA_PLAYER_FOR_SOUNDS = (sounds as u8) != 0;
     COMPATIBLE_EXES = (compatible_exes as u8) != 0;
 }
 
 unsafe extern "fastcall" fn save_preferences() {
-    let autosave_name = UStr::new("AutoSave");
-    let sounds_name = UStr::new("SoundsInMediaPlayer");
-    let compatible_exes_name = UStr::new("CompatibleExes");
+    let autosave_name = ustr!("AutoSave");
+    let sounds_name = ustr!("SoundsInMediaPlayer");
+    let compatible_exes_name = ustr!("CompatibleExes");
     // save as bool
-    let _: u32 = delphi_call!(0x716b78, autosave_name.0, u32::from(AUTOSAVE_ON_BUILD));
-    let _: u32 = delphi_call!(0x716b78, sounds_name.0, u32::from(MEDIA_PLAYER_FOR_SOUNDS));
-    let _: u32 = delphi_call!(0x716b78, compatible_exes_name.0, u32::from(COMPATIBLE_EXES));
+    let _: u32 = delphi_call!(0x716b78, autosave_name.as_ptr(), u32::from(AUTOSAVE_ON_BUILD));
+    let _: u32 = delphi_call!(0x716b78, sounds_name.as_ptr(), u32::from(MEDIA_PLAYER_FOR_SOUNDS));
+    let _: u32 = delphi_call!(0x716b78, compatible_exes_name.as_ptr(), u32::from(COMPATIBLE_EXES));
 }
 
 unsafe extern "fastcall" fn open_preferences_form() {
@@ -445,7 +445,7 @@ unsafe extern "fastcall" fn about_inj(about_dialog: *const *const usize) {
         "call {}",
         in(reg) 0x4ee6d8, // TControl.SetText
         in("eax") edition_label,
-        in("edx") info.0,
+        in("edx") info.as_ptr(),
         clobber_abi("C"),
     );
 }
@@ -585,7 +585,7 @@ unsafe extern "C" fn load_recent_project_and_maybe_compile() {
                 if let Some(path) = args.peek() {
                     // we found a build arg, build project and close
                     let path = UStr::new(path);
-                    let _: u32 = delphi_call!(0x6ce300, path.0, 0, 0, 0);
+                    let _: u32 = delphi_call!(0x6ce300, path.as_ptr(), 0, 0, 0);
                     std::process::exit(0);
                 }
             }
@@ -643,7 +643,7 @@ unsafe extern "C" fn install_extensions_to_exedir_if_possible() {
             // add a trailing slash
             exe_path.push("");
             let exe_path_ustr = UStr::new(exe_path);
-            let _: u32 = delphi_call!(0x407f0c, out, exe_path_ustr.0);
+            let _: u32 = delphi_call!(0x407f0c, out, exe_path_ustr.as_ptr());
         }
     }
     naked_asm!(
@@ -987,9 +987,10 @@ unsafe extern "C" fn gm82_file_association_inj() {
 
 unsafe extern "fastcall" fn gm82_file_association(reg: u32) {
     let ext = UStr::new(r"\.gm82");
-    let _: u32 = delphi_call!(0x6dd850, reg, ext.0, 0, UStr::new("gm82file").0);
+    let _: u32 = delphi_call!(0x6dd850, reg, ext.as_ptr(), 0, ustr!("gm82file").as_ptr());
     let _: u32 = delphi_call!(0x452568, reg, 0x80000001u32);
-    let _: u32 = delphi_call!(0x6dd850, reg, ext.0, UStr::new(r"\Software\Classes").0, UStr::new("gm82file").0);
+    let _: u32 =
+        delphi_call!(0x6dd850, reg, ext.as_ptr(), UStr::new(r"\Software\Classes").as_ptr(), ustr!("gm82file").as_ptr());
 }
 
 unsafe extern "fastcall" fn check_gm_processes(name: usize, value: u32) {
@@ -1340,7 +1341,7 @@ unsafe extern "fastcall" fn object_show_children(object_form: *const i32) {
         }
     } else {
         let mut menu_item = TMenuItem::new(0);
-        menu_item.set_caption(&UStr::new("<no children>"));
+        menu_item.set_caption(&ustr!("<no children>"));
         menu_item.set_image_index(-1);
         popup.Items.add(menu_item);
     }
@@ -1611,9 +1612,9 @@ unsafe extern "fastcall" fn code_editor_script_hint(name: *const u16, out: &mut 
                     script.source.as_slice().iter().position(|&c| c == b'\r' as u16).unwrap_or(script.source.len()) - 3;
                 let mut untrimmed = UStr::default();
                 // @UStrCopy
-                let _: u32 = delphi_call!(0x4086a8, script.source.0, 4, count, &mut untrimmed.0);
+                let _: u32 = delphi_call!(0x4086a8, script.source.as_ptr(), 4, count, &mut untrimmed);
                 // Trim
-                let _: u32 = delphi_call!(0x415dd0, untrimmed.0, &mut out.0);
+                let _: u32 = delphi_call!(0x415dd0, untrimmed.as_ptr(), out);
             }
         }
     }
@@ -1633,7 +1634,7 @@ unsafe extern "C" fn completion_script_args_inj() {
 }
 
 unsafe extern "fastcall" fn add_space_before_trigger_name(trigger_id: i32, out: &mut UStr) {
-    *out = UStr::new(" ");
+    *out = ustr!(" ");
     let mut tmp = UStr::default();
     let _: u32 = delphi_call!(0x6bcce4, trigger_id, &mut tmp);
     out.push_ustr(&tmp);
@@ -1647,13 +1648,13 @@ unsafe extern "fastcall" fn completion_script_args(script_id: usize, out: &mut U
                 - paren_pos;
             let mut untrimmed = UStr::default();
             // @UStrCopy
-            let _: u32 = delphi_call!(0x4086a8, script.source.0, paren_pos + 1, count, &mut untrimmed.0);
+            let _: u32 = delphi_call!(0x4086a8, script.source.as_ptr(), paren_pos + 1, count, &mut untrimmed);
             // Trim
-            let _: u32 = delphi_call!(0x415dd0, untrimmed.0, &mut out.0);
+            let _: u32 = delphi_call!(0x415dd0, untrimmed.as_ptr(), out);
             return
         }
     }
-    *out = UStr(0x6baf10 as _);
+    *out = UStr::from_address(0x6baf10);
 }
 
 #[unsafe(naked)]
@@ -1785,9 +1786,9 @@ unsafe extern "fastcall" fn patch_error_box(caption: *const u16, text: *const u1
         GameMaker.exe. Would you like to open the relevant folder now?",
     );
     // UStrCat
-    let _: u32 = delphi_call!(0x4082dc, &mut message, extra_text.0);
+    let _: u32 = delphi_call!(0x4082dc, &mut message, extra_text.as_ptr());
     // TApplication.MessageBox
-    let answer: u32 = delphi_call!(0x51fbdc, *(0x7882ec as *const u32), message.0, caption, 0x14);
+    let answer: u32 = delphi_call!(0x51fbdc, *(0x7882ec as *const u32), message.as_ptr(), caption, 0x14);
     if answer == 6 {
         let path = std::env::current_exe()
             .ok()
@@ -1873,7 +1874,7 @@ unsafe extern "C" fn get_asset_from_name_unicase<T: GetAssetList>() {
             .par_iter()
             .enumerate()
             .find_map_first(|(i, n)| {
-                let res: i32 = delphi_call!(0x415924, name.0, n.0);
+                let res: i32 = delphi_call!(0x415924, name.as_ptr(), n.as_ptr());
                 (res == 0).then(|| i as i32)
             })
             .unwrap_or(-1)
@@ -2054,7 +2055,7 @@ unsafe extern "fastcall" fn show_instance_id(id: usize, out: &mut UStr, room_id:
             }
             UStr::new(format!("_{:08X}", name))
         };
-        let _: u32 = delphi_call!(0x40839c, out, ide::ROOMS.names()[room_id].0, suffix.0);
+        let _: u32 = delphi_call!(0x40839c, out, ide::ROOMS.names()[room_id].as_ptr(), suffix.as_ptr());
     } else {
         let _: u32 = delphi_call!(0x41666c, id, out);
     }
@@ -2086,7 +2087,7 @@ unsafe extern "fastcall" fn load_garbage_offset() {
 #[unsafe(naked)]
 unsafe extern "fastcall" fn save_exe_and_autosave() {
     unsafe extern "fastcall" fn inj() {
-        if AUTOSAVE_ON_BUILD && !(*ide::PROJECT_PATH).0.is_null() {
+        if AUTOSAVE_ON_BUILD && !(*ide::PROJECT_PATH).is_empty() {
             // TMainForm.Save1Click
             let _: u32 = delphi_call!(0x6e0540, *(0x790100 as *const usize));
         }
@@ -2105,7 +2106,7 @@ unsafe extern "fastcall" fn save_exe_and_autosave() {
 #[unsafe(naked)]
 unsafe extern "fastcall" fn run_exe_and_autosave() {
     unsafe extern "fastcall" fn inj(out: bool) -> bool {
-        if AUTOSAVE_ON_BUILD && !(*ide::PROJECT_PATH).0.is_null() {
+        if AUTOSAVE_ON_BUILD && !(*ide::PROJECT_PATH).is_empty() {
             // TMainForm.Save1Click
             let _: u32 = delphi_call!(0x6e0540, *(0x790100 as *const usize));
         }
@@ -2130,11 +2131,11 @@ unsafe extern "fastcall" fn play_sound() {
                 // TODO BROKEN
                 let path = UStr::default();
                 // get temp filename with extension
-                let _: u32 = delphi_call!(0x5342d4, sound.extension.0, &path.0);
+                let _: u32 = delphi_call!(0x5342d4, sound.extension.as_ptr(), &path.as_ptr());
                 // TCustomMemoryStream.SaveToFile
-                let _: u32 = delphi_call!(0x43fe70, data, path.0);
+                let _: u32 = delphi_call!(0x43fe70, data, path.as_ptr());
                 // shell execute
-                let _: u32 = delphi_call!(0x5338dc, path.0, 0, 0);
+                let _: u32 = delphi_call!(0x5338dc, path.as_ptr(), 0, 0);
             }
         } else {
             // CSound.Play
@@ -2198,7 +2199,7 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
             if project_modified {
                 SAVING_FOR_ROOM_EDITOR = true;
                 let _: u32 = delphi_call!(0x51cc64, *(0x7882f0 as *const u32), 0xfff5); // set cursor
-                let success: u32 = delphi_call!(0x705c84, (*ide::PROJECT_PATH).0); // save
+                let success: u32 = delphi_call!(0x705c84, (*ide::PROJECT_PATH).as_ptr()); // save
                 let _: u32 = delphi_call!(0x51cc64, *(0x7882f0 as *const u32), 0); // reset cursor
                 SAVING_FOR_ROOM_EDITOR = false;
                 if success == 0 {
@@ -2373,7 +2374,7 @@ unsafe fn patch_call(instr: usize, proc: usize) {
 unsafe fn injector() {
     std::panic::set_hook(Box::new(|info| {
         let msg = UStr::new(info.to_string() + "\r\n\r\nPlease send a screenshot of this error message to Floogle.");
-        let _: u32 = delphi_call!(0x51fbdc, *(0x7882ec as *const usize), msg.0, 0, 0x10);
+        let _: u32 = delphi_call!(0x51fbdc, *(0x7882ec as *const usize), msg.as_ptr(), 0, 0x10);
         std::process::exit(-1);
     }));
 

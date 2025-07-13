@@ -82,7 +82,7 @@ unsafe extern "fastcall" fn show_message_and_reload() {
                 // put original TApplication.Idle back
                 crate::patch_call(0x51f74b, 0x520418);
                 // reload
-                let _: u32 = delphi_call!(0x7059d8, (*ide::PROJECT_PATH).0);
+                let _: u32 = delphi_call!(0x7059d8, (*ide::PROJECT_PATH).as_ptr());
             }
         }
         // patch TApplication.Idle call in TApplication.HandleMessage to close modals instead

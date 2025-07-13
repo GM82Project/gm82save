@@ -1345,7 +1345,7 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         let font_list: u32 = delphi_call!(0x6fb55c);
         let mut missing_fonts = HashSet::new();
         for font in ide::FONTS.assets().iter().filter_map(Option::as_ref) {
-            let index: i32 = delphi_call!(0x43ee44, font_list, font.sys_name.0);
+            let index: i32 = delphi_call!(0x43ee44, font_list, font.sys_name.as_ptr());
             if index < 0 {
                 missing_fonts.insert(font.sys_name.clone());
             }

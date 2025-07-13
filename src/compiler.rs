@@ -97,15 +97,15 @@ unsafe extern "fastcall" fn compile_constants(stream: usize) -> bool {
         let _: u32 = delphi_call!(
             0x52f168,
             stream,
-            UStr::new(format!("{}_{:08X}", room_name.to_os_string().to_str().unwrap(), name)).0
+            UStr::new(format!("{}_{:08X}", room_name.to_os_string().to_str().unwrap(), name)).as_ptr()
         );
         // write constant value
-        let _: u32 = delphi_call!(0x52f168, stream, UStr::new(id.to_string()).0);
+        let _: u32 = delphi_call!(0x52f168, stream, UStr::new(id.to_string()).as_ptr());
     }
     // write original constants
     for (name, value) in constant_names.iter().zip(constant_values) {
-        let _: u32 = delphi_call!(0x52f168, stream, name.0);
-        let _: u32 = delphi_call!(0x52f168, stream, value.0);
+        let _: u32 = delphi_call!(0x52f168, stream, name.as_ptr());
+        let _: u32 = delphi_call!(0x52f168, stream, value.as_ptr());
     }
     true
 }

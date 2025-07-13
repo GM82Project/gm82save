@@ -657,7 +657,43 @@ pub unsafe fn CompareText(a: &UStr, b: *const u16) -> i32 {
 }
 
 #[repr(transparent)]
-pub struct UStr(pub *mut u16);
+pub struct UStr(*mut u16);
+
+macro_rules! ustr {
+    ($s:expr) => {{
+        #[allow(unused_unsafe)]
+        unsafe {
+            UStr::from_address(
+                const {
+                    let mut out = [0; ($s.len() + 2) / 2 + 3];
+                    // lo: CodePage (UTF16LE), hi: ElemSize (2)
+                    out[0] = 0x0204b0;
+                    // refCount (-1)
+                    out[1] = u32::MAX;
+                    // Len
+                    out[2] = $s.len() as u32;
+                    // can't use for loops in const code
+                    let mut i = 0;
+                    while i < $s.len() {
+                        let c = $s.as_bytes()[i];
+                        assert!(c.is_ascii());
+                        out[i / 2 + 3] = c as u32;
+                        i += 1;
+                        if i < $s.len() {
+                            let c = $s.as_bytes()[i];
+                            assert!(c.is_ascii());
+                            out[i / 2 + 3] |= (c as u32) << 16;
+                            i += 1;
+                        }
+                    }
+                    out
+                }
+                .as_ptr()
+                .add(3) as usize,
+            )
+        }
+    }};
+}
 
 impl UStr {
     pub const EMPTY: Self = Self(ptr::null_mut());
@@ -687,12 +723,20 @@ impl UStr {
         out
     }
 
+    pub fn as_ptr(&self) -> *const u16 {
+        self.0
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.as_ptr().is_null()
+    }
+
     pub fn len(&self) -> usize {
-        if self.0.is_null() { 0 } else { unsafe { self.0.cast::<usize>().sub(1).read() } }
+        if self.is_empty() { 0 } else { unsafe { self.as_ptr().cast::<usize>().sub(1).read() } }
     }
 
     pub fn as_slice(&self) -> &[u16] {
-        if self.0.is_null() { &[] } else { unsafe { slice::from_raw_parts(self.0, self.len()) } }
+        if self.is_empty() { &[] } else { unsafe { slice::from_raw_parts(self.as_ptr(), self.len()) } }
     }
 
     pub fn to_os_string(&self) -> OsString {
@@ -701,6 +745,10 @@ impl UStr {
 
     pub const unsafe fn from_ptr(s: &*const u16) -> &Self {
         std::mem::transmute(s)
+    }
+
+    pub const unsafe fn from_address(addr: usize) -> Self {
+        Self(addr as *mut u16)
     }
 
     pub fn push_ustr(&mut self, other: &Self) {

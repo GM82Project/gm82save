@@ -288,7 +288,7 @@ unsafe fn create_code_form(
         let applies_to_name = UStr::default();
         let _: u32 = delphi_call!(0x62cabc, applies_to, &applies_to_name);
         // WhoName.SetText
-        let _: u32 = delphi_call!(0x4ee6d8, form.add(0x3cc / 4).read(), applies_to_name.0);
+        let _: u32 = delphi_call!(0x4ee6d8, form.add(0x3cc / 4).read(), applies_to_name.as_ptr());
         let check_offset = match applies_to {
             -1 => 0x3c0,
             -2 => 0x3c4,
@@ -365,7 +365,7 @@ unsafe extern "C" fn open_code_action() {
                 let _: u32 = delphi_call!(0x6d0df0, event_type, event_number, &mut event_name);
                 (
                     object_name
-                        + UStr::new(" - ")
+                        + ustr!(" - ")
                         + event_name
                         + UStr::new(format!(" - Action {} - ", action_id + 1))
                         + UStr::from_ptr(&title),
@@ -395,9 +395,9 @@ unsafe extern "C" fn open_code_action() {
         };
         open_or_insert(CodeHolder::Action(action), || {
             let (code, form) = create_code_form(
-                action.param_strings[0].0,
+                action.param_strings[0].as_ptr(),
                 Some(action.applies_to),
-                title.0,
+                title.as_ptr(),
                 action.action_kind != 6,
                 action as *const _ as _,
                 false,
@@ -419,10 +419,10 @@ unsafe extern "C" fn open_code_action() {
 #[unsafe(naked)]
 unsafe extern "C" fn open_room_code() {
     unsafe extern "fastcall" fn inj(room_id: usize, room: &Room) {
-        let title = ide::ROOMS.names()[room_id].clone() + UStr::new(" - Room Creation Code");
+        let title = ide::ROOMS.names()[room_id].clone() + ustr!(" - Room Creation Code");
         open_or_insert(CodeHolder::Room(room), || {
             let (code, form) =
-                create_code_form(room.creation_code.0, None, title.0, true, room as *const _ as _, false);
+                create_code_form(room.creation_code.as_ptr(), None, title.as_ptr(), true, room as *const _ as _, false);
             (code, form, room_id)
         });
     }
@@ -440,7 +440,7 @@ unsafe extern "C" fn open_trigger_code() {
     unsafe extern "fastcall" fn inj(title: *const u16, trigger: &Trigger) {
         open_or_insert(CodeHolder::Trigger(trigger), || {
             let (code, form) =
-                create_code_form(trigger.condition.0, None, title, true, trigger as *const _ as _, false);
+                create_code_form(trigger.condition.as_ptr(), None, title, true, trigger as *const _ as _, false);
             (code, form, 0)
         });
         update_trigger_form(trigger);

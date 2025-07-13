@@ -170,7 +170,7 @@ impl Font {
             let mut max_buffer_size = 0;
             let mut glyph_metrics = std::mem::zeroed();
             // calculate character sizes and required buffer size
-            let w_height = canvas.TextHeight(&UStr::new("W"));
+            let w_height = canvas.TextHeight(&ustr!("W"));
             for c in self.range_start..=self.range_end {
                 let c = c as usize;
                 self.s_chr[c] = if c == 0 {
