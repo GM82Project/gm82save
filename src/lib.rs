@@ -321,7 +321,102 @@ unsafe extern "fastcall" fn stuff_to_do_on_project_init() {
     refresh_gm82room_checkbox();
 }
 
+#[unsafe(naked)]
+unsafe extern "fastcall" fn save_preferences_inj() {
+    naked_asm!(
+        "mov ecx, 0x716b78",
+        "call ecx",
+        "jmp {}",
+        sym save_preferences,
+    );
+}
+
+unsafe extern "fastcall" fn load_preferences() {
+    let autosave_name = UStr::new("AutoSave");
+    let sounds_name = UStr::new("SoundsInMediaPlayer");
+    let compatible_exes_name = UStr::new("CompatibleExes");
+    // load as bool
+    let autosave: u32 = delphi_call!(0x716d20, autosave_name.0, 0);
+    let sounds: u32 = delphi_call!(0x716d20, sounds_name.0, 0);
+    let compatible_exes: u32 = delphi_call!(0x716d20, compatible_exes_name.0, 0);
+    AUTOSAVE_ON_BUILD = (autosave as u8) != 0;
+    MEDIA_PLAYER_FOR_SOUNDS = (sounds as u8) != 0;
+    COMPATIBLE_EXES = (compatible_exes as u8) != 0;
+}
+
+unsafe extern "fastcall" fn save_preferences() {
+    let autosave_name = UStr::new("AutoSave");
+    let sounds_name = UStr::new("SoundsInMediaPlayer");
+    let compatible_exes_name = UStr::new("CompatibleExes");
+    // save as bool
+    let _: u32 = delphi_call!(0x716b78, autosave_name.0, u32::from(AUTOSAVE_ON_BUILD));
+    let _: u32 = delphi_call!(0x716b78, sounds_name.0, u32::from(MEDIA_PLAYER_FOR_SOUNDS));
+    let _: u32 = delphi_call!(0x716b78, compatible_exes_name.0, u32::from(COMPATIBLE_EXES));
+}
+
+unsafe extern "fastcall" fn open_preferences_form() {
+    let preferences_form = *(0x79a7f4 as *const *const *const *const usize);
+    let sounds = *preferences_form.add(0x42c / 4);
+    let autosave = *preferences_form.add(0x4c4 / 4);
+    let compatible_exes = *preferences_form.add(0x4c8 / 4);
+    // SetChecked
+    asm!(
+        "call {}",
+        in(reg) sounds.read().add(0xf0 / 4).read(),
+        in("eax") sounds,
+        in("edx") u32::from(MEDIA_PLAYER_FOR_SOUNDS),
+        clobber_abi("C"),
+    );
+    asm!(
+        "call {}",
+        in(reg) autosave.read().add(0xf0 / 4).read(),
+        in("eax") autosave,
+        in("edx") u32::from(AUTOSAVE_ON_BUILD),
+        clobber_abi("C"),
+    );
+    asm!(
+        "call {}",
+        in(reg) compatible_exes.read().add(0xf0 / 4).read(),
+        in("eax") compatible_exes,
+        in("edx") u32::from(COMPATIBLE_EXES),
+        clobber_abi("C"),
+    );
+}
+
 unsafe extern "fastcall" fn close_preferences_form() {
+    let preferences_form = *(0x79a7f4 as *const *const *const *const usize);
+    let sounds_checkbox = *preferences_form.add(0x42c / 4);
+    let autosave_checkbox = *preferences_form.add(0x4c4 / 4);
+    let compatible_exes_checkbox = *preferences_form.add(0x4c8 / 4);
+    let mut sounds: u8;
+    let mut autosave: u8;
+    let mut compatible_exes: u8;
+    // GetChecked
+    asm!(
+        "call {}",
+        in(reg) sounds_checkbox.read().add(0xec / 4).read(),
+        in("eax") sounds_checkbox,
+        lateout("al") sounds,
+        clobber_abi("C"),
+    );
+    asm!(
+        "call {}",
+        in(reg) autosave_checkbox.read().add(0xec / 4).read(),
+        in("eax") autosave_checkbox,
+        lateout("al") autosave,
+        clobber_abi("C"),
+    );
+    asm!(
+        "call {}",
+        in(reg) compatible_exes_checkbox.read().add(0xec / 4).read(),
+        in("eax") compatible_exes_checkbox,
+        lateout("al") compatible_exes,
+        clobber_abi("C"),
+    );
+    MEDIA_PLAYER_FOR_SOUNDS = sounds != 0;
+    AUTOSAVE_ON_BUILD = autosave != 0;
+    COMPATIBLE_EXES = compatible_exes != 0;
+
     refresh_gm82room_checkbox();
     // save to registry
     let _: u32 = delphi_call!(0x718ac0);
@@ -1969,6 +2064,90 @@ static mut SAW_APPLIES_TO_WARNING: bool = false;
 
 static mut SAVING_FOR_ROOM_EDITOR: bool = false;
 
+static mut AUTOSAVE_ON_BUILD: bool = false;
+
+static mut COMPATIBLE_EXES: bool = false;
+
+static mut MEDIA_PLAYER_FOR_SOUNDS: bool = false;
+
+#[unsafe(naked)]
+unsafe extern "fastcall" fn load_garbage_offset() {
+    naked_asm!(
+        "mov al, byte ptr [{}]",
+        "test al, al",
+        "mov eax, 3174000",
+        "mov edx, 3800000",
+        "cmovne eax, edx",
+        "ret",
+        sym COMPATIBLE_EXES,
+    );
+}
+
+#[unsafe(naked)]
+unsafe extern "fastcall" fn save_exe_and_autosave() {
+    unsafe extern "fastcall" fn inj() {
+        if AUTOSAVE_ON_BUILD && !(*ide::PROJECT_PATH).0.is_null() {
+            // TMainForm.Save1Click
+            let _: u32 = delphi_call!(0x6e0540, *(0x790100 as *const usize));
+        }
+    }
+    naked_asm!(
+        "push ebx",
+        "mov ebx, 0x6ce300",
+        "push dword ptr [esp + 8]",
+        "call ebx",
+        "pop ebx",
+        "jmp {}",
+        sym inj,
+    )
+}
+
+#[unsafe(naked)]
+unsafe extern "fastcall" fn run_exe_and_autosave() {
+    unsafe extern "fastcall" fn inj(out: bool) -> bool {
+        if AUTOSAVE_ON_BUILD && !(*ide::PROJECT_PATH).0.is_null() {
+            // TMainForm.Save1Click
+            let _: u32 = delphi_call!(0x6e0540, *(0x790100 as *const usize));
+        }
+        return out;
+    }
+    naked_asm!(
+        "push ebx",
+        "mov ebx, 0x533978",
+        "push dword ptr [esp + 8]",
+        "call ebx",
+        "pop ebx",
+        "jmp {}",
+        sym inj,
+    );
+}
+
+#[unsafe(naked)]
+unsafe extern "fastcall" fn play_sound() {
+    unsafe extern "fastcall" fn inj(sound: &asset::Sound) {
+        if MEDIA_PLAYER_FOR_SOUNDS {
+            if let Some(data) = sound.data.as_deref() {
+                // TODO BROKEN
+                let path = UStr::default();
+                // get temp filename with extension
+                let _: u32 = delphi_call!(0x5342d4, sound.extension.0, &path.0);
+                // TCustomMemoryStream.SaveToFile
+                let _: u32 = delphi_call!(0x43fe70, data, path.0);
+                // shell execute
+                let _: u32 = delphi_call!(0x5338dc, path.0, 0, 0);
+            }
+        } else {
+            // CSound.Play
+            let _: u32 = delphi_call!(0x65003c, sound);
+        }
+    }
+    naked_asm!(
+        "mov ecx, eax",
+        "jmp {}",
+        sym inj,
+    );
+}
+
 unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
     if *(0x79a982 as *const bool) {
         return delphi_call!(0x6884c8, room_id)
@@ -2577,8 +2756,19 @@ unsafe fn injector() {
     // read NewsBrowser from form as ValueEdit
     patch(0x71a96b, &[0x8b, 0x80, 0xa0, 0x02, 0x00, 0x00, 0xa3, 0x83, 0xa9, 0x79, 0x00, 0x90, 0x90]);
     patch(0x71a972, &(addr_of!(DEFAULT_ROOM_SPEED) as *const u32 as usize as u32).to_le_bytes());
-    // update menu box
+    // additional preferences form changes
+    patch_call(0x71a52c, open_preferences_form as usize);
+    patch(0x71a531, &[0x90; 15]);
     patch_call(0x71aaf7, close_preferences_form as usize);
+
+    // always run in advanced mode + do additional preferences changes
+    patch(0x717955, &[
+        0xc6, 0x05, 0x80, 0xa9, 0x79, 0x00, 0x01, // mov byte ptr [0x79a980], 1
+        0xe8, 0, 0, 0, 0, // call <...>
+        0xeb, 0x33, // jmp 0x717996
+    ]);
+    patch_call(0x71795c, load_preferences as _);
+    patch_call(0x7190dd, save_preferences_inj as _);
 
     // toggle gm82room instead of opening news
     patch_call(0x6e2002, toggle_gm82room_checkbox as _);
@@ -2669,6 +2859,14 @@ unsafe fn injector() {
     // check for time going backwards
     patch(0x4199fb, &[0xe9]);
     patch_call(0x4199fb, reset_if_time_went_backwards as _);
+
+    patch_call(0x651cb0, play_sound as _);
+
+    patch_call(0x6d83dc, run_exe_and_autosave as _);
+    patch_call(0x6ce781, save_exe_and_autosave as _);
+
+    patch(0x6cdf32, &[0xe8]);
+    patch_call(0x6cdf32, load_garbage_offset as _);
 
     patch_call(0x6cd928, save_exe::save_assets_inj::<asset::Sound> as usize);
     patch_call(0x6cd943, save_exe::save_assets_inj::<asset::Sprite> as usize);
