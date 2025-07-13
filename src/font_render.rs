@@ -115,7 +115,7 @@ impl Font {
                 x += self.s_w[c as usize] + hspacing;
             }
             if y + row_height > height {
-                break
+                break;
             }
             self.s_bw = width;
             self.s_bh = height;
@@ -160,7 +160,7 @@ impl Font {
             let matrix = [0u16, 1, 0, 0, 0, 0, 0, 1];
             let mut text_metrics = std::mem::zeroed();
             if GetTextMetricsW(hdc, &mut text_metrics) == 0 {
-                return
+                return;
             }
             let codepage = charset_to_codepage(self.charset);
             self.s_bw = 0;

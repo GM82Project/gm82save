@@ -490,7 +490,7 @@ unsafe extern "fastcall" fn save(proj_path: &UStr, stream_ptr: *mut u32) -> u16 
         stream_ptr.write(buf);
         // save gmk
         let success: u32 = delphi_call!(0x705798, buf);
-        return success as u16
+        return success as u16;
     }
 
     if let Err(e) = save::save_gmk(&mut path) {
@@ -534,7 +534,7 @@ unsafe extern "fastcall" fn load(proj_path: &UStr, stream_ptr: *mut u32, result_
     if !is_gm82 {
         let stream = delphi_call!(0x405a4c, 0x52e8fc, 1);
         stream_ptr.write(stream);
-        return false
+        return false;
     }
 
     if let Err(e) = load::load_gmk(path) {
@@ -710,16 +710,16 @@ unsafe extern "C" fn move_extensions_from_localappdata_to_exedir() {
                     .take(30)
                     .join("\n");
                 if filenames.is_empty() {
-                    return
+                    return;
                 }
                 let message =
                     format!("These extension files need to be moved to the install folder:\n\n{filenames}\n\nProceed?");
                 let answer = show_question(&UStr::new(message));
                 if answer != 6 {
-                    return
+                    return;
                 }
             } else {
-                return
+                return;
             }
             // perform operation
             if let Ok(iter) = std::fs::read_dir(appdata_path) {
@@ -791,7 +791,7 @@ unsafe extern "fastcall" fn inflate(src: &delphi::TMemoryStream) -> delphi::Delp
     decoder.write_all(&data).unwrap();
     let dst = decoder.finish().unwrap();
     dst.set_pos(0);
-    return dst
+    return dst;
 }
 
 #[unsafe(naked)]
@@ -1132,7 +1132,7 @@ unsafe extern "fastcall" fn create_background_from_clipboard(background_form: *m
     bitmap.SetPixelFormat(7);
     if !bitmap.load_from_clipboard() {
         // no image in clipboard
-        return
+        return;
     }
     bitmap.SetPixelFormat(7);
     let background = &mut *background_form.add(0x3f0 / 4).read();
@@ -1380,7 +1380,7 @@ unsafe extern "fastcall" fn confirm_before_deleting_action(action_id: usize, eve
             let message = UStr::new(format!("Are you sure you want to delete this action?"));
             let answer = show_question(&message);
             if answer != 6 {
-                return -1i32 as usize
+                return -1i32 as usize;
             }
         }
     }
@@ -1651,7 +1651,7 @@ unsafe extern "fastcall" fn completion_script_args(script_id: usize, out: &mut U
             let _: u32 = delphi_call!(0x4086a8, script.source.as_ptr(), paren_pos + 1, count, &mut untrimmed);
             // Trim
             let _: u32 = delphi_call!(0x415dd0, untrimmed.as_ptr(), out);
-            return
+            return;
         }
     }
     *out = UStr::from_address(0x6baf10);
@@ -1776,7 +1776,7 @@ static mut SEEN_ERROR: bool = false;
 
 unsafe extern "fastcall" fn patch_error_box(caption: *const u16, text: *const u16, _flags: u32) {
     if SEEN_ERROR {
-        return
+        return;
     }
     SEEN_ERROR = true;
     let mut message = UStr::from_ptr(&text).clone();
@@ -1969,11 +1969,11 @@ unsafe extern "fastcall" fn rename_room(room_id: usize, new_name: *const u16) ->
         let new_name_slice = new_name.as_slice();
         if new_name_slice.is_empty() {
             show_message("Can't give room an empty name.");
-            return ptr::null()
+            return ptr::null();
         }
         if new_name_slice.contains(&(b'=' as u16)) {
             show_message("Can't use illegal character '=' in asset name.");
-            return ptr::null()
+            return ptr::null();
         }
         let old_name = room_names[room_id].to_os_string().into_string().unwrap();
         let new_name = new_name.to_os_string().into_string().unwrap();
@@ -1992,7 +1992,7 @@ fn fix_instances_when_renaming_room(room: &mut asset::Room, old_name: &str, new_
         let code = inst.creation_code.to_os_string().into_string().unwrap();
         let mut it = re.captures_iter(&code).filter_map(|c| c.get(1)).filter(|m| m.as_str() == old_name).peekable();
         if it.peek().is_none() {
-            continue
+            continue;
         }
         let mut new_code = String::with_capacity(code.len());
         let mut last_match = 0;
@@ -2049,7 +2049,7 @@ unsafe extern "fastcall" fn show_instance_id(id: usize, out: &mut UStr, room_id:
                     name = delphi::Random();
                     if !insts.values().any(|ex| ex.name == name) {
                         insts.get_mut(&id).unwrap().name = name;
-                        break
+                        break;
                     }
                 }
             }
@@ -2151,7 +2151,7 @@ unsafe extern "fastcall" fn play_sound() {
 
 unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
     if *(0x79a982 as *const bool) {
-        return delphi_call!(0x6884c8, room_id)
+        return delphi_call!(0x6884c8, room_id);
     }
     let editor_path = match std::env::current_exe() {
         Ok(mut path) => {
@@ -2203,7 +2203,7 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
                 let _: u32 = delphi_call!(0x51cc64, *(0x7882f0 as *const u32), 0); // reset cursor
                 SAVING_FOR_ROOM_EDITOR = false;
                 if success == 0 {
-                    return 0
+                    return 0;
                 }
             } else {
                 project_watcher::unwatch();
@@ -2225,7 +2225,7 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
                 if answer != 6 {
                     // update room timestamp so it re-saves
                     let _: u32 = delphi_call!(0x6930cc, room_id);
-                    return 0
+                    return 0;
                 }
             }
             {
@@ -2332,7 +2332,7 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
             room_path.pop();
             update_timestamp();
             project_watcher::setup_watcher(&mut room_path);
-            return 0
+            return 0;
         }
     }
     delphi_call!(0x6884c8, room_id) // the default
@@ -2481,11 +2481,14 @@ unsafe fn injector() {
     patch_call(0x643eb7, image_editor_dont_error_when_switching_tool as _);
 
     // get default blend mode from form in image editor
-    patch(0x64654d, &[
-        0x8b, 0xc3, // mov eax, ebx
-        0xe8, 0x58, 0xf6, 0xff, 0xff, // call TImageEditorForm.DrawModeGroupClick
-        0x90, 0x90, 0x90, // nops
-    ]);
+    patch(
+        0x64654d,
+        &[
+            0x8b, 0xc3, // mov eax, ebx
+            0xe8, 0x58, 0xf6, 0xff, 0xff, // call TImageEditorForm.DrawModeGroupClick
+            0x90, 0x90, 0x90, // nops
+        ],
+    );
 
     // copy origin when New
     patch_call(0x6ee2f8, copy_origin_on_new as _);
@@ -2541,15 +2544,21 @@ unsafe fn injector() {
     // don't show Trace.log after debug run
     patch(0x6d83f1, &[0xe9, 0x45, 0x05, 0x00, 0x00]);
     // load DebugTraceCheckBox as TValueEdit
-    patch(0x71a6bb, &[
-        0xe8, 0xa0, 0x60, 0xe1, 0xff, // call TValueEdit.SetValue
-        0x90, 0x90, 0x90, // nop slide
-    ]);
+    patch(
+        0x71a6bb,
+        &[
+            0xe8, 0xa0, 0x60, 0xe1, 0xff, // call TValueEdit.SetValue
+            0x90, 0x90, 0x90, // nop slide
+        ],
+    );
     // save DebugTraceCheckBox as TValueEdit
-    patch(0x71aad5, &[
-        0x8b, 0x80, 0xa0, 0x02, 0x00, 0x00, // mov eax, DebugTraceCheckBox.i_value
-        0xa2, 0x98, 0xa9, 0x79, 0x00, // mov [compression_value], al
-    ]);
+    patch(
+        0x71aad5,
+        &[
+            0x8b, 0x80, 0xa0, 0x02, 0x00, 0x00, // mov eax, DebugTraceCheckBox.i_value
+            0xa2, 0x98, 0xa9, 0x79, 0x00, // mov [compression_value], al
+        ],
+    );
     // set default to 1
     patch(0x71792e, &[0xb2, 0x01]);
     // load from registry as int
@@ -2650,12 +2659,15 @@ unsafe fn injector() {
 
     // fix triggers in code completion
     patch(0x6baa1c, &[0x98, 0x23]); // get trigger const instead of name
-    patch(0x6baa2e, &[
-        0x6a, 0x00, // push 0
-        0x6a, 0x04, // push 4
-        0x8d, 0x54, 0x24, 0x4, // lea edx, [esp+4]
-        0x8b, 0xcb, // mov ecx, ebx (the mov to eax afterwards is useless but that's fine)
-    ]);
+    patch(
+        0x6baa2e,
+        &[
+            0x6a, 0x00, // push 0
+            0x6a, 0x04, // push 4
+            0x8d, 0x54, 0x24, 0x4, // lea edx, [esp+4]
+            0x8b, 0xcb, // mov ecx, ebx (the mov to eax afterwards is useless but that's fine)
+        ],
+    );
     patch_call(0x6baa3a, add_space_before_trigger_name as usize);
     patch(0x6baa41, &[0xb0]);
 
@@ -2763,11 +2775,14 @@ unsafe fn injector() {
     patch_call(0x71aaf7, close_preferences_form as usize);
 
     // always run in advanced mode + do additional preferences changes
-    patch(0x717955, &[
-        0xc6, 0x05, 0x80, 0xa9, 0x79, 0x00, 0x01, // mov byte ptr [0x79a980], 1
-        0xe8, 0, 0, 0, 0, // call <...>
-        0xeb, 0x33, // jmp 0x717996
-    ]);
+    patch(
+        0x717955,
+        &[
+            0xc6, 0x05, 0x80, 0xa9, 0x79, 0x00, 0x01, // mov byte ptr [0x79a980], 1
+            0xe8, 0, 0, 0, 0, // call <...>
+            0xeb, 0x33, // jmp 0x717996
+        ],
+    );
     patch_call(0x71795c, load_preferences as _);
     patch_call(0x7190dd, save_preferences_inj as _);
 

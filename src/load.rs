@@ -106,7 +106,7 @@ pub unsafe fn read_resource_tree(
     path: &mut PathBuf,
 ) -> Result<()> {
     if names.is_empty() {
-        return Ok(())
+        return Ok(());
     }
     path.push(type_name);
     path.push("tree.yyd");
@@ -116,7 +116,7 @@ pub unsafe fn read_resource_tree(
     for line in f.lines() {
         let line = line?;
         if line.is_empty() {
-            continue
+            continue;
         }
         let trimmed = line.trim_start();
         let level = line.len() - trimmed.len();
@@ -153,7 +153,7 @@ fn load_triggers(maps: &AssetMaps, path: &mut PathBuf) -> Result<()> {
     ide::alloc_triggers(names.len());
     for (name, trig_p) in names.iter().zip(ide::get_triggers_mut()) {
         if name.is_empty() {
-            continue
+            continue;
         }
         let mut trig = Trigger::new();
         trig.name = UStr::new(name);
@@ -282,7 +282,7 @@ unsafe fn load_frame(path: &std::path::Path, frame: &mut Frame) -> Result<()> {
                 depth,
                 coltype,
                 path.to_string_lossy()
-            )))
+            )));
         },
     }
     frame.data = data.as_ptr();
@@ -379,7 +379,7 @@ unsafe fn load_event(
     let object_name = path.file_stem().map(OsStr::to_string_lossy).unwrap_or_default();
     for action_code in event_code.split(ACTION_TOKEN) {
         if action_code.trim().is_empty() {
-            continue
+            continue;
         }
         let (params, code) = action_code.split_once("*/").ok_or_else(|| Error::SyntaxError(path.to_path_buf()))?;
         let action = event.add_action(0, 0);
@@ -391,14 +391,14 @@ unsafe fn load_event(
                     "lib_id" => {
                         action.lib_id = v.parse()?;
                         if lib_id_set {
-                            return Err(Error::SyntaxError(path.to_path_buf()))
+                            return Err(Error::SyntaxError(path.to_path_buf()));
                         }
                         lib_id_set = true;
                     },
                     "action_id" => {
                         action.id = v.parse()?;
                         if !lib_id_set || act_id_set {
-                            return Err(Error::SyntaxError(path.to_path_buf()))
+                            return Err(Error::SyntaxError(path.to_path_buf()));
                         }
                         act_id_set = true;
                         // manually check if action exists so we can throw an error
@@ -408,7 +408,7 @@ unsafe fn load_event(
                         }) {
                             action.fill_in(action.lib_id, action.id);
                         } else {
-                            return Err(Error::UnknownAction(action.lib_id, action.id))
+                            return Err(Error::UnknownAction(action.lib_id, action.id));
                         }
                     },
                     "relative" => action.is_relative = v.parse::<u8>()? != 0,
@@ -431,7 +431,7 @@ unsafe fn load_event(
                     "var_value" => action.param_strings[1] = UStr::new(v),
                     "arg0" | "arg1" | "arg2" | "arg3" | "arg4" | "arg5" | "arg6" | "arg7" => {
                         if !act_id_set {
-                            return Err(Error::SyntaxError(path.to_path_buf()))
+                            return Err(Error::SyntaxError(path.to_path_buf()));
                         }
                         let i = k.chars().last().unwrap().to_digit(8).unwrap() as usize;
                         let err = |t| {
@@ -502,7 +502,7 @@ unsafe fn load_object(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<Delp
                             v.to_string(),
                             "sprite",
                             format!("object {object_name} sprite"),
-                        ))
+                        ));
                     },
                 }
             },
@@ -519,7 +519,7 @@ unsafe fn load_object(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<Delp
                             v.to_string(),
                             "object",
                             format!("object {object_name} parent"),
-                        ))
+                        ));
                     },
                 }
             },
@@ -528,7 +528,11 @@ unsafe fn load_object(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<Delp
                     Some(&i) => i as _,
                     None if v.is_empty() => -1,
                     _ => {
-                        return Err(Error::AssetNotFound(v.to_string(), "sprite", format!("object {object_name} mask")))
+                        return Err(Error::AssetNotFound(
+                            v.to_string(),
+                            "sprite",
+                            format!("object {object_name} mask"),
+                        ));
                     },
                 }
             },
@@ -540,7 +544,7 @@ unsafe fn load_object(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<Delp
     let code = read_file(&path)?;
     for event in code.trim_start_matches("#define ").split("\n#define ") {
         if event.trim().is_empty() {
-            continue
+            continue;
         }
         let err = || Error::SyntaxError(path.to_path_buf());
         let (name, actions) = event.split_once("\n").ok_or_else(err)?;
@@ -565,7 +569,7 @@ unsafe fn load_timeline(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<De
     let (events, times) = tl.alloc(iter.clone().count());
     for (code, time_p, event) in izip!(iter, times, events) {
         if code.trim().is_empty() {
-            continue
+            continue;
         }
         let (name, actions) = match code.split_once("\n") {
             Some(tuple) => tuple,
@@ -614,7 +618,7 @@ pub fn load_path(file_path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<Delp
         point.y = iter.next().ok_or_else(err)?.parse()?;
         point.speed = iter.next().ok_or_else(err)?.parse()?;
         if iter.next() != None {
-            return Err(err())
+            return Err(err());
         }
     }
     path.commit();
@@ -658,7 +662,7 @@ unsafe fn load_instances(room: &mut Room, path: &mut PathBuf, objs: &HashMap<Str
                 loop {
                     let id = delphi::Random();
                     if !ids.lock().contains(&id) {
-                        break id
+                        break id;
                     }
                 }
             };
@@ -705,7 +709,7 @@ unsafe fn load_tiles(path: &mut PathBuf, bgs: &HashMap<String, usize>) -> Result
     for line in f.lines() {
         let line = line?;
         if line.is_empty() {
-            continue
+            continue;
         }
         let depth = line.parse()?;
         path.push(line);
@@ -751,7 +755,7 @@ unsafe fn load_tiles(path: &mut PathBuf, bgs: &HashMap<String, usize>) -> Result
                     extra.blend = s.parse()?;
                 }
                 if iter.next() != None {
-                    return Err(err())
+                    return Err(err());
                 }
                 Ok(t)
             })
@@ -1081,7 +1085,7 @@ unsafe fn load_settings(path: &mut PathBuf) -> Result<()> {
 
 fn load_index(name: &str, has_any: bool, path: &mut PathBuf) -> Result<Assets> {
     if !has_any {
-        return Ok(Assets { index: Vec::new(), map: HashMap::new() })
+        return Ok(Assets { index: Vec::new(), map: HashMap::new() });
     }
     path.push(name);
     path.push("index.yyd");
@@ -1206,7 +1210,7 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
                 ide::settings::VERSION_RELEASE.write(iter.next().ok_or_else(err)?.parse()?);
                 ide::settings::VERSION_BUILD.write(iter.next().ok_or_else(err)?.parse()?);
                 if iter.next() != None {
-                    return Err(Error::InvalidVersion(v.to_string()))
+                    return Err(Error::InvalidVersion(v.to_string()));
                 }
             },
             "has_backgrounds" => has_backgrounds = v.parse::<u8>()? != 0,

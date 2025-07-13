@@ -85,13 +85,13 @@ impl Frame {
             let y = if flip { 15 - y } else { y };
             if y < voffset || y >= voffset + height {
                 row.fill(0);
-                continue
+                continue;
             }
             let y = y - voffset;
             for (x, px) in row.chunks_exact_mut(4).enumerate() {
                 if x < hoffset || x >= hoffset + width {
                     px.fill(0);
-                    continue
+                    continue;
                 }
                 let x = x - hoffset;
                 // get sample points

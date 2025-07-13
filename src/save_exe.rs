@@ -558,14 +558,14 @@ pub unsafe extern "C" fn write_event_tables() {
     extern "fastcall" fn inj(stream: &mut TMemoryStream) -> bool {
         let resource_tree_res: u32 = unsafe { delphi_call!(0x71de7c, stream, 1) };
         if resource_tree_res == 0 {
-            return false
+            return false;
         }
 
         fn obj_has_event(obj: &asset::Object, event_type: usize, event_number: usize) -> bool {
             let mut obj_opt = Some(obj);
             while let Some(obj) = obj_opt {
                 if obj.has_direct_event(event_type, event_number) {
-                    return true
+                    return true;
                 }
                 obj_opt = ide::OBJECTS.assets().get_asset(obj.parent_index);
             }
@@ -575,7 +575,7 @@ pub unsafe extern "C" fn write_event_tables() {
         fn obj_has_collision_event(obj: &asset::Object, mut other_id: usize) -> bool {
             while let Some(other) = ide::OBJECTS.assets().get_asset(other_id as i32) {
                 if obj_has_event(obj, 4, other_id) {
-                    return true
+                    return true;
                 }
                 other_id = other.parent_index as usize;
             }
@@ -638,11 +638,11 @@ pub unsafe extern "C" fn write_event_tables() {
             })
             .is_err()
         {
-            return false
+            return false;
         }
 
         if encoder.write_u32::<LE>(collision_holders.len() as u32).is_err() {
-            return false
+            return false;
         }
 
         if collision_holders
@@ -653,13 +653,13 @@ pub unsafe extern "C" fn write_event_tables() {
             })
             .is_err()
         {
-            return false
+            return false;
         }
 
         let data = if let Ok(x) = encoder.finish() { x } else { return false };
 
         if stream.write_u32::<LE>(data.len() as u32).is_err() {
-            return false
+            return false;
         }
         stream.write_all(&data).is_ok()
     }
@@ -700,7 +700,7 @@ pub unsafe extern "fastcall" fn write_encrypted_gamedata(stream: &mut TMemoryStr
     // generate gamedata
     let res: u32 = delphi_call!(0x6cd8ac, stream);
     if res == 0 {
-        return false
+        return false;
     }
     // write a few null bytes so i don't have to figure out how to fix the decompiler
     for _ in 0..4 {

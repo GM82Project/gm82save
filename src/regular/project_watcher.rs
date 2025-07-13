@@ -29,7 +29,7 @@ unsafe extern "fastcall" fn show_message_and_reload() {
             if vmt == 0x7153c4 {
                 // call real TApplication.Idle and return
                 let _: u32 = delphi_call!(0x520418, *(0x7882ec as *const usize));
-                return
+                return;
             }
         }
     }
@@ -121,7 +121,7 @@ pub fn on_notify() {
             // (note: not modals, i actually have some level of control over those)
             crate::patch_call(0x51f74b, show_message_and_reload as _);
         }
-        break
+        break;
     }
 }
 

@@ -67,17 +67,17 @@ impl<'a> GetAsset<f64> for &'a [f64] {
 
 fn filename_invalid(s: &str) -> Option<u8> {
     if s == "." || s == ".." || s.as_bytes().last().copied() == Some(b'.') {
-        return Some(b'.')
+        return Some(b'.');
     }
     if s.trim().is_empty() {
-        return Some(b' ')
+        return Some(b' ');
     }
     for c in b"<>:\"/\\|?*" {
         if s.as_bytes().contains(c) {
-            return Some(*c)
+            return Some(*c);
         }
     }
-    return None
+    return None;
 }
 
 fn make_unicase(s: String, u: &UStr) -> unicase::UniCase<String> {
@@ -258,67 +258,67 @@ fn save_font(font: &Font, path: &mut PathBuf) -> Result<()> {
 unsafe fn event_needs_update(ev: &Event) -> bool {
     for action in ev.get_actions() {
         if ide::OBJECTS.timestamps().get_asset(action.applies_to) > LAST_SAVE {
-            return true
+            return true;
         }
         if action.action_kind == 0 {
             for (ty, val) in action.param_types.iter().zip(&action.param_strings) {
                 fn parameter_get_timestamp(ty: u32, val: &UStr) -> Result<f64> {
                     let val = val.try_decode()?.parse()?;
                     if val < 0 {
-                        return Ok(0.0)
+                        return Ok(0.0);
                     }
                     let time = match ty {
                         5 => {
                             if ide::SPRITES.assets().get_asset(val).is_none() {
-                                return Ok(f64::MAX)
+                                return Ok(f64::MAX);
                             }
                             ide::SPRITES.timestamps().get_asset(val)
                         },
                         6 => {
                             if ide::SOUNDS.assets().get_asset(val).is_none() {
-                                return Ok(f64::MAX)
+                                return Ok(f64::MAX);
                             }
                             ide::SOUNDS.timestamps().get_asset(val)
                         },
                         7 => {
                             if ide::BACKGROUNDS.assets().get_asset(val).is_none() {
-                                return Ok(f64::MAX)
+                                return Ok(f64::MAX);
                             }
                             ide::BACKGROUNDS.timestamps().get_asset(val)
                         },
                         8 => {
                             if ide::PATHS.assets().get_asset(val).is_none() {
-                                return Ok(f64::MAX)
+                                return Ok(f64::MAX);
                             }
                             ide::PATHS.timestamps().get_asset(val)
                         },
                         9 => {
                             if ide::SCRIPTS.assets().get_asset(val).is_none() {
-                                return Ok(f64::MAX)
+                                return Ok(f64::MAX);
                             }
                             ide::SCRIPTS.timestamps().get_asset(val)
                         },
                         10 => {
                             if ide::OBJECTS.assets().get_asset(val).is_none() {
-                                return Ok(f64::MAX)
+                                return Ok(f64::MAX);
                             }
                             ide::OBJECTS.timestamps().get_asset(val)
                         },
                         11 => {
                             if ide::ROOMS.assets().get_asset(val).is_none() {
-                                return Ok(f64::MAX)
+                                return Ok(f64::MAX);
                             }
                             ide::ROOMS.timestamps().get_asset(val)
                         },
                         12 => {
                             if ide::FONTS.assets().get_asset(val).is_none() {
-                                return Ok(f64::MAX)
+                                return Ok(f64::MAX);
                             }
                             ide::FONTS.timestamps().get_asset(val)
                         },
                         14 => {
                             if ide::TIMELINES.assets().get_asset(val).is_none() {
-                                return Ok(f64::MAX)
+                                return Ok(f64::MAX);
                             }
                             ide::TIMELINES.timestamps().get_asset(val)
                         },
@@ -328,12 +328,12 @@ unsafe fn event_needs_update(ev: &Event) -> bool {
                     Ok(time)
                 }
                 if !matches!(parameter_get_timestamp(*ty, val).map(|t| t > LAST_SAVE), Ok(false)) {
-                    return true
+                    return true;
                 }
             }
         }
     }
-    return false
+    return false;
 }
 
 unsafe fn save_event<F: Write>(ev: &Event, name: &str, file: &mut F) -> Result<()> {
@@ -368,19 +368,24 @@ unsafe fn save_event<F: Write>(ev: &Event, name: &str, file: &mut F) -> Result<(
                 // normal
                 writeln!(file, "invert={}", u8::from(action.invert_condition))?;
                 for i in 0..action.param_count as usize {
-                    writeln!(file, "arg{}={}", i, match action.param_types[i] {
-                        5 => ide::SPRITES.names().get_asset(action.param_strings[i].try_decode()?.parse()?),
-                        6 => ide::SOUNDS.names().get_asset(action.param_strings[i].try_decode()?.parse()?),
-                        7 => ide::BACKGROUNDS.names().get_asset(action.param_strings[i].try_decode()?.parse()?),
-                        8 => ide::PATHS.names().get_asset(action.param_strings[i].try_decode()?.parse()?),
-                        9 => ide::SCRIPTS.names().get_asset(action.param_strings[i].try_decode()?.parse()?),
-                        10 => ide::OBJECTS.names().get_asset(action.param_strings[i].try_decode()?.parse()?),
-                        11 => ide::ROOMS.names().get_asset(action.param_strings[i].try_decode()?.parse()?),
-                        12 => ide::FONTS.names().get_asset(action.param_strings[i].try_decode()?.parse()?),
-                        14 => ide::TIMELINES.names().get_asset(action.param_strings[i].try_decode()?.parse()?),
-                        // params can have newlines so delimit
-                        _ => action.param_strings[i].try_delimit()?,
-                    })?;
+                    writeln!(
+                        file,
+                        "arg{}={}",
+                        i,
+                        match action.param_types[i] {
+                            5 => ide::SPRITES.names().get_asset(action.param_strings[i].try_decode()?.parse()?),
+                            6 => ide::SOUNDS.names().get_asset(action.param_strings[i].try_decode()?.parse()?),
+                            7 => ide::BACKGROUNDS.names().get_asset(action.param_strings[i].try_decode()?.parse()?),
+                            8 => ide::PATHS.names().get_asset(action.param_strings[i].try_decode()?.parse()?),
+                            9 => ide::SCRIPTS.names().get_asset(action.param_strings[i].try_decode()?.parse()?),
+                            10 => ide::OBJECTS.names().get_asset(action.param_strings[i].try_decode()?.parse()?),
+                            11 => ide::ROOMS.names().get_asset(action.param_strings[i].try_decode()?.parse()?),
+                            12 => ide::FONTS.names().get_asset(action.param_strings[i].try_decode()?.parse()?),
+                            14 => ide::TIMELINES.names().get_asset(action.param_strings[i].try_decode()?.parse()?),
+                            // params can have newlines so delimit
+                            _ => action.param_strings[i].try_delimit()?,
+                        }
+                    )?;
                 }
             },
             5 => {
@@ -399,7 +404,7 @@ unsafe fn save_event<F: Write>(ev: &Event, name: &str, file: &mut F) -> Result<(
             // code
             let code = action.param_strings[0].try_decode()?;
             if code.starts_with("#define") || code.contains("\n#define") {
-                return Err(Error::Other("events should not contain #define".to_string()))
+                return Err(Error::Other("events should not contain #define".to_string()));
             }
             write_gml(file, &action.param_strings[0])?;
         }
@@ -452,7 +457,7 @@ unsafe fn object_needs_update(obj: &Object) -> bool {
         || obj.events[events::EV_COLLISION]
             .iter()
             .enumerate()
-            .any(|(i, e)| e.action_count != 0 && ide::OBJECTS.timestamps().get_asset(i as _) > LAST_SAVE)
+            .any(|(i, e)| e.action_count != 0 && ide::OBJECTS.timestamps().get_asset(i as _) > LAST_SAVE);
 }
 
 unsafe fn save_object(obj: &Object, path: &mut PathBuf) -> Result<()> {
@@ -477,7 +482,7 @@ unsafe fn save_object(obj: &Object, path: &mut PathBuf) -> Result<()> {
                     if (ev_type == events::EV_COLLISION && ide::OBJECTS.assets().get_asset(ev_numb as _).is_none())
                         || (ev_type == events::EV_TRIGGER && ide::get_triggers().get_asset(ev_numb as _).is_none())
                     {
-                        continue
+                        continue;
                     }
                     let name = event_name(ev_type, ev_numb);
                     save_event(ev, &name, &mut f)?;
@@ -506,7 +511,7 @@ unsafe fn room_needs_update(room: &Room) -> bool {
         t.source_bg >= 0
             && (ide::BACKGROUNDS.assets().get_asset(t.source_bg).is_none()
                 || ide::BACKGROUNDS.timestamps().get_asset(t.source_bg) > LAST_SAVE)
-    })
+    });
 }
 
 unsafe fn save_tiles(tiles: &[Tile], path: &mut PathBuf) -> Result<()> {
@@ -789,10 +794,10 @@ fn save_triggers(path: &mut PathBuf) -> Result<()> {
                 let name = trigger.name.try_decode()?;
                 writeln!(index, "{}", name)?;
                 if let Some(c) = filename_invalid(&name) {
-                    return Err(Error::BadTriggerName(name, char::from(c)))
+                    return Err(Error::BadTriggerName(name, char::from(c)));
                 }
                 if !name_set.insert(make_unicase(name, &trigger.name)) {
-                    return Err(Error::DuplicateTrigger(trigger.name.try_decode()?))
+                    return Err(Error::DuplicateTrigger(trigger.name.try_decode()?));
                 }
             } else {
                 writeln!(index)?;
@@ -847,10 +852,10 @@ unsafe fn save_assets<'a, T: Sync>(
             if !name.is_empty() {
                 count += 1;
                 if let Some(c) = filename_invalid(&name) {
-                    return Err(Error::BadAssetName(name, char::from(c)))
+                    return Err(Error::BadAssetName(name, char::from(c)));
                 }
                 if !name_set.insert(make_unicase(name, name_wide)) {
-                    return Err(Error::DuplicateAsset(name_wide.try_decode()?))
+                    return Err(Error::DuplicateAsset(name_wide.try_decode()?));
                 }
             }
         }
@@ -896,10 +901,10 @@ unsafe fn save_included_files(path: &mut PathBuf, smart_save: bool) -> Result<()
             writeln!(index, "{}", name)?;
 
             if let Some(c) = filename_invalid(&name) {
-                return Err(Error::BadIncludedFileName(name, char::from(c)))
+                return Err(Error::BadIncludedFileName(name, char::from(c)));
             }
             if !names_set.insert(name) {
-                return Err(Error::DuplicateIncludedFile(file.file_name.try_decode()?))
+                return Err(Error::DuplicateIncludedFile(file.file_name.try_decode()?));
             }
         }
         path.push("index.yyd");
@@ -908,7 +913,7 @@ unsafe fn save_included_files(path: &mut PathBuf, smart_save: bool) -> Result<()
     }
     for (file, timestamp) in files.iter().zip(ide::get_included_file_timestamps()) {
         if smart_save && *timestamp < LAST_SAVE {
-            continue
+            continue;
         }
         let file = &**file;
         let mut name = file.file_name.try_decode()?;
@@ -1003,12 +1008,12 @@ unsafe fn save_icon_cache(path: &mut PathBuf, smart_save: bool) -> Result<()> {
     const BMP_SIZE: usize = 16 * 16 * 4 + BMP_HEADER.len();
     unsafe fn save_frame(frame: &Frame, name: &UStr, path: &std::path::Path, only_if_needed: bool) -> Result<()> {
         if frame.width == 0 || frame.height == 0 {
-            return Ok(())
+            return Ok(());
         }
         let mut path = path.join(name.to_os_string());
         path.set_extension("bmp");
         if only_if_needed && path.exists() {
-            return Ok(())
+            return Ok(());
         }
         let mut out = Vec::with_capacity(BMP_SIZE);
         out.extend_from_slice(BMP_HEADER);
@@ -1251,7 +1256,7 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
                     name = delphi::Random();
                     if !extra_data.values().any(|ex| ex.name == name) {
                         extra_data.get_mut(&id).unwrap().name = name;
-                        break
+                        break;
                     }
                 }
             }

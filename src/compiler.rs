@@ -24,7 +24,7 @@ lazy_static! {
 unsafe extern "fastcall" fn compile_constants(stream: usize) -> bool {
     if EXTRA_DATA.is_none() {
         let res: usize = delphi_call!(0x696744, stream, 1);
-        return res as u8 != 0
+        return res as u8 != 0;
     }
 
     let constant_names = ide::get_constant_names();

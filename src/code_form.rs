@@ -616,11 +616,14 @@ pub unsafe fn inject() {
     patch_call(0x682a43, check_all_closing as _);
     patch(0x682a4b, &[0x26]);
     patch(0x682a6b, &[0x0a]);
-    patch(0x682a72, &[
-        0x33, 0xc0, // xor eax, eax
-        0xb0, 0x06, // mov al, 6
-        0xe8, 0, 0, 0, 0, // call <...>
-        0xc6, 0x06, 0x02, // mov dword ptr [esi], 2
-    ]);
+    patch(
+        0x682a72,
+        &[
+            0x33, 0xc0, // xor eax, eax
+            0xb0, 0x06, // mov al, 6
+            0xe8, 0, 0, 0, 0, // call <...>
+            0xc6, 0x06, 0x02, // mov dword ptr [esi], 2
+        ],
+    );
     patch_call(0x682a76, close_code as _);
 }
