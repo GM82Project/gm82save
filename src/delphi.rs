@@ -657,49 +657,46 @@ pub unsafe fn CompareText(a: &UStr, b: *const u16) -> i32 {
 }
 
 #[repr(transparent)]
-pub struct UStr(*mut u16);
+pub struct UStr(*const u16);
 
 macro_rules! ustr {
-    ($s:expr) => {{
-        #[allow(unused_unsafe)]
-        unsafe {
-            UStr::from_address(
-                const {
-                    let mut out = [0; ($s.len() + 2) / 2 + 3];
-                    // lo: CodePage (UTF16LE), hi: ElemSize (2)
-                    out[0] = 0x0204b0;
-                    // refCount (-1)
-                    out[1] = u32::MAX;
-                    // Len
-                    out[2] = $s.len() as u32;
-                    // can't use for loops in const code
-                    let mut i = 0;
-                    while i < $s.len() {
+    ($s:literal) => {{
+        const HEADER_SIZE: usize = 3;
+        UStr::from_address(
+            const {
+                // Add 1 character to length for the null terminator.
+                // Add 1 character to length and halve for u16 -> u32.
+                let mut out = [0u32; ($s.len() + 2) / 2 + HEADER_SIZE];
+                // lo: CodePage (UTF16LE), hi: ElemSize (2)
+                out[0] = 0x0204b0;
+                // refCount (-1)
+                out[1] = u32::MAX;
+                // Len
+                out[2] = $s.len() as u32;
+                // can't use for loops in const code
+                let mut i = 0;
+                while i < $s.len() {
+                    let c = $s.as_bytes()[i];
+                    assert!(c.is_ascii());
+                    out[i / 2 + HEADER_SIZE] = c as u32;
+                    i += 1;
+                    if i < $s.len() {
                         let c = $s.as_bytes()[i];
                         assert!(c.is_ascii());
-                        out[i / 2 + 3] = c as u32;
+                        out[i / 2 + HEADER_SIZE] |= (c as u32) << 16;
                         i += 1;
-                        if i < $s.len() {
-                            let c = $s.as_bytes()[i];
-                            assert!(c.is_ascii());
-                            out[i / 2 + 3] |= (c as u32) << 16;
-                            i += 1;
-                        }
                     }
-                    out
                 }
-                .as_ptr()
-                .add(3) as usize,
-            )
-        }
+                out
+            }[HEADER_SIZE..]
+                .as_ptr() as usize,
+        )
     }};
 }
 
 impl UStr {
-    pub const EMPTY: Self = Self(ptr::null_mut());
-
     pub fn new(s: impl AsRef<OsStr>) -> Self {
-        let mut out = UStr(ptr::null_mut());
+        let mut out = UStr(ptr::null());
         let s = s.as_ref();
         // if it takes more than one WTF-16 u16, it will DEFINITELY take more than one WTF-8 u8
         let guess_len = s.len();
@@ -707,7 +704,8 @@ impl UStr {
             unsafe {
                 UStrSetLength(&mut out, guess_len);
                 let mut real_len = 0;
-                for (dst, src) in slice::from_raw_parts_mut(out.0, guess_len).iter_mut().zip(s.encode_wide()) {
+                for (dst, src) in slice::from_raw_parts_mut(out.0.cast_mut(), guess_len).iter_mut().zip(s.encode_wide())
+                {
                     *dst = src;
                     real_len += 1;
                 }
@@ -718,7 +716,7 @@ impl UStr {
     }
 
     pub fn from_char(c: u16) -> Self {
-        let mut out = UStr(ptr::null_mut());
+        let mut out = UStr(ptr::null());
         let _: u32 = unsafe { delphi_call!(0x408034, &mut out, u32::from(c)) };
         out
     }
@@ -760,7 +758,7 @@ impl UStr {
 
 impl Default for UStr {
     fn default() -> Self {
-        UStr(ptr::null_mut())
+        UStr(ptr::null())
     }
 }
 
