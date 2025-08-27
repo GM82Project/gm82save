@@ -99,21 +99,27 @@ impl std::fmt::Display for Error {
             Self::DuplicateIncludedFile(n) => write!(f, "multiple included files named {}", n),
             Self::DuplicateTrigger(n) => write!(f, "multiple triggers named {}", n),
             Self::BadAssetName(n, c) => {
-                if *c == '.' || *c == ' ' {
+                if *c == '\0' {
+                    write!(f, "asset name \"{n}\" cannot be used as a Windows filename")
+                } else if *c == '.' || *c == ' ' {
                     write!(f, "asset name \"{n}\" is illegal")
                 } else {
                     write!(f, "asset name {n} may not contain character {c}")
                 }
             },
             Self::BadIncludedFileName(n, c) => {
-                if *c == '.' || *c == ' ' {
+                if *c == '\0' {
+                    write!(f, "included file name \"{n}\" cannot be used as a Windows filename")
+                } else if *c == '.' || *c == ' ' {
                     write!(f, "included file name \"{n}\" is illegal")
                 } else {
                     write!(f, "included file name {n} may not contain character {c}")
                 }
             },
             Self::BadTriggerName(n, c) => {
-                if *c == '.' || *c == ' ' {
+                if *c == '\0' {
+                    write!(f, "trigger name \"{n}\" cannot be used as a Windows filename")
+                } else if *c == '.' || *c == ' ' {
                     write!(f, "trigger name \"{n}\" is illegal")
                 } else {
                     write!(f, "trigger name {n} may not contain character {c}")

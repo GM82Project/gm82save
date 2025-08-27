@@ -65,6 +65,11 @@ impl<'a> GetAsset<f64> for &'a [f64] {
     }
 }
 
+const INVALID_NAMES: &[&str] = &[
+    "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2",
+    "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+];
+
 fn filename_invalid(s: &str) -> Option<u8> {
     if s == "." || s == ".." || s.as_bytes().last().copied() == Some(b'.') {
         return Some(b'.');
@@ -76,6 +81,9 @@ fn filename_invalid(s: &str) -> Option<u8> {
         if s.as_bytes().contains(c) {
             return Some(*c);
         }
+    }
+    if INVALID_NAMES.iter().any(|&s2| unicase::eq_ascii(s, s2)) {
+        return Some(0);
     }
     return None;
 }
