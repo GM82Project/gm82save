@@ -2898,6 +2898,9 @@ unsafe fn injector() {
     patch(0x6cdf32, &[0xe8]);
     patch_call(0x6cdf32, load_garbage_offset as _);
 
+    // skip deleting rundata icon (wine can't delete it here, so it's already gone from rundata)
+    patch(0x6cccce, &[0x0f, 0x85, 0xd9, 0x00, 0x00, 0x00, 0x00]);
+
     patch_call(0x6cd928, save_exe::save_assets_inj::<asset::Sound> as usize);
     patch_call(0x6cd943, save_exe::save_assets_inj::<asset::Sprite> as usize);
     patch_call(0x6cd95e, save_exe::save_assets_inj::<asset::Background> as usize);
