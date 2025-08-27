@@ -105,8 +105,20 @@ impl std::fmt::Display for Error {
                     write!(f, "asset name {n} may not contain character {c}")
                 }
             },
-            Self::BadIncludedFileName(n, c) => write!(f, "included file name {n} may not contain character {c}"),
-            Self::BadTriggerName(n, c) => write!(f, "trigger file name {n} may not contain character {c}"),
+            Self::BadIncludedFileName(n, c) => {
+                if *c == '.' || *c == ' ' {
+                    write!(f, "included file name \"{n}\" is illegal")
+                } else {
+                    write!(f, "included file name {n} may not contain character {c}")
+                }
+            },
+            Self::BadTriggerName(n, c) => {
+                if *c == '.' || *c == ' ' {
+                    write!(f, "trigger name \"{n}\" is illegal")
+                } else {
+                    write!(f, "trigger name {n} may not contain character {c}")
+                }
+            },
             Self::OldGM82 => write!(f, "this project was made with a newer version of gm82save, please update"),
             Self::Other(s) => write!(f, "other error: {}", s),
         }
