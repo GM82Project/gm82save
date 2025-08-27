@@ -2216,6 +2216,17 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
             let _: u32 = delphi_call!(0x51acd0, *(0x790100 as *const u32)); // hide main form
             let result = std::process::Command::new(editor_path).arg(&room_path).spawn().and_then(|mut c| c.wait());
             let _: u32 = delphi_call!(0x51acd8, *(0x790100 as *const u32)); // show main form
+
+            //bring ide to the front
+            type BOOL = i32;
+            type HANDLE = isize;
+            #[link(name = "user32")]
+            unsafe extern "system" {
+                fn GetActiveWindow() -> HANDLE;
+                fn SetForegroundWindow(hwnd: HANDLE) -> BOOL;
+            }
+            SetForegroundWindow(GetActiveWindow());
+
             if !matches!(result.map(|s| s.success()), Ok(true)) {
                 let message = UStr::new(format!(
                     "It looks like gm82room crashed. Would you like to load its changes? \
