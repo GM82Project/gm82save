@@ -2147,9 +2147,9 @@ unsafe extern "fastcall" fn play_sound() {
         if MEDIA_PLAYER_FOR_SOUNDS {
             if let Some(data) = sound.data.as_deref() {
                 // TODO BROKEN
-                let path = UStr::default();
+                let mut path = UStr::default();
                 // get temp filename with extension
-                let _: u32 = delphi_call!(0x5342d4, sound.extension.as_ptr(), &path.as_ptr());
+                let _: u32 = delphi_call!(0x5342d4, sound.extension.as_ptr(), &mut path);
                 // TCustomMemoryStream.SaveToFile
                 let _: u32 = delphi_call!(0x43fe70, data, path.as_ptr());
                 // shell execute
