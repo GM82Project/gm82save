@@ -995,6 +995,17 @@ unsafe extern "C" fn update_sprite_mask_timestamp() {
 }
 
 #[unsafe(naked)]
+unsafe extern "C" fn update_path_timestamp_and_draw_form() {
+    naked_asm!(
+        "mov eax, [eax + 0x458]",
+        "mov edx, 0x7229e8", // update path timestamp
+        "mov eax, ebx",
+        "mov edx, 0x720560", // draw path from
+        "jmp edx",
+    );
+}
+
+#[unsafe(naked)]
 unsafe extern "C" fn gm82_file_association_inj() {
     naked_asm!(
         "mov ecx, eax",
@@ -2903,6 +2914,9 @@ unsafe fn injector() {
     patch_timestamp_mask(0x6f33fa);
     patch_timestamp_mask(0x6f34e8);
     patch_timestamp_mask(0x6f3555);
+
+    // update path timestamp when changing room (important for gm82room)
+    patch_call(0x7211ff, update_path_timestamp_and_draw_form as _);
 
     // check for time going backwards
     patch(0x4199fb, &[0xe9]);
