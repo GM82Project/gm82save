@@ -999,6 +999,8 @@ unsafe extern "C" fn update_path_timestamp_and_draw_form() {
     naked_asm!(
         "mov eax, [eax + 0x458]",
         "mov edx, 0x7229e8", // update path timestamp
+        "call edx",
+        "mov byte ptr [ebx + 0x450], 1", // mark form as modified
         "mov eax, ebx",
         "mov edx, 0x720560", // draw path from
         "jmp edx",
