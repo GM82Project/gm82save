@@ -2255,9 +2255,9 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
                 fn keybd_event(bVK: u8, bScan: u8, dwFlags: u32, dwExtraInfo: isize);
                 fn SetForegroundWindow(hwnd: HANDLE) -> BOOL;
             }
-            keybd_event(0xA5, 0, 0, 0); //send alt keycode to trick windows into allowing the jump
+            keybd_event(0x12, 0x38, 0, 0); //send alt keycode to trick windows into allowing the jump
             SetForegroundWindow(GetActiveWindow());
-            keybd_event(0xA5, 0, 0x02, 0); //clear alt
+            keybd_event(0x12, 0x38, 0x0002, 0); //clear alt
 
             if !matches!(result.map(|s| s.success()), Ok(true)) {
                 let message = UStr::new(format!(
