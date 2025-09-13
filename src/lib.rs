@@ -618,6 +618,12 @@ unsafe extern "C" fn load_recent_project_and_maybe_compile() {
     );
 }
 
+unsafe extern "fastcall" fn skip_remove_temp_on_cmd_build() {
+    if !std::env::args().any(|arg| arg == "--build") {
+        let _: u32 = delphi_call!(0x534370);
+    }
+}
+
 #[unsafe(naked)]
 unsafe extern "C" fn gm81_or_gm82_inj() {
     naked_asm!(
@@ -2431,6 +2437,8 @@ unsafe fn injector() {
     patch(0x6dead7, &[0xeb]);
 
     patch_call(0x6deb0f, load_recent_project_and_maybe_compile as _);
+
+    patch_call(0x534370, skip_remove_temp_on_cmd_build as _);
 
     // about dialog
     #[rustfmt::skip]
