@@ -2438,7 +2438,7 @@ unsafe fn injector() {
 
     patch_call(0x6deb0f, load_recent_project_and_maybe_compile as _);
 
-    patch_call(0x534370, skip_remove_temp_on_cmd_build as _);
+    patch_call(0x6de7d3, skip_remove_temp_on_cmd_build as _);
 
     // about dialog
     #[rustfmt::skip]
