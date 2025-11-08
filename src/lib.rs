@@ -1001,6 +1001,27 @@ unsafe extern "C" fn update_sprite_mask_timestamp() {
 }
 
 #[unsafe(naked)]
+unsafe extern "C" fn update_origin_from_gmspr() {
+    naked_asm!(
+        // load sprite
+        "mov ecx, 0x5b3c40",
+        "call ecx",
+        // check that loading worked
+        "test al, al",
+        "jz 2f",
+        // if we're not on the first sprite, return
+        "cmp dword ptr [ebp - 0xc], 0",
+        "jnz 2f",
+        "mov eax, [ebp - 0x04]", // this
+        "mov edx, [ebp - 0x14]", // loaded sprite
+        "mov ecx, 0x5b33a8",     // sprite assign
+        "call ecx",
+        "mov al, 0", // we already did the load so skip the appending
+        "2: ret",
+    );
+}
+
+#[unsafe(naked)]
 unsafe extern "C" fn update_path_timestamp_and_draw_form() {
     naked_asm!(
         "mov eax, [eax + 0x458]",
@@ -2914,6 +2935,9 @@ unsafe fn injector() {
 
     // don't show save/discard question when deleting object
     patch(0x62ca28, &[0x90; 5]);
+
+    // load first sprite in full
+    patch_call(0x63aff1, update_origin_from_gmspr as _);
 
     // update timestamp properly in mask form
     unsafe fn patch_timestamp_mask(dest: usize) {
