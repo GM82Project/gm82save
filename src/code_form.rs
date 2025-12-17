@@ -332,6 +332,24 @@ unsafe fn open_or_insert(holder: CodeHolder, create: impl FnOnce() -> (UStr, Cod
 }
 
 #[unsafe(naked)]
+unsafe extern "C" fn edit_action() {
+    unsafe extern "fastcall" fn inj(action: Option<&Action>) -> bool {
+        if let Some(action) = action {
+            let out: u32 = delphi_call!(0x6ff4dc, action);
+            if let Some(definition) = action.get_definition() {
+                if definition.uses_code_editor() {
+                    // don't mark code editor actions as modified yet
+                    return false;
+                }
+            }
+            return out != 0;
+        }
+        return false;
+    }
+    naked_asm!("mov ecx, eax", "jmp {}", sym inj);
+}
+
+#[unsafe(naked)]
 unsafe extern "C" fn open_code_action() {
     unsafe extern "fastcall" fn inj(
         title: *const u16,
@@ -583,8 +601,8 @@ pub unsafe fn inject() {
     patch_call(0x68aea0, open_instance_code as _);
 
     // don't mark as updated when simply opening a form
-    patch(0x6c781d, &[0xeb]);
-    patch(0x6f98ad, &[0xeb]);
+    patch_call(0x6c7816, edit_action as _);
+    patch_call(0x6f98a6, edit_action as _);
     patch(0x689f3d, &[0xeb]);
     patch(0x68aeca, &[0xeb]);
 

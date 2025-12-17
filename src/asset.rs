@@ -385,6 +385,13 @@ impl Action {
     pub unsafe fn fill_in(&mut self, lib_id: u32, act_id: u32) {
         let _: u32 = delphi_call!(0x710544, self, lib_id, act_id);
     }
+
+    pub fn get_definition(&self) -> Option<&ActionDefinition> {
+        unsafe {
+            let definition: *const ActionDefinition = delphi_call!(0x714e30, self.lib_id, self.id);
+            definition.as_ref()
+        }
+    }
 }
 
 #[repr(C)]
@@ -664,6 +671,12 @@ pub struct ActionDefinition {
     execution_type: u32,
     function_name: UStr,
     code_string: UStr,
+}
+
+impl ActionDefinition {
+    pub fn uses_code_editor(&self) -> bool {
+        self.interface == 5 || self.interface == 6
+    }
 }
 
 #[repr(C)]
