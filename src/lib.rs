@@ -2882,17 +2882,19 @@ unsafe fn injector() {
     patch_call(0x71c6dd, add_three_newest_inj as _);
 
     // only delete resource if resource is focused
-    patch(0x6e33b2, &[
-        0x50, // push eax
-        0xe8, 0xa8, 0x42, 0xe1, 0xff, // call TWinControl.Focused
-        0x85, 0xc0, // test eax, eax
-        0x58, // pop eax
-        0x74, 0x07, // je past this call and test
-        0xe8, 0x7a, 0xd1, 0xdc, 0xff, // call TCustomTreeView.GetSelected
-        0x85, 0xc0, // test eax, eax
-        0x0f, 0x84, 0xc7, 0x00, 0x00, 0x0, // je 0x6e3491 (end of function)
-
-    ]);
+    patch(
+        0x6e33b2,
+        &[
+            0x50, // push eax
+            0xe8, 0xa8, 0x42, 0xe1, 0xff, // call TWinControl.Focused
+            0x85, 0xc0, // test eax, eax
+            0x58, // pop eax
+            0x74, 0x07, // je past this call and test
+            0xe8, 0x7a, 0xd1, 0xdc, 0xff, // call TCustomTreeView.GetSelected
+            0x85, 0xc0, // test eax, eax
+            0x0f, 0x84, 0xc7, 0x00, 0x00, 0x0, // je 0x6e3491 (end of function)
+        ],
+    );
 
     // case insensitive ctrl-r
     patch_call(0x6e144a, get_asset_from_name_unicase::<asset::Object> as _);
