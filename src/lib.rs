@@ -2508,6 +2508,8 @@ unsafe fn injector() {
     patch(0x6dfbec, &[b'2']);
     // save new .gm82 projects to subfolder when using "save as" dialog
     patch_call(0x6e06b3, make_new_folder as _);
+    // default to .gm82
+    patch(0x6e0734, &['2' as u8]);
 
     // install extensions to own directory if possible
     patch_call(0x713cdf, install_extensions_to_exedir_if_possible as _);
