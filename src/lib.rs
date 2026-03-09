@@ -26,7 +26,7 @@ mod save_exe;
 mod stub;
 
 use crate::{
-    delphi::{TMenuItem, TTreeNode, UStr},
+    delphi::{ExtractFileExt, TMenuItem, TTreeNode, UStr, UStrCopy},
     ide::get_triggers,
     load::UStrPtr,
     regular::{extension_watcher::update_extensions, project_watcher},
@@ -2165,8 +2165,17 @@ unsafe extern "fastcall" fn save_exe_and_autosave() {
 unsafe extern "fastcall" fn run_exe_and_autosave() {
     unsafe extern "fastcall" fn inj(out: bool) -> bool {
         if AUTOSAVE_ON_BUILD && !(*ide::PROJECT_PATH).is_empty() {
-            // TMainForm.Save1Click
-            let _: u32 = delphi_call!(0x6e0540, *(0x790100 as *const usize));
+            // are we gmk or gmd? if so don't autosave
+            let ext = ExtractFileExt(&*ide::PROJECT_PATH);
+            let dont_autosave_extensions = [ustr!(".gmk"), ustr!(".gmd")];
+            if dont_autosave_extensions.iter().all(|x| delphi::CompareText(&ext, x.as_ptr()) != 0) {
+                // also don't autosave over backups
+                let first_three = UStrCopy(&ext, 1, 3);
+                if delphi::CompareText(&first_three, ustr!(".gb").as_ptr()) != 0 {
+                    // TMainForm.Save1Click
+                    let _: u32 = delphi_call!(0x6e0540, *(0x790100 as *const usize));
+                }
+            }
         }
         return out;
     }

@@ -651,9 +651,21 @@ pub unsafe fn UStrClr(str: &mut UStr) {
     let _: u32 = delphi_call!(0x407ea8, str);
 }
 
+pub fn UStrCopy(str: &UStr, start: usize, end: usize) -> UStr {
+    let out = UStr::default();
+    let _: u32 = unsafe { delphi_call!(0x4086a8, str.0, start, end, &out.0) };
+    out
+}
+
 // terrible hack for the second operand i'm sorry
 pub unsafe fn CompareText(a: &UStr, b: *const u16) -> i32 {
     delphi_call!(0x415924, a.0, b)
+}
+
+pub fn ExtractFileExt(path: &UStr) -> UStr {
+    let out = UStr::default();
+    let _: u32 = unsafe { delphi_call!(0x4173d8, path.0, &out.0) };
+    out
 }
 
 #[repr(transparent)]
