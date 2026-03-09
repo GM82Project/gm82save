@@ -578,7 +578,7 @@ unsafe extern "C" fn stuff_to_do_on_ide_start() {
             .add(0x3fc / 4)
             .read()
             .add(0x110 / 4)
-            .write(start_shader_compiler as usize);
+            .write(start_shader_compiler as *const () as usize);
     }
     naked_asm!(
         "mov eax, 0x77f464",
@@ -2446,8 +2446,8 @@ unsafe fn patch(dest: usize, source: &[u8]) {
     FlushInstructionCache(GetCurrentProcess(), dest.cast(), source.len());
 }
 
-unsafe fn patch_call(instr: usize, proc: usize) {
-    patch(instr + 1, &(proc - (instr as usize + 5)).to_le_bytes());
+unsafe fn patch_call(instr: usize, proc: *const ()) {
+    patch(instr + 1, &(proc as usize - (instr as usize + 5)).to_le_bytes());
 }
 
 #[cfg_attr(not(test), ctor::ctor)]
@@ -2492,7 +2492,7 @@ unsafe fn injector() {
         0x74, 0x25, // je 0x705cef (after save fail)
         0xe9, 0x7e, 0x01, 0x00, 0x00, // jmp 0x705e4d (after save success)
     ];
-    save_patch[1..5].copy_from_slice(&(save_inj as usize - (save_dest + 5)).to_le_bytes());
+    save_patch[1..5].copy_from_slice(&(save_inj as *const () as usize - (save_dest + 5)).to_le_bytes());
     patch(save_dest, &save_patch);
 
     // call load() instead of CStream.Create
@@ -2504,7 +2504,7 @@ unsafe fn injector() {
         0x84, 0xc0, // test al,al
         0x0f, 0x85, 0xa4, 0x00, 0x00, 0x00, // jne 0x705af3 (after load)
     ];
-    load_patch[1..5].copy_from_slice(&(load_inj as usize - (load_dest + 5)).to_le_bytes());
+    load_patch[1..5].copy_from_slice(&(load_inj as *const () as usize - (load_dest + 5)).to_le_bytes());
     patch(load_dest, &load_patch);
 
     // check for .gm82 as well as .gm81 when dragging file onto game maker
@@ -2713,7 +2713,7 @@ unsafe fn injector() {
 
     // but also don't resize on create *if* maximized
     patch(0x653d83, &[0xe8, 0, 0, 0, 0, 0x90]);
-    patch_call(0x653d83, code_editor_dont_resize_if_maximized as usize);
+    patch_call(0x653d83, code_editor_dont_resize_if_maximized as _);
 
     // middle click in code editor shows resource
     // remove first check
@@ -2753,7 +2753,7 @@ unsafe fn injector() {
             0x8b, 0xcb, // mov ecx, ebx (the mov to eax afterwards is useless but that's fine)
         ],
     );
-    patch_call(0x6baa3a, add_space_before_trigger_name as usize);
+    patch_call(0x6baa3a, add_space_before_trigger_name as _);
     patch(0x6baa41, &[0xb0]);
 
     // show number on code actions
@@ -2855,9 +2855,9 @@ unsafe fn injector() {
     patch(0x71a96b, &[0x8b, 0x80, 0xa0, 0x02, 0x00, 0x00, 0xa3, 0x83, 0xa9, 0x79, 0x00, 0x90, 0x90]);
     patch(0x71a972, &(addr_of!(DEFAULT_ROOM_SPEED) as *const u32 as usize as u32).to_le_bytes());
     // additional preferences form changes
-    patch_call(0x71a52c, open_preferences_form as usize);
+    patch_call(0x71a52c, open_preferences_form as _);
     patch(0x71a531, &[0x90; 15]);
-    patch_call(0x71aaf7, close_preferences_form as usize);
+    patch_call(0x71aaf7, close_preferences_form as _);
 
     // always run in advanced mode + do additional preferences changes
     patch(
@@ -2993,17 +2993,17 @@ unsafe fn injector() {
     // skip deleting rundata icon (wine can't delete it here, so it's already gone from rundata)
     patch(0x6cccce, &[0x0f, 0x85, 0xd9, 0x00, 0x00, 0x00, 0x00]);
 
-    patch_call(0x6cd928, save_exe::save_assets_inj::<asset::Sound> as usize);
-    patch_call(0x6cd943, save_exe::save_assets_inj::<asset::Sprite> as usize);
-    patch_call(0x6cd95e, save_exe::save_assets_inj::<asset::Background> as usize);
-    patch_call(0x06cd979, save_exe::save_assets_inj::<asset::Path> as usize);
-    patch_call(0x6cd994, save_exe::save_assets_inj::<asset::Script> as usize);
-    patch_call(0x6cd9af, save_exe::save_assets_inj::<asset::Font> as usize);
-    patch_call(0x6cd9ca, save_exe::save_assets_inj::<asset::Timeline> as usize);
-    patch_call(0x6cd9e1, save_exe::save_assets_inj::<asset::Object> as usize);
-    patch_call(0x6cd9f8, save_exe::save_assets_inj::<asset::Room> as usize);
+    patch_call(0x6cd928, save_exe::save_assets_inj::<asset::Sound> as _);
+    patch_call(0x6cd943, save_exe::save_assets_inj::<asset::Sprite> as _);
+    patch_call(0x6cd95e, save_exe::save_assets_inj::<asset::Background> as _);
+    patch_call(0x06cd979, save_exe::save_assets_inj::<asset::Path> as _);
+    patch_call(0x6cd994, save_exe::save_assets_inj::<asset::Script> as _);
+    patch_call(0x6cd9af, save_exe::save_assets_inj::<asset::Font> as _);
+    patch_call(0x6cd9ca, save_exe::save_assets_inj::<asset::Timeline> as _);
+    patch_call(0x6cd9e1, save_exe::save_assets_inj::<asset::Object> as _);
+    patch_call(0x6cd9f8, save_exe::save_assets_inj::<asset::Room> as _);
 
-    patch_call(0x6cda40, save_exe::write_event_tables as usize);
+    patch_call(0x6cda40, save_exe::write_event_tables as _);
 
-    patch_call(0x6ce104, save_exe::write_encrypted_gamedata_inj as usize);
+    patch_call(0x6ce104, save_exe::write_encrypted_gamedata_inj as _);
 }

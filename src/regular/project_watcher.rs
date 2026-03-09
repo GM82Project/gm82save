@@ -35,7 +35,7 @@ unsafe extern "fastcall" fn show_message_and_reload() {
     }
 
     // reset TApplication.Idle
-    crate::patch_call(0x51f74b, 0x520418);
+    crate::patch_call(0x51f74b, 0x520418 as _);
     let message = UStr::new(format!(
         "Project files have been modified outside Game Maker. Reload project? \
                    Unsaved changes will be lost.\r\n\
@@ -80,7 +80,7 @@ unsafe extern "fastcall" fn show_message_and_reload() {
                 current_modal.add(0x2b8 / 4).write(2 as _);
             } else {
                 // put original TApplication.Idle back
-                crate::patch_call(0x51f74b, 0x520418);
+                crate::patch_call(0x51f74b, 0x520418 as _);
                 // reload
                 let _: u32 = delphi_call!(0x7059d8, (*ide::PROJECT_PATH).as_ptr());
             }

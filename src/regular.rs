@@ -23,7 +23,7 @@ fn enable_timer() {
         }
         let timer = timer_ptr.read();
         timer.add(0x34 / 4).write(1000); // interval (ms)
-        timer.add(0x40 / 4).write(on_notify as _); // event
+        timer.add(0x40 / 4).write(on_notify as *const () as usize); // event
         timer.add(0x48 / 4).write(1); // enabled
         let _: u32 = delphi_call!(0x48e12c, timer);
     }

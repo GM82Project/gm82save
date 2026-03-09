@@ -314,7 +314,11 @@ unsafe fn create_code_form(
     let _: u32 = delphi_call!(0x6b83b8, editor, code);
     // editor OnChange event
     editor.add(0x2d4 / 4).write(holder as _);
-    editor.add(0x2d0 / 4).write(if is_instance { update_instance_code as _ } else { update_code_inj as _ });
+    editor.add(0x2d0 / 4).write(if is_instance {
+        update_instance_code as *const () as u32
+    } else {
+        update_code_inj as *const () as u32
+    });
     // set up find box
     let _: u32 = delphi_call!(0x681d00, form);
     (UStr::from_ptr(&code).clone(), form as usize)
@@ -621,9 +625,9 @@ pub unsafe fn inject() {
     patch_call(0x6889b0, room_safe_undo as _);
 
     // close form when deleting assets
-    patch(0x70fd58, &(destroy_action as usize).to_le_bytes());
-    patch(0x62cf30, &(destroy_trigger as usize).to_le_bytes());
-    patch(0x6564b4, &(destroy_room as usize).to_le_bytes());
+    patch(0x70fd58, &(destroy_action as *const () as usize).to_le_bytes());
+    patch(0x62cf30, &(destroy_trigger as *const () as usize).to_le_bytes());
+    patch(0x6564b4, &(destroy_room as *const () as usize).to_le_bytes());
 
     // disable condition memo when code form is open
     patch_call(0x6bc183, trigger_disable_condition_memo as _);
