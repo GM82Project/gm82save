@@ -2167,7 +2167,7 @@ unsafe extern "fastcall" fn run_exe_and_autosave() {
         if AUTOSAVE_ON_BUILD && !(*ide::PROJECT_PATH).is_empty() {
             // are we gmk or gmd? if so don't autosave
             let ext = ExtractFileExt(&*ide::PROJECT_PATH);
-            let dont_autosave_extensions = [ustr!(".gmk"), ustr!(".gmd")];
+            let dont_autosave_extensions = [ustr!(".gmk"), ustr!(".gmd"), ustr!(".gm6")];
             if dont_autosave_extensions.iter().all(|x| delphi::CompareText(&ext, x.as_ptr()) != 0) {
                 // also don't autosave over backups
                 let first_three = UStrCopy(&ext, 1, 3);
