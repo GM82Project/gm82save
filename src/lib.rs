@@ -2073,16 +2073,19 @@ unsafe extern "C" fn dont_make_room_form_inj() {
     );
 }
 
-unsafe extern "fastcall" fn dont_make_room_form(node: &TTreeNode) {
-    // always open if gm82room is disabled, not opening a room, or not using gm82 format
-    if *(0x79a982 as *const bool)
-        || (*node.data).kind != 4
-        || (*ide::PROJECT_PATH).as_slice().last().copied() != Some(b'2' as u16)
-    {
-        let _: u32 = delphi_call!(0x71d608, node);
-    } else {
-        // actually just rename
-        let _: u32 = delphi_call!(0x4ad8b0, node);
+unsafe extern "fastcall" fn dont_make_room_form(node: Option<&TTreeNode>) {
+    // in theory this should never be null, but we've seen it be null so just double check
+    if let Some(node) = node {
+        // always open if gm82room is disabled, not opening a room, or not using gm82 format
+        if *(0x79a982 as *const bool)
+            || (*node.data).kind != 4
+            || (*ide::PROJECT_PATH).as_slice().last().copied() != Some(b'2' as u16)
+        {
+            let _: u32 = delphi_call!(0x71d608, node);
+        } else {
+            // actually just rename
+            let _: u32 = delphi_call!(0x4ad8b0, node);
+        }
     }
 }
 
