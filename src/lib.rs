@@ -2454,8 +2454,7 @@ unsafe fn patch_call(instr: usize, proc: *const ()) {
 }
 
 #[cfg_attr(not(test), ctor::ctor)]
-#[cfg_attr(test, allow(dead_code))]
-unsafe fn injector() {
+pub unsafe fn injector() {
     std::panic::set_hook(Box::new(|info| {
         let msg = UStr::new(info.to_string() + "\r\n\r\nPlease send a screenshot of this error message to Floogle.");
         let _: u32 = delphi_call!(0x51fbdc, *(0x7882ec as *const usize), msg.as_ptr(), 0, 0x10);
