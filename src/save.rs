@@ -535,7 +535,7 @@ unsafe fn save_tiles(tiles: &[Tile], path: &mut PathBuf) -> Result<()> {
             },
         };
         let TileExtra { xscale, yscale, blend } =
-            EXTRA_DATA.as_ref().and_then(|e| e.1.get(&tile.id).cloned()).unwrap_or_default();
+            EXTRA_DATA.as_ref().and_then(|e| e.tiles.get(&tile.id).cloned()).unwrap_or_default();
         writeln!(
             f,
             "{},{},{},{},{},{},{},{},{},{},{}",
@@ -567,7 +567,7 @@ fn save_instances(instances: &[Instance], path: &mut PathBuf) -> Result<()> {
     path.push("instances.txt");
     let mut f = open_file(&path)?;
     path.pop();
-    let extra_data = unsafe { &mut EXTRA_DATA.get_or_insert_with(Default::default).0 };
+    let extra_data = unsafe { &mut EXTRA_DATA.get_or_insert_with(Default::default).instances };
 
     for instance in instances {
         let mut code = Vec::with_capacity(instance.creation_code.len());
@@ -581,7 +581,7 @@ fn save_instances(instances: &[Instance], path: &mut PathBuf) -> Result<()> {
             path.pop();
         }
         let InstanceExtra { xscale, yscale, blend, angle, .. } =
-            unsafe { EXTRA_DATA.as_ref().and_then(|e| e.0.get(&instance.id).cloned()).unwrap_or_default() };
+            unsafe { EXTRA_DATA.as_ref().and_then(|e| e.instances.get(&instance.id).cloned()).unwrap_or_default() };
         writeln!(
             f,
             "{},{},{},{},{},{},{},{},{},{}",
@@ -1254,7 +1254,7 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
     for (room, timestamp) in
         ide::ROOMS.assets().iter().zip(ide::ROOMS.timestamps_mut()).filter_map(|(r, t)| Some((r.as_deref()?, t)))
     {
-        let extra_data = &mut EXTRA_DATA.get_or_insert_with(Default::default).0;
+        let extra_data = &mut EXTRA_DATA.get_or_insert_with(Default::default).instances;
         for id in room.get_instances().iter().map(|i| i.id) {
             let mut name = extra_data.entry(id).or_default().name;
             if name == 0 {

@@ -691,7 +691,7 @@ unsafe fn load_instances(room: &mut Room, path: &mut PathBuf, objs: &HashMap<Str
             Ok(())
         },
     )?;
-    let extra_data = &mut EXTRA_DATA.as_mut().unwrap().0;
+    let extra_data = &mut EXTRA_DATA.as_mut().unwrap().instances;
     extra_data.reserve(extras.len());
     for (inst, extra) in room.get_instances().iter().zip(extras.drain(..)) {
         extra_data.insert(inst.id, extra);
@@ -705,7 +705,7 @@ unsafe fn load_tiles(path: &mut PathBuf, bgs: &HashMap<String, usize>) -> Result
     path.push("layers.txt");
     let f = open_file(&path)?;
     path.pop();
-    let extra_data = &mut EXTRA_DATA.as_mut().unwrap().1;
+    let extra_data = &mut EXTRA_DATA.as_mut().unwrap().tiles;
     for line in f.lines() {
         let line = line?;
         if line.is_empty() {

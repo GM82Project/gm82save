@@ -1,5 +1,5 @@
 use crate::{
-    AssetListTrait, DEFLATE_LEVEL, EXTRA_DATA, InstanceExtra, TileExtra, UStr, asset,
+    AssetListTrait, DEFLATE_LEVEL, EXTRA_DATA, ExtraData, InstanceExtra, TileExtra, UStr, asset,
     delphi::{self, TMemoryStream},
     ide,
     regular::extension_watcher::update_extensions,
@@ -430,7 +430,8 @@ impl GetAssetList for asset::Room {
             write_string(&i.creation_code, &mut out)?;
             if !exe {
                 out.write_u32::<LE>(i.locked as _)?;
-            } else if let Some(data) = extra_data.map(|(insts, _)| insts.get(&i.id).unwrap_or(&InstanceExtra::DEFAULT))
+            } else if let Some(data) =
+                extra_data.map(|ExtraData { instances, .. }| instances.get(&i.id).unwrap_or(&InstanceExtra::DEFAULT))
             {
                 out.write_f64::<LE>(data.xscale)?;
                 out.write_f64::<LE>(data.yscale)?;
@@ -451,7 +452,9 @@ impl GetAssetList for asset::Room {
             out.write_u32::<LE>(t.id as _)?;
             if !exe {
                 out.write_u32::<LE>(t.locked as _)?;
-            } else if let Some(data) = extra_data.map(|(_, tiles)| tiles.get(&t.id).unwrap_or(&TileExtra::DEFAULT)) {
+            } else if let Some(data) =
+                extra_data.map(|ExtraData { tiles, .. }| tiles.get(&t.id).unwrap_or(&TileExtra::DEFAULT))
+            {
                 out.write_f64::<LE>(data.xscale)?;
                 out.write_f64::<LE>(data.yscale)?;
                 out.write_u32::<LE>(data.blend as _)?;

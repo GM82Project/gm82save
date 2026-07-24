@@ -454,7 +454,13 @@ unsafe fn refresh_gm82room_checkbox() {
     let _: u32 = delphi_call!(0x4c0238, room_item, !*(0x79a982 as *const bool) as u32);
 }
 
-static mut EXTRA_DATA: Option<(HashMap<usize, InstanceExtra>, HashMap<usize, TileExtra>)> = None;
+#[derive(Default)]
+struct ExtraData {
+    instances: HashMap<usize, InstanceExtra>,
+    tiles: HashMap<usize, TileExtra>,
+}
+
+static mut EXTRA_DATA: Option<ExtraData> = None;
 
 unsafe extern "fastcall" fn about_inj(about_dialog: *const *const usize) {
     let info = UStr::new(concat!("gm82save: ", env!("ABOUT_BUILD_DATE")));
@@ -883,7 +889,7 @@ unsafe extern "stdcall" fn duplicate_room(room: &mut asset::Room, old_id: usize,
 }
 
 unsafe fn freshen_room_ids(room: &mut asset::Room) {
-    if let Some((instance_map, tile_map)) = EXTRA_DATA.as_mut() {
+    if let Some(ExtraData { instances: instance_map, tiles: tile_map, .. }) = EXTRA_DATA.as_mut() {
         let last_instance_id = *ide::LAST_INSTANCE_ID + 1;
         let instances = room.get_instances_mut();
         *ide::LAST_INSTANCE_ID += instances.len();
@@ -2102,7 +2108,7 @@ unsafe extern "C" fn show_instance_id_inj() {
 }
 
 unsafe extern "fastcall" fn show_instance_id(id: usize, out: &mut UStr, room_id: usize) {
-    if let Some((insts, _)) = EXTRA_DATA.as_mut() {
+    if let Some(ExtraData { instances: insts, .. }) = EXTRA_DATA.as_mut() {
         let suffix = {
             let mut name = insts.entry(id).or_default().name;
             if name == 0 {
@@ -2316,7 +2322,7 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
                 let room_opt = &mut ide::ROOMS.assets_mut()[room_id];
                 let room = room_opt.as_mut().unwrap();
                 // remove this room's ids from the global thing
-                if let Some((extra_inst, extra_tile)) = EXTRA_DATA.as_mut() {
+                if let Some(ExtraData { instances: extra_inst, tiles: extra_tile, .. }) = EXTRA_DATA.as_mut() {
                     for inst in room.get_instances() {
                         extra_inst.remove(&inst.id);
                     }

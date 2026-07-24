@@ -1,5 +1,5 @@
 use super::{EXTRA_DATA, InstanceExtra, TileExtra, patch, patch_call};
-use crate::{UStr, ide, ide::AssetListTrait};
+use crate::{ExtraData, UStr, ide, ide::AssetListTrait};
 use lazy_static::lazy_static;
 use rayon::prelude::*;
 use regex::Regex;
@@ -79,7 +79,7 @@ unsafe extern "fastcall" fn compile_constants(stream: usize) -> bool {
             room.get_instances().par_iter().filter_map(move |inst| {
                 EXTRA_DATA
                     .as_ref()
-                    .and_then(|(extra, _)| extra.get(&inst.id))
+                    .and_then(|ExtraData { instances, .. }| instances.get(&inst.id))
                     .filter(|extra| instance_names.contains(&extra.name))
                     .map(|extra| (name, inst.id, extra.name))
             })
@@ -228,7 +228,9 @@ unsafe fn save_real(file: usize, real: &f64) {
 
 unsafe extern "fastcall" fn save_instance_extra(file: usize, id: usize, exe: bool) {
     if exe {
-        if let Some(data) = EXTRA_DATA.as_ref().map(|(insts, _)| insts.get(&id).unwrap_or(&InstanceExtra::DEFAULT)) {
+        if let Some(data) =
+            EXTRA_DATA.as_ref().map(|ExtraData { instances, .. }| instances.get(&id).unwrap_or(&InstanceExtra::DEFAULT))
+        {
             save_real(file, &data.xscale);
             save_real(file, &data.yscale);
             let _: u32 = delphi_call!(0x52f12c, file, data.blend);
@@ -239,7 +241,9 @@ unsafe extern "fastcall" fn save_instance_extra(file: usize, id: usize, exe: boo
 
 unsafe extern "fastcall" fn save_tile_extra(file: usize, id: usize, exe: bool) {
     if exe {
-        if let Some(data) = EXTRA_DATA.as_ref().map(|(_, tiles)| tiles.get(&id).unwrap_or(&TileExtra::DEFAULT)) {
+        if let Some(data) =
+            EXTRA_DATA.as_ref().map(|ExtraData { tiles, .. }| tiles.get(&id).unwrap_or(&TileExtra::DEFAULT))
+        {
             save_real(file, &data.xscale);
             save_real(file, &data.yscale);
             let _: u32 = delphi_call!(0x52f12c, file, data.blend);
