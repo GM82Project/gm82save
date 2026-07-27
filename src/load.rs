@@ -1244,8 +1244,8 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     read_txt(&path, |k, v| {
         match k {
             "gm82_version" => match v.parse::<u8>()? {
-                newer if newer > 5 => return Err(Error::OldGM82),
-                older if older < 5 => importing_old_version = true,
+                newer if newer > 6 => return Err(Error::OldGM82),
+                older if older < 6 => importing_old_version = true,
                 _ => (),
             },
             "gameid" => ide::GAME_ID.write(v.parse()?),
