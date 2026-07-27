@@ -33,6 +33,7 @@ use crate::{
     save::GetAsset,
     save_exe::GetAssetList,
 };
+use chashmap::CHashMap;
 use ide::AssetListTrait;
 use itertools::Itertools;
 use lazy_static::lazy_static;
@@ -456,8 +457,20 @@ unsafe fn refresh_gm82room_checkbox() {
 
 #[derive(Default)]
 struct ExtraData {
+    settings: HashMap<String, String>,
+    game_information: HashMap<String, String>,
     instances: HashMap<usize, InstanceExtra>,
     tiles: HashMap<usize, TileExtra>,
+    triggers: HashMap<usize, HashMap<String, String>>,
+    sprites: CHashMap<usize, HashMap<String, String>>,
+    sounds: CHashMap<usize, HashMap<String, String>>,
+    backgrounds: CHashMap<usize, HashMap<String, String>>,
+    paths: CHashMap<usize, HashMap<String, String>>,
+    scripts: CHashMap<usize, HashMap<String, String>>,
+    objects: CHashMap<usize, HashMap<String, String>>,
+    rooms: CHashMap<usize, HashMap<String, String>>,
+    fonts: CHashMap<usize, HashMap<String, String>>,
+    timelines: CHashMap<usize, HashMap<String, String>>,
 }
 
 static mut EXTRA_DATA: Option<ExtraData> = None;
@@ -2380,14 +2393,22 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
             asset_maps_path.push("paths");
             let path_names = &asset_maps.paths.index;
             ide::PATHS.alloc(path_names.len());
+            if let Some(extra_data) = &mut EXTRA_DATA {
+                extra_data.paths.clear();
+            }
             path_names
                 .iter()
                 .zip(ide::PATHS.assets_mut())
                 .zip(ide::PATHS.names_mut())
-                .try_for_each(|((name, asset), name_p)| -> Result<()> {
+                .enumerate()
+                .try_for_each(|(i, ((name, asset), name_p))| -> Result<()> {
                     if !name.is_empty() {
                         *name_p = UStr::new(name);
-                        *asset = Some(load::load_path(&mut asset_maps_path.join(name), &asset_maps)?);
+                        let mut extra = HashMap::new();
+                        *asset = Some(load::load_path(&mut asset_maps_path.join(name), &asset_maps, &mut extra)?);
+                        if !extra.is_empty() {
+                            EXTRA_DATA.get_or_insert_default().paths.insert_new(i, extra);
+                        }
                     }
                     Ok(())
                 })
@@ -2413,11 +2434,18 @@ unsafe extern "fastcall" fn room_form(room_id: usize) -> u32 {
             load::read_resource_tree(ide::RT_PATHS, 8, "paths", &asset_maps.paths.map, true, &mut asset_maps_path)
                 .expect("loading updated path tree failed");
             // reload room
+            if let Some(extra_data) = &mut EXTRA_DATA {
+                extra_data.rooms.remove(&room_id);
+            }
+            let mut extra = HashMap::new();
             ide::ROOMS.assets_mut()[room_id] = Some(
-                load::load_room(&mut room_path, &asset_maps)
+                load::load_room(&mut room_path, &asset_maps, &mut extra)
                     .map_err(|e| e.to_string())
                     .expect("loading the updated room failed"),
             );
+            if !extra.is_empty() {
+                EXTRA_DATA.get_or_insert_default().rooms.insert_new(room_id, extra);
+            }
             room_path.pop();
             room_path.pop();
             update_timestamp();

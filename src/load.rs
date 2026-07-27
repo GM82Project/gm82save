@@ -1,13 +1,13 @@
 use crate::{
-    ACTION_TOKEN, EXTRA_DATA, Error, GMLLines, InstanceExtra, PATH_FORM_UPDATED, Result, TileExtra,
+    ACTION_TOKEN, EXTRA_DATA, Error, ExtraData, GMLLines, InstanceExtra, PATH_FORM_UPDATED, Result, TileExtra,
     asset::*,
-    delphi,
-    delphi::{DelphiBox, UStr, advance_progress_form},
-    events, ide,
-    ide::AssetListTrait,
+    delphi::{self, DelphiBox, UStr, advance_progress_form},
+    events,
+    ide::{self, AssetListTrait},
     regular::project_watcher,
     run_while_updating_bar, show_message, update_timestamp,
 };
+use chashmap::CHashMap;
 use itertools::izip;
 use parking_lot::Mutex;
 use rayon::prelude::*;
@@ -147,11 +147,15 @@ pub unsafe fn read_resource_tree(
     Ok(())
 }
 
-fn load_triggers(maps: &AssetMaps, path: &mut PathBuf) -> Result<()> {
+fn load_triggers(
+    maps: &AssetMaps,
+    extra_data: &mut HashMap<usize, HashMap<String, String>>,
+    path: &mut PathBuf,
+) -> Result<()> {
     path.push("triggers");
     let names = &maps.triggers.index;
     ide::alloc_triggers(names.len());
-    for (name, trig_p) in names.iter().zip(ide::get_triggers_mut()) {
+    for (i, (name, trig_p)) in names.iter().zip(ide::get_triggers_mut()).enumerate() {
         if name.is_empty() {
             continue;
         }
@@ -159,14 +163,18 @@ fn load_triggers(maps: &AssetMaps, path: &mut PathBuf) -> Result<()> {
         trig.name = UStr::new(name);
         path.push(name);
         path.set_extension("txt");
+        let mut extra = HashMap::new();
         read_txt(&path, |k, v| {
             match k {
                 "constant" => trig.constant_name = UStr::new(v),
                 "kind" => trig.kind = v.parse()?,
-                _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
+                _ => _ = extra.insert(k.to_owned(), v.to_owned()),
             }
             Ok(())
         })?;
+        if !extra.is_empty() {
+            extra_data.insert(i, extra);
+        }
         path.set_extension("gml");
         trig.condition = load_gml(&read_file(&path)?);
         path.pop();
@@ -184,7 +192,11 @@ fn verify_path(path: &std::path::Path) -> Result<()> {
     }
 }
 
-unsafe fn load_sound(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<DelphiBox<Sound>> {
+unsafe fn load_sound(
+    path: &mut PathBuf,
+    _asset_maps: &AssetMaps,
+    extra_data: &mut HashMap<String, String>,
+) -> Result<DelphiBox<Sound>> {
     let mut snd = Sound::new();
     path.set_extension("txt");
     let mut extension = String::new();
@@ -202,7 +214,7 @@ unsafe fn load_sound(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<Delp
             "volume" => snd.volume = v.parse()?,
             "pan" => snd.pan = v.parse()?,
             "preload" => snd.preload = v.parse::<u8>()? != 0,
-            _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
+            _ => _ = extra_data.insert(k.to_owned(), v.to_owned()),
         }
         Ok(())
     })?;
@@ -289,7 +301,11 @@ unsafe fn load_frame(path: &std::path::Path, frame: &mut Frame) -> Result<()> {
     Ok(())
 }
 
-unsafe fn load_background(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<DelphiBox<Background>> {
+unsafe fn load_background(
+    path: &mut PathBuf,
+    _asset_maps: &AssetMaps,
+    extra_data: &mut HashMap<String, String>,
+) -> Result<DelphiBox<Background>> {
     let mut bg = Background::new();
     path.set_extension("txt");
     let mut bg_exists = false;
@@ -303,7 +319,7 @@ unsafe fn load_background(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result
             "tile_voffset" => bg.v_offset = v.parse()?,
             "tile_hsep" => bg.h_sep = v.parse()?,
             "tile_vsep" => bg.v_sep = v.parse()?,
-            _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
+            _ => _ = extra_data.insert(k.to_owned(), v.to_owned()),
         }
         Ok(())
     })?;
@@ -314,7 +330,11 @@ unsafe fn load_background(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result
     Ok(bg)
 }
 
-unsafe fn load_sprite(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<DelphiBox<Sprite>> {
+unsafe fn load_sprite(
+    path: &mut PathBuf,
+    _asset_maps: &AssetMaps,
+    extra_data: &mut HashMap<String, String>,
+) -> Result<DelphiBox<Sprite>> {
     let mut sp = Sprite::new();
     path.push("sprite.txt");
     read_txt(&path, |k, v| {
@@ -330,7 +350,7 @@ unsafe fn load_sprite(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<Del
             "bbox_bottom" => sp.bbox_bottom = v.parse()?,
             "bbox_right" => sp.bbox_right = v.parse()?,
             "bbox_top" => sp.bbox_top = v.parse()?,
-            _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
+            _ => _ = extra_data.insert(k.to_owned(), v.to_owned()),
         }
         Ok(())
     })?;
@@ -343,14 +363,22 @@ unsafe fn load_sprite(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<Del
     Ok(sp)
 }
 
-fn load_script(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<DelphiBox<Script>> {
+fn load_script(
+    path: &mut PathBuf,
+    _asset_maps: &AssetMaps,
+    _extra_data: &mut HashMap<String, String>,
+) -> Result<DelphiBox<Script>> {
     path.set_extension("gml");
     let mut s = Script::new();
     s.source = load_gml(&read_file(path)?);
     Ok(s)
 }
 
-fn load_font(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<DelphiBox<Font>> {
+fn load_font(
+    path: &mut PathBuf,
+    _asset_maps: &AssetMaps,
+    extra_data: &mut HashMap<String, String>,
+) -> Result<DelphiBox<Font>> {
     let mut f = Font::new();
     path.set_extension("txt");
     read_txt(path, |k, v| {
@@ -363,7 +391,7 @@ fn load_font(path: &mut PathBuf, _asset_maps: &AssetMaps) -> Result<DelphiBox<Fo
             "aa_level" => f.aa_level = v.parse()?, // DOES NOT CORRESPOND TO .GMK OR .EXE
             "range_start" => f.range_start = v.parse()?,
             "range_end" => f.range_end = v.parse()?,
-            _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
+            _ => _ = extra_data.insert(k.to_owned(), v.to_owned()),
         }
         Ok(())
     })?;
@@ -463,6 +491,7 @@ unsafe fn load_event(
                             action.param_strings[i] = UStr::new(undelimit(v));
                         }
                     },
+                    // Events are too difficult to set up extra data for.
                     _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
                 }
                 Ok(())
@@ -484,7 +513,11 @@ unsafe fn load_event(
     Ok(())
 }
 
-unsafe fn load_object(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<DelphiBox<Object>> {
+unsafe fn load_object(
+    path: &mut PathBuf,
+    asset_maps: &AssetMaps,
+    extra_data: &mut HashMap<String, String>,
+) -> Result<DelphiBox<Object>> {
     path.set_extension("txt");
     let object_name = path.file_stem().map(OsStr::to_string_lossy).unwrap_or_default();
     let mut obj = Object::new();
@@ -536,7 +569,7 @@ unsafe fn load_object(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<Delp
                     },
                 }
             },
-            _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
+            _ => _ = extra_data.insert(k.to_owned(), v.to_owned()),
         }
         Ok(())
     })?;
@@ -561,7 +594,11 @@ unsafe fn load_object(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<Delp
     Ok(obj)
 }
 
-unsafe fn load_timeline(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<DelphiBox<Timeline>> {
+unsafe fn load_timeline(
+    path: &mut PathBuf,
+    asset_maps: &AssetMaps,
+    _extra_data: &mut HashMap<String, String>,
+) -> Result<DelphiBox<Timeline>> {
     let mut tl = Timeline::new();
     path.set_extension("gml");
     let code = read_file(&path)?;
@@ -582,7 +619,11 @@ unsafe fn load_timeline(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<De
     Ok(tl)
 }
 
-pub fn load_path(file_path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<DelphiBox<Path>> {
+pub fn load_path(
+    file_path: &mut PathBuf,
+    asset_maps: &AssetMaps,
+    extra_data: &mut HashMap<String, String>,
+) -> Result<DelphiBox<Path>> {
     let mut path = Path::new();
     file_path.push("path.txt");
     let path_name =
@@ -603,7 +644,7 @@ pub fn load_path(file_path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<Delp
             },
             "snap_x" => path.snap_x = v.parse()?,
             "snap_y" => path.snap_y = v.parse()?,
-            _ => return Err(Error::UnknownKey(file_path.to_path_buf(), k.to_string())),
+            _ => _ = extra_data.insert(k.to_owned(), v.to_owned()),
         }
         Ok(())
     })?;
@@ -771,7 +812,11 @@ unsafe fn load_tiles(path: &mut PathBuf, bgs: &HashMap<String, usize>) -> Result
     Ok(tiles)
 }
 
-pub unsafe fn load_room(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<DelphiBox<Room>> {
+pub unsafe fn load_room(
+    path: &mut PathBuf,
+    asset_maps: &AssetMaps,
+    extra_data: &mut HashMap<String, String>,
+) -> Result<DelphiBox<Room>> {
     let mut room = Room::new();
     path.push("room.txt");
     let room_name = path.parent().and_then(std::path::Path::file_name).map(OsStr::to_string_lossy).unwrap_or_default();
@@ -842,7 +887,7 @@ pub unsafe fn load_room(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<De
                             })? as _
                         }
                     },
-                    _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
+                    _ => _ = extra_data.insert(k.to_owned(), v.to_owned()),
                 }
             },
             "views_enabled" => room.views_enabled = v.parse::<u8>()? != 0,
@@ -861,7 +906,7 @@ pub unsafe fn load_room(path: &mut PathBuf, asset_maps: &AssetMaps) -> Result<De
             "tab" => room.tab = v.parse()?, // i still don't know wtf this is
             "editor_x" => room.x_position_scroll = v.parse()?,
             "editor_y" => room.y_position_scroll = v.parse()?,
-            _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
+            _ => _ = extra_data.insert(k.to_owned(), v.to_owned()),
         }
         Ok(())
     })?;
@@ -909,6 +954,7 @@ unsafe fn load_included_files(path: &mut PathBuf) -> Result<()> {
                 "remove" => file.remove_at_end = v.parse::<u8>()? != 0,
                 "export" => file.export_setting = v.parse()?,
                 "export_folder" => file.export_custom_folder = UStr::new(v),
+                // Included files can't be indexed by id, so this seems complicated.
                 _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
             }
             Ok(())
@@ -934,7 +980,7 @@ unsafe fn load_included_files(path: &mut PathBuf) -> Result<()> {
     Ok(())
 }
 
-unsafe fn load_game_information(path: &mut PathBuf) -> Result<()> {
+unsafe fn load_game_information(extra_data: &mut HashMap<String, String>, path: &mut PathBuf) -> Result<()> {
     use ide::game_info::*;
     let editor = &mut *(**FORM).editor;
     path.push("game_information.txt");
@@ -954,7 +1000,7 @@ unsafe fn load_game_information(path: &mut PathBuf) -> Result<()> {
             "resizable" => RESIZABLE.write(v.parse::<u8>()? != 0),
             "window_on_top" => WINDOW_ON_TOP.write(v.parse::<u8>()? != 0),
             "freeze_game" => FREEZE_GAME.write(v.parse::<u8>()? != 0),
-            _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
+            _ => _ = extra_data.insert(k.to_owned(), v.to_owned()),
         }
         Ok(())
     })?;
@@ -965,7 +1011,7 @@ unsafe fn load_game_information(path: &mut PathBuf) -> Result<()> {
     Ok(())
 }
 
-unsafe fn load_settings(path: &mut PathBuf) -> Result<()> {
+unsafe fn load_settings(extra_data: &mut ExtraData, path: &mut PathBuf) -> Result<()> {
     use ide::settings::*;
     path.push("settings");
     load_constants(path)?;
@@ -1021,7 +1067,7 @@ unsafe fn load_settings(path: &mut PathBuf) -> Result<()> {
             "always_abort" => ALWAYS_ABORT.write(v.parse::<u8>()? != 0),
             "zero_uninitialized_vars" => ZERO_UNINITIALIZED_VARS.write(v.parse::<u8>()? != 0),
             "error_on_uninitialized_args" => ERROR_ON_UNINITIALIZED_ARGS.write(v.parse::<u8>()? != 0),
-            _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
+            _ => _ = extra_data.settings.insert(k.to_owned(), v.to_owned()),
         }
         Ok(())
     })?;
@@ -1078,7 +1124,7 @@ unsafe fn load_settings(path: &mut PathBuf) -> Result<()> {
         }
         path.pop();
     }
-    load_game_information(path)?;
+    load_game_information(&mut extra_data.game_information, path)?;
     path.pop();
     Ok(())
 }
@@ -1099,13 +1145,14 @@ fn load_index(name: &str, has_any: bool, path: &mut PathBuf) -> Result<Assets> {
 
 unsafe fn load_assets<'a, T: 'static + Sync, AL: AssetListTrait<T> + Sync>(
     name: &str,
-    load_asset: unsafe fn(&mut PathBuf, &AssetMaps) -> Result<DelphiBox<T>>,
+    load_asset: unsafe fn(&mut PathBuf, &AssetMaps, &mut HashMap<String, String>) -> Result<DelphiBox<T>>,
     the_assets: &AL,
     assets: &Assets,
     bar_start: u32,
     bar_end: u32,
     path: &mut PathBuf,
     asset_maps: &AssetMaps,
+    extra_data: &mut CHashMap<usize, HashMap<String, String>>,
 ) -> Result<()> {
     path.push(name);
     let names = &assets.index;
@@ -1116,11 +1163,15 @@ unsafe fn load_assets<'a, T: 'static + Sync, AL: AssetListTrait<T> + Sync>(
     }
     if name != "rooms" {
         run_while_updating_bar(bar_start, bar_end, names.len() as u32, |tx| {
-            names.par_iter().zip(the_assets.assets_mut()).zip(the_assets.names_mut()).try_for_each(
-                |((name, asset), name_p)| -> Result<()> {
+            names.par_iter().zip(the_assets.assets_mut()).zip(the_assets.names_mut()).enumerate().try_for_each(
+                |(i, ((name, asset), name_p))| -> Result<()> {
                     if !name.is_empty() {
                         *name_p = UStr::new(name);
-                        *asset = Some(load_asset(&mut path.join(name), asset_maps)?);
+                        let mut extra = HashMap::new();
+                        *asset = Some(load_asset(&mut path.join(name), asset_maps, &mut extra)?);
+                        if !extra.is_empty() {
+                            extra_data.insert_new(i, extra);
+                        }
                     }
                     let _ = tx.send(());
                     Ok(())
@@ -1129,11 +1180,15 @@ unsafe fn load_assets<'a, T: 'static + Sync, AL: AssetListTrait<T> + Sync>(
         })?;
     } else {
         run_while_updating_bar(bar_start, bar_end, names.len() as u32, |tx| {
-            names.iter().zip(the_assets.assets_mut()).zip(the_assets.names_mut()).try_for_each(
-                |((name, asset), name_p)| -> Result<()> {
+            names.iter().zip(the_assets.assets_mut()).zip(the_assets.names_mut()).enumerate().try_for_each(
+                |(i, ((name, asset), name_p))| -> Result<()> {
                     if !name.is_empty() {
                         *name_p = UStr::new(name);
-                        *asset = Some(load_asset(&mut path.join(name), asset_maps)?);
+                        let mut extra = HashMap::new();
+                        *asset = Some(load_asset(&mut path.join(name), asset_maps, &mut extra)?);
+                        if !extra.is_empty() {
+                            extra_data.insert_new(i, extra);
+                        }
                     }
                     let _ = tx.send(());
                     Ok(())
@@ -1174,7 +1229,7 @@ pub fn load_asset_maps(
 pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     ide::initialize_project();
     PATH_FORM_UPDATED = false;
-    EXTRA_DATA = Some(Default::default());
+    let extra_data = EXTRA_DATA.insert(Default::default());
     let mut has_backgrounds = true;
     let mut has_datafiles = true;
     let mut has_fonts = true;
@@ -1223,13 +1278,14 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
             "has_sprites" => has_sprites = v.parse::<u8>()? != 0,
             "has_timelines" => has_timelines = v.parse::<u8>()? != 0,
             "has_triggers" => has_triggers = v.parse::<u8>()? != 0,
+            // We load the root file in multiple places, and I don't really want to duplicate every key.
             _ => return Err(Error::UnknownKey(path.to_path_buf(), k.to_string())),
         }
         Ok(())
     })?;
     path.pop();
     advance_progress_form(5);
-    load_settings(&mut path)?;
+    load_settings(extra_data, &mut path)?;
     advance_progress_form(10);
     let asset_maps = load_asset_maps(
         &mut path,
@@ -1244,11 +1300,31 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         has_timelines,
     )?;
     advance_progress_form(15);
-    load_triggers(&asset_maps, &mut path)?;
+    load_triggers(&asset_maps, &mut extra_data.triggers, &mut path)?;
     advance_progress_form(20);
-    load_assets("sounds", load_sound, &ide::SOUNDS, &asset_maps.sounds, 20, 30, &mut path, &asset_maps)?;
+    load_assets(
+        "sounds",
+        load_sound,
+        &ide::SOUNDS,
+        &asset_maps.sounds,
+        20,
+        30,
+        &mut path,
+        &asset_maps,
+        &mut extra_data.sounds,
+    )?;
     advance_progress_form(30);
-    load_assets("sprites", load_sprite, &ide::SPRITES, &asset_maps.sprites, 30, 40, &mut path, &asset_maps)?;
+    load_assets(
+        "sprites",
+        load_sprite,
+        &ide::SPRITES,
+        &asset_maps.sprites,
+        30,
+        40,
+        &mut path,
+        &asset_maps,
+        &mut extra_data.sprites,
+    )?;
     advance_progress_form(40);
     load_assets(
         "backgrounds",
@@ -1259,6 +1335,7 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
         45,
         &mut path,
         &asset_maps,
+        &mut extra_data.backgrounds,
     )?;
     advance_progress_form(45);
     // register sprite icons
@@ -1290,17 +1367,77 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
     // image list OnChange
     let _: u32 = delphi_call!(0x5081b8, *(0x789b38 as *const usize));
     advance_progress_form(65);
-    load_assets("paths", load_path, &ide::PATHS, &asset_maps.paths, 65, 70, &mut path, &asset_maps)?;
+    load_assets(
+        "paths",
+        load_path,
+        &ide::PATHS,
+        &asset_maps.paths,
+        65,
+        70,
+        &mut path,
+        &asset_maps,
+        &mut extra_data.paths,
+    )?;
     advance_progress_form(70);
-    load_assets("scripts", load_script, &ide::SCRIPTS, &asset_maps.scripts, 70, 75, &mut path, &asset_maps)?;
+    load_assets(
+        "scripts",
+        load_script,
+        &ide::SCRIPTS,
+        &asset_maps.scripts,
+        70,
+        75,
+        &mut path,
+        &asset_maps,
+        &mut extra_data.scripts,
+    )?;
     advance_progress_form(75);
-    load_assets("fonts", load_font, &ide::FONTS, &asset_maps.fonts, 75, 80, &mut path, &asset_maps)?;
+    load_assets(
+        "fonts",
+        load_font,
+        &ide::FONTS,
+        &asset_maps.fonts,
+        75,
+        80,
+        &mut path,
+        &asset_maps,
+        &mut extra_data.fonts,
+    )?;
     advance_progress_form(80);
-    load_assets("timelines", load_timeline, &ide::TIMELINES, &asset_maps.timelines, 80, 85, &mut path, &asset_maps)?;
+    load_assets(
+        "timelines",
+        load_timeline,
+        &ide::TIMELINES,
+        &asset_maps.timelines,
+        80,
+        85,
+        &mut path,
+        &asset_maps,
+        &mut extra_data.timelines,
+    )?;
     advance_progress_form(85);
-    load_assets("objects", load_object, &ide::OBJECTS, &asset_maps.objects, 85, 90, &mut path, &asset_maps)?;
+    load_assets(
+        "objects",
+        load_object,
+        &ide::OBJECTS,
+        &asset_maps.objects,
+        85,
+        90,
+        &mut path,
+        &asset_maps,
+        &mut extra_data.objects,
+    )?;
     advance_progress_form(90);
-    load_assets("rooms", load_room, &ide::ROOMS, &asset_maps.rooms, 90, 95, &mut path, &asset_maps)?;
+    load_assets(
+        "rooms",
+        load_room,
+        &ide::ROOMS,
+        &asset_maps.rooms,
+        90,
+        95,
+        &mut path,
+        &asset_maps,
+        &mut extra_data.rooms,
+    )?;
     advance_progress_form(95);
     if has_datafiles {
         load_included_files(&mut path)?;

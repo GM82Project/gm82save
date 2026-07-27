@@ -1,14 +1,14 @@
 use crate::{
-    ACTION_TOKEN, EXTRA_DATA, Error, GMLLines, InstanceExtra, LAST_SAVE, PATH_FORM_UPDATED, Result,
+    ACTION_TOKEN, EXTRA_DATA, Error, ExtraData, GMLLines, InstanceExtra, LAST_SAVE, PATH_FORM_UPDATED, Result,
     SAW_APPLIES_TO_WARNING, TileExtra,
     asset::*,
-    delphi,
-    delphi::{DelphiBox, TTreeNode, UStr, advance_progress_form},
-    events, ide,
-    ide::AssetListTrait,
+    delphi::{self, DelphiBox, TTreeNode, UStr, advance_progress_form},
+    events,
+    ide::{self, AssetListTrait},
     regular::project_watcher,
     run_while_updating_bar, show_message, update_timestamp,
 };
+use chashmap::CHashMap;
 use itertools::Itertools;
 use png::Compression;
 use rayon::prelude::*;
@@ -148,7 +148,7 @@ fn no_dependencies<T>(_: &T) -> bool {
     false
 }
 
-fn save_sound(sound: &Sound, path: &mut PathBuf) -> Result<()> {
+fn save_sound(sound: &Sound, extra_data: Option<&HashMap<String, String>>, path: &mut PathBuf) -> Result<()> {
     let extension = sound.extension.try_decode()?;
     path.set_extension(extension.trim_matches('.'));
     if let Some(data) = sound.data.as_ref() {
@@ -164,11 +164,14 @@ fn save_sound(sound: &Sound, path: &mut PathBuf) -> Result<()> {
     writeln!(f, "volume={}", sound.volume)?;
     writeln!(f, "pan={}", sound.pan)?;
     writeln!(f, "preload={}", u8::from(sound.preload))?;
+    for (k, v) in extra_data.into_iter().flatten().sorted() {
+        writeln!(f, "{}={}", k, v)?;
+    }
     f.flush()?;
     Ok(())
 }
 
-fn save_sprite(sprite: &Sprite, path: &mut PathBuf) -> Result<()> {
+fn save_sprite(sprite: &Sprite, extra_data: Option<&HashMap<String, String>>, path: &mut PathBuf) -> Result<()> {
     create_dirs(&path)?;
     for (i, frame) in sprite.get_frames().iter().enumerate() {
         path.push(format!("{}.png", i));
@@ -188,12 +191,15 @@ fn save_sprite(sprite: &Sprite, path: &mut PathBuf) -> Result<()> {
     writeln!(f, "bbox_top={}", sprite.bbox_top)?;
     writeln!(f, "bbox_right={}", sprite.bbox_right)?;
     writeln!(f, "bbox_bottom={}", sprite.bbox_bottom)?;
+    for (k, v) in extra_data.into_iter().flatten().sorted() {
+        writeln!(f, "{}={}", k, v)?;
+    }
     f.flush()?;
     path.pop();
     Ok(())
 }
 
-fn save_background(back: &Background, path: &mut PathBuf) -> Result<()> {
+fn save_background(back: &Background, extra_data: Option<&HashMap<String, String>>, path: &mut PathBuf) -> Result<()> {
     path.set_extension("png");
     let frame = &back.frame;
     if frame.width != 0 && frame.height != 0 {
@@ -209,6 +215,9 @@ fn save_background(back: &Background, path: &mut PathBuf) -> Result<()> {
     writeln!(f, "tile_voffset={}", back.v_offset)?;
     writeln!(f, "tile_hsep={}", back.h_sep)?;
     writeln!(f, "tile_vsep={}", back.v_sep)?;
+    for (k, v) in extra_data.into_iter().flatten().sorted() {
+        writeln!(f, "{}={}", k, v)?;
+    }
     f.flush()?;
     Ok(())
 }
@@ -220,7 +229,7 @@ unsafe fn path_needs_update(path: &Path) -> bool {
                 || ide::ROOMS.timestamps().get_asset(path.path_editor_room_background) > LAST_SAVE)
 }
 
-fn save_path(path: &Path, file_path: &mut PathBuf) -> Result<()> {
+fn save_path(path: &Path, extra_data: Option<&HashMap<String, String>>, file_path: &mut PathBuf) -> Result<()> {
     create_dirs(&file_path)?;
     file_path.push("path.txt");
     let mut f = open_file(&file_path)?;
@@ -237,18 +246,21 @@ fn save_path(path: &Path, file_path: &mut PathBuf) -> Result<()> {
     for p in path.get_points() {
         writeln!(f, "{},{},{}", p.x, p.y, p.speed)?;
     }
+    for (k, v) in extra_data.into_iter().flatten().sorted() {
+        writeln!(f, "{}={}", k, v)?;
+    }
     f.flush()?;
     file_path.pop();
     Ok(())
 }
 
-fn save_script(script: &Script, path: &mut PathBuf) -> Result<()> {
+fn save_script(script: &Script, _extra_data: Option<&HashMap<String, String>>, path: &mut PathBuf) -> Result<()> {
     path.set_extension("gml");
     save_gml(&path, &script.source)?;
     Ok(())
 }
 
-fn save_font(font: &Font, path: &mut PathBuf) -> Result<()> {
+fn save_font(font: &Font, extra_data: Option<&HashMap<String, String>>, path: &mut PathBuf) -> Result<()> {
     path.set_extension("txt");
     let mut f = open_file(path)?;
     writeln!(f, "name={}", font.sys_name.try_decode()?)?;
@@ -259,6 +271,9 @@ fn save_font(font: &Font, path: &mut PathBuf) -> Result<()> {
     writeln!(f, "aa_level={}", font.aa_level)?; // DOES NOT CORRESPOND TO .GMK OR .EXE
     writeln!(f, "range_start={}", font.range_start)?;
     writeln!(f, "range_end={}", font.range_end)?;
+    for (k, v) in extra_data.into_iter().flatten().sorted() {
+        writeln!(f, "{}={}", k, v)?;
+    }
     f.flush()?;
     Ok(())
 }
@@ -424,7 +439,11 @@ unsafe fn timeline_needs_update(tl: &Timeline) -> bool {
     tl.get_events().iter().any(|e| event_needs_update(e))
 }
 
-unsafe fn save_timeline(tl: &Timeline, path: &mut PathBuf) -> Result<()> {
+unsafe fn save_timeline(
+    tl: &Timeline,
+    _extra_data: Option<&HashMap<String, String>>,
+    path: &mut PathBuf,
+) -> Result<()> {
     path.set_extension("gml");
     let mut f = open_file(path)?;
     for (time, event) in tl.get_times().iter().zip(tl.get_events()) {
@@ -468,7 +487,7 @@ unsafe fn object_needs_update(obj: &Object) -> bool {
             .any(|(i, e)| e.action_count != 0 && ide::OBJECTS.timestamps().get_asset(i as _) > LAST_SAVE);
 }
 
-unsafe fn save_object(obj: &Object, path: &mut PathBuf) -> Result<()> {
+unsafe fn save_object(obj: &Object, extra_data: Option<&HashMap<String, String>>, path: &mut PathBuf) -> Result<()> {
     path.set_extension("txt");
     {
         let mut f = open_file(&path)?;
@@ -479,6 +498,9 @@ unsafe fn save_object(obj: &Object, path: &mut PathBuf) -> Result<()> {
         writeln!(f, "depth={}", obj.depth)?;
         writeln!(f, "parent={}", ide::OBJECTS.names().get_asset(obj.parent_index))?;
         writeln!(f, "mask={}", ide::SPRITES.names().get_asset(obj.mask_index))?;
+        for (k, v) in extra_data.into_iter().flatten().sorted() {
+            writeln!(f, "{}={}", k, v)?;
+        }
         f.flush()?;
     }
     path.set_extension("gml");
@@ -601,7 +623,7 @@ fn save_instances(instances: &[Instance], path: &mut PathBuf) -> Result<()> {
     Ok(())
 }
 
-unsafe fn save_room(room: &Room, path: &mut PathBuf) -> Result<()> {
+unsafe fn save_room(room: &Room, extra_data: Option<&HashMap<String, String>>, path: &mut PathBuf) -> Result<()> {
     let _: u32 = delphi_call!(0x6576fc, room); // clean unused assets
     create_dirs(&path)?;
     path.push("room.txt");
@@ -664,6 +686,9 @@ unsafe fn save_room(room: &Room, path: &mut PathBuf) -> Result<()> {
         writeln!(f, "tab={}", room.tab)?; // wtf is this
         writeln!(f, "editor_x={}", room.x_position_scroll)?;
         writeln!(f, "editor_y={}", room.y_position_scroll)?;
+        for (k, v) in extra_data.into_iter().flatten().sorted() {
+            writeln!(f, "{}={}", k, v)?;
+        }
         f.flush()?;
     }
     path.pop();
@@ -692,7 +717,7 @@ fn save_constants(path: &mut PathBuf) -> Result<()> {
     Ok(())
 }
 
-unsafe fn save_settings(path: &mut PathBuf, smart_save: bool) -> Result<()> {
+unsafe fn save_settings(extra_data: &ExtraData, path: &mut PathBuf, smart_save: bool) -> Result<()> {
     use ide::settings::*;
     path.push("settings");
     create_dirs(&path)?;
@@ -744,6 +769,9 @@ unsafe fn save_settings(path: &mut PathBuf, smart_save: bool) -> Result<()> {
             writeln!(f, "always_abort={}", u8::from(*ALWAYS_ABORT))?;
             writeln!(f, "zero_uninitialized_vars={}", u8::from(*ZERO_UNINITIALIZED_VARS))?;
             writeln!(f, "error_on_uninitialized_args={}", u8::from(*ERROR_ON_UNINITIALIZED_ARGS))?;
+            for (k, v) in extra_data.settings.iter().sorted() {
+                writeln!(f, "{}={}", k, v)?;
+            }
             f.flush()?;
         }
         if LOADING_BAR.read() == 2 {
@@ -784,13 +812,13 @@ unsafe fn save_settings(path: &mut PathBuf, smart_save: bool) -> Result<()> {
         path.pop();
     }
     if !smart_save || *ide::GAME_INFO_UPDATED {
-        save_game_information(path)?;
+        save_game_information(&extra_data.game_information, path)?;
     }
     path.pop();
     Ok(())
 }
 
-fn save_triggers(path: &mut PathBuf) -> Result<()> {
+fn save_triggers(extra_data: &HashMap<usize, HashMap<String, String>>, path: &mut PathBuf) -> Result<()> {
     path.push("triggers");
     create_dirs(&path)?;
     let triggers = ide::get_triggers();
@@ -815,7 +843,7 @@ fn save_triggers(path: &mut PathBuf) -> Result<()> {
         write_file(&path, index)?;
         path.pop();
     }
-    for trigger in triggers {
+    for (i, trigger) in triggers.iter().enumerate() {
         if let Some(trigger) = trigger.as_ref() {
             let name = trigger.name.try_decode()?;
             path.push(&name);
@@ -824,6 +852,9 @@ fn save_triggers(path: &mut PathBuf) -> Result<()> {
                 let mut f = open_file(&path)?;
                 writeln!(f, "constant={}", trigger.constant_name.try_decode()?)?;
                 writeln!(f, "kind={}", trigger.kind)?;
+                for (k, v) in extra_data.get(&i).into_iter().flatten().sorted() {
+                    writeln!(f, "{}={}", k, v)?;
+                }
                 f.flush()?;
             }
             path.set_extension("gml");
@@ -843,7 +874,8 @@ unsafe fn save_assets<'a, T: Sync>(
     names: &[UStr],
     timestamps: &[f64],
     tree: *const *const TTreeNode,
-    save_func: unsafe fn(&T, &mut PathBuf) -> Result<()>,
+    extra_data: &CHashMap<usize, HashMap<String, String>>,
+    save_func: unsafe fn(&T, Option<&HashMap<String, String>>, &mut PathBuf) -> Result<()>,
     smart_save: bool,
     dependency_check: unsafe fn(&T) -> bool,
     path: &mut PathBuf,
@@ -872,17 +904,20 @@ unsafe fn save_assets<'a, T: Sync>(
         path.pop();
     }
     run_while_updating_bar(_bar_start, _bar_end, count, |tx| {
-        (assets, names, timestamps).into_par_iter().try_for_each(|(asset, name, timestamp)| -> Result<()> {
-            if let Some(asset) = asset {
-                if !smart_save || *timestamp > LAST_SAVE || dependency_check(asset) {
-                    let name = name.try_decode()?;
-                    let mut p = path.join(name);
-                    save_func(asset, &mut p)?;
-                    let _ = tx.send(());
+        (assets, names, timestamps).into_par_iter().enumerate().try_for_each(
+            |(i, (asset, name, timestamp))| -> Result<()> {
+                if let Some(asset) = asset {
+                    if !smart_save || *timestamp > LAST_SAVE || dependency_check(asset) {
+                        let name = name.try_decode()?;
+                        let mut p = path.join(name);
+                        let extra = extra_data.get(&i);
+                        save_func(asset, extra.as_deref(), &mut p)?;
+                        let _ = tx.send(());
+                    }
                 }
-            }
-            Ok(())
-        })
+                Ok(())
+            },
+        )
     })?;
     path.push("tree.yyd");
     if let Some(tree) = tree.as_ref() {
@@ -962,7 +997,7 @@ unsafe fn save_included_files(path: &mut PathBuf, smart_save: bool) -> Result<()
     Ok(())
 }
 
-unsafe fn save_game_information(path: &mut PathBuf) -> Result<()> {
+unsafe fn save_game_information(extra_data: &HashMap<String, String>, path: &mut PathBuf) -> Result<()> {
     use ide::game_info::*;
     let editor = &*(**FORM).editor;
     path.push("game_information.txt");
@@ -979,6 +1014,9 @@ unsafe fn save_game_information(path: &mut PathBuf) -> Result<()> {
         writeln!(f, "resizable={}", u8::from(*RESIZABLE))?;
         writeln!(f, "window_on_top={}", u8::from(*WINDOW_ON_TOP))?;
         writeln!(f, "freeze_game={}", u8::from(*FREEZE_GAME))?;
+        for (k, v) in extra_data.into_iter().sorted() {
+            writeln!(f, "{}={}", k, v)?;
+        }
         f.flush()?;
     }
     path.set_extension("rtf");
@@ -1062,6 +1100,7 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
     let smart_save = project_watcher::watching() && LAST_SAVE != 0.0;
     project_watcher::unwatch();
     PATH_FORM_UPDATED = false;
+    let extra_data = EXTRA_DATA.get_or_insert_default();
     // check if we have any assets to save
     let has_backgrounds = ide::BACKGROUNDS.assets().iter().any(Option::is_some);
     let has_datafiles = !ide::get_included_files().is_empty();
@@ -1116,10 +1155,10 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
     }
     path.pop();
     advance_progress_form(5);
-    save_settings(path, smart_save)?;
+    save_settings(extra_data, path, smart_save)?;
     advance_progress_form(10);
     if has_triggers && (!smart_save || *ide::TRIGGERS_UPDATED) {
-        save_triggers(path)?;
+        save_triggers(&extra_data.triggers, path)?;
     }
     advance_progress_form(15);
     if has_sounds && (!smart_save || *ide::SOUNDS_UPDATED || *ide::RESOURCE_TREE_UPDATED) {
@@ -1131,6 +1170,7 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
             ide::SOUNDS.names(),
             ide::SOUNDS.timestamps(),
             ide::RT_SOUNDS,
+            &extra_data.sounds,
             save_sound,
             smart_save,
             no_dependencies,
@@ -1147,6 +1187,7 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
             ide::SPRITES.names(),
             ide::SPRITES.timestamps(),
             ide::RT_SPRITES,
+            &extra_data.sprites,
             save_sprite,
             smart_save,
             no_dependencies,
@@ -1163,6 +1204,7 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
             ide::BACKGROUNDS.names(),
             ide::BACKGROUNDS.timestamps(),
             ide::RT_BACKGROUNDS,
+            &extra_data.backgrounds,
             save_background,
             smart_save,
             no_dependencies,
@@ -1179,6 +1221,7 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
             ide::PATHS.names(),
             ide::PATHS.timestamps(),
             ide::RT_PATHS,
+            &extra_data.paths,
             save_path,
             smart_save,
             path_needs_update,
@@ -1195,6 +1238,7 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
             ide::SCRIPTS.names(),
             ide::SCRIPTS.timestamps(),
             ide::RT_SCRIPTS,
+            &extra_data.scripts,
             save_script,
             smart_save,
             no_dependencies,
@@ -1211,6 +1255,7 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
             ide::FONTS.names(),
             ide::FONTS.timestamps(),
             ide::RT_FONTS,
+            &extra_data.fonts,
             save_font,
             smart_save,
             no_dependencies,
@@ -1227,6 +1272,7 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
             ide::TIMELINES.names(),
             ide::TIMELINES.timestamps(),
             ide::RT_TIMELINES,
+            &extra_data.timelines,
             save_timeline,
             smart_save,
             timeline_needs_update,
@@ -1243,6 +1289,7 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
             ide::OBJECTS.names(),
             ide::OBJECTS.timestamps(),
             ide::RT_OBJECTS,
+            &extra_data.objects,
             save_object,
             smart_save,
             object_needs_update,
@@ -1254,16 +1301,16 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
     for (room, timestamp) in
         ide::ROOMS.assets().iter().zip(ide::ROOMS.timestamps_mut()).filter_map(|(r, t)| Some((r.as_deref()?, t)))
     {
-        let extra_data = &mut EXTRA_DATA.get_or_insert_with(Default::default).instances;
+        let instances = &mut extra_data.instances;
         for id in room.get_instances().iter().map(|i| i.id) {
-            let mut name = extra_data.entry(id).or_default().name;
+            let mut name = instances.entry(id).or_default().name;
             if name == 0 {
                 *ide::ROOMS_UPDATED = true;
                 delphi::Now(timestamp);
                 loop {
                     name = delphi::Random();
-                    if !extra_data.values().any(|ex| ex.name == name) {
-                        extra_data.get_mut(&id).unwrap().name = name;
+                    if !instances.values().any(|ex| ex.name == name) {
+                        instances.get_mut(&id).unwrap().name = name;
                         break;
                     }
                 }
@@ -1278,6 +1325,7 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
         ide::ROOMS.names(),
         ide::ROOMS.timestamps(),
         ide::RT_ROOMS,
+        &extra_data.rooms,
         save_room,
         smart_save,
         room_needs_update,
