@@ -70,20 +70,20 @@ const INVALID_NAMES: &[&str] = &[
     "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
 ];
 
-fn filename_invalid(s: &str) -> Option<u8> {
-    if s == "." || s == ".." || s.as_bytes().last().copied() == Some(b'.') {
-        return Some(b'.');
+fn filename_invalid(s: &str) -> Option<char> {
+    if s == "." || s == ".." || s.ends_with('.') {
+        return Some('.');
     }
     if s.trim().is_empty() {
-        return Some(b' ');
+        return Some(' ');
     }
-    for c in b"<>:\"/\\|?*" {
-        if s.as_bytes().contains(c) {
-            return Some(*c);
+    for c in s.chars() {
+        if c.is_control() || "<>:\"/\\|?*".contains(c) {
+            return Some(c);
         }
     }
     if INVALID_NAMES.iter().any(|&s2| unicase::eq_ascii(s, s2)) {
-        return Some(0);
+        return Some('\0');
     }
     return None;
 }
@@ -830,7 +830,7 @@ fn save_triggers(extra_data: &HashMap<usize, HashMap<String, String>>, path: &mu
                 let name = trigger.name.try_decode()?;
                 writeln!(index, "{}", name)?;
                 if let Some(c) = filename_invalid(&name) {
-                    return Err(Error::BadTriggerName(name, char::from(c)));
+                    return Err(Error::BadTriggerName(name, c));
                 }
                 if !name_set.insert(make_unicase(name, &trigger.name)) {
                     return Err(Error::DuplicateTrigger(trigger.name.try_decode()?));
@@ -892,7 +892,7 @@ unsafe fn save_assets<'a, T: Sync>(
             if !name.is_empty() {
                 count += 1;
                 if let Some(c) = filename_invalid(&name) {
-                    return Err(Error::BadAssetName(name, char::from(c)));
+                    return Err(Error::BadAssetName(name, c));
                 }
                 if !name_set.insert(make_unicase(name, name_wide)) {
                     return Err(Error::DuplicateAsset(name_wide.try_decode()?));
@@ -944,7 +944,7 @@ unsafe fn save_included_files(path: &mut PathBuf, smart_save: bool) -> Result<()
             writeln!(index, "{}", name)?;
 
             if let Some(c) = filename_invalid(&name) {
-                return Err(Error::BadIncludedFileName(name, char::from(c)));
+                return Err(Error::BadIncludedFileName(name, c));
             }
             if !names_set.insert(name) {
                 return Err(Error::DuplicateIncludedFile(file.file_name.try_decode()?));

@@ -114,7 +114,12 @@ impl std::fmt::Display for Error {
                 } else if *c == '.' || *c == ' ' {
                     write!(f, "included file name \"{n}\" is illegal")
                 } else {
-                    write!(f, "included file name {n} may not contain character {c}")
+                    write!(
+                        f,
+                        "included file name {} may not contain character {}",
+                        n.escape_default(),
+                        c.escape_default()
+                    )
                 }
             },
             Self::BadTriggerName(n, c) => {
