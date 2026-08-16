@@ -830,10 +830,10 @@ fn save_triggers(extra_data: &HashMap<usize, HashMap<String, String>>, path: &mu
                 let name = trigger.name.try_decode()?;
                 writeln!(index, "{}", name)?;
                 if let Some(c) = filename_invalid(&name) {
-                    return Err(Error::BadTriggerName(name, c));
+                    return Err(Error::BadAssetName("trigger", name, c));
                 }
                 if !name_set.insert(make_unicase(name, &trigger.name)) {
-                    return Err(Error::DuplicateTrigger(trigger.name.try_decode()?));
+                    return Err(Error::DuplicateAsset("triggers", trigger.name.try_decode()?));
                 }
             } else {
                 writeln!(index)?;
@@ -869,7 +869,7 @@ fn save_triggers(extra_data: &HashMap<usize, HashMap<String, String>>, path: &mu
 unsafe fn save_assets<'a, T: Sync>(
     _bar_start: u32,
     _bar_end: u32,
-    name: &str,
+    type_name_plural: &'static str,
     assets: &[Option<DelphiBox<T>>],
     names: &[UStr],
     timestamps: &[f64],
@@ -880,7 +880,8 @@ unsafe fn save_assets<'a, T: Sync>(
     dependency_check: unsafe fn(&T) -> bool,
     path: &mut PathBuf,
 ) -> Result<()> {
-    path.push(name);
+    let type_name_singular = type_name_plural.trim_end_matches('s');
+    path.push(type_name_plural);
     create_dirs(&path)?;
     let mut count = 0;
     {
@@ -892,10 +893,10 @@ unsafe fn save_assets<'a, T: Sync>(
             if !name.is_empty() {
                 count += 1;
                 if let Some(c) = filename_invalid(&name) {
-                    return Err(Error::BadAssetName(name, c));
+                    return Err(Error::BadAssetName(type_name_singular, name, c));
                 }
                 if !name_set.insert(make_unicase(name, name_wide)) {
-                    return Err(Error::DuplicateAsset(name_wide.try_decode()?));
+                    return Err(Error::DuplicateAsset(type_name_plural, name_wide.try_decode()?));
                 }
             }
         }
@@ -944,10 +945,10 @@ unsafe fn save_included_files(path: &mut PathBuf, smart_save: bool) -> Result<()
             writeln!(index, "{}", name)?;
 
             if let Some(c) = filename_invalid(&name) {
-                return Err(Error::BadIncludedFileName(name, c));
+                return Err(Error::BadAssetName("included file", name, c));
             }
             if !names_set.insert(name) {
-                return Err(Error::DuplicateIncludedFile(file.file_name.try_decode()?));
+                return Err(Error::DuplicateAsset("included files", file.file_name.try_decode()?));
             }
         }
         path.push("index.yyd");

@@ -64,12 +64,8 @@ pub enum Error {
     ParseIntError(std::num::ParseIntError),
     ParseFloatError(std::num::ParseFloatError),
     InvalidVersion(String),
-    DuplicateAsset(String),
-    DuplicateIncludedFile(String),
-    DuplicateTrigger(String),
-    BadAssetName(String, char),
-    BadIncludedFileName(String, char),
-    BadTriggerName(String, char),
+    DuplicateAsset(&'static str, String),
+    BadAssetName(&'static str, String, char),
     OldGM82,
     Other(String),
 }
@@ -96,40 +92,9 @@ impl std::fmt::Display for Error {
             Self::ParseIntError(e) => write!(f, "integer parse error: {}", e),
             Self::ParseFloatError(e) => write!(f, "float parse error: {}", e),
             Self::InvalidVersion(v) => write!(f, "invalid exe_version {}", v),
-            Self::DuplicateAsset(n) => write!(f, "multiple assets named {}", n),
-            Self::DuplicateIncludedFile(n) => write!(f, "multiple included files named {}", n),
-            Self::DuplicateTrigger(n) => write!(f, "multiple triggers named {}", n),
-            Self::BadAssetName(n, c) => {
-                if *c == '\0' {
-                    write!(f, "asset name \"{n}\" cannot be used as a Windows filename")
-                } else if *c == '.' || *c == ' ' {
-                    write!(f, "asset name \"{n}\" is illegal")
-                } else {
-                    write!(f, "asset name {n} may not contain character {c}")
-                }
-            },
-            Self::BadIncludedFileName(n, c) => {
-                if *c == '\0' {
-                    write!(f, "included file name \"{n}\" cannot be used as a Windows filename")
-                } else if *c == '.' || *c == ' ' {
-                    write!(f, "included file name \"{n}\" is illegal")
-                } else {
-                    write!(
-                        f,
-                        "included file name {} may not contain character {}",
-                        n.escape_default(),
-                        c.escape_default()
-                    )
-                }
-            },
-            Self::BadTriggerName(n, c) => {
-                if *c == '\0' {
-                    write!(f, "trigger name \"{n}\" cannot be used as a Windows filename")
-                } else if *c == '.' || *c == ' ' {
-                    write!(f, "trigger name \"{n}\" is illegal")
-                } else {
-                    write!(f, "trigger name {n} may not contain character {c}")
-                }
+            Self::DuplicateAsset(ty, n) => write!(f, "multiple {ty} named {}", n),
+            Self::BadAssetName(ty, n, c) => {
+                write!(f, "{ty} name {} may not contain character {}", n.escape_default(), c.escape_default())
             },
             Self::OldGM82 => write!(f, "this project was made with a newer version of gm82save, please update"),
             Self::Other(s) => write!(f, "other error: {}", s),
