@@ -568,6 +568,12 @@ unsafe extern "C" fn stuff_to_do_on_ide_start() {
             .read()
             .add(0x110 / 4)
             .write(start_shader_compiler as *const () as usize);
+
+        #[link(name = "user32")]
+        unsafe extern "system" {
+            fn SetProcessDPIAware() -> u32;
+        }
+        SetProcessDPIAware();
     }
     naked_asm!(
         "mov eax, 0x77f464",
