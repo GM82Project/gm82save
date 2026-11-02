@@ -324,23 +324,28 @@ unsafe extern "fastcall" fn load_preferences() {
     let autosave_name = ustr!("AutoSave");
     let sounds_name = ustr!("SoundsInMediaPlayer");
     let compatible_exes_name = ustr!("CompatibleExes");
+    let dpi_aware_name = ustr!("DpiAware");
     // load as bool
     let autosave: u32 = delphi_call!(0x716d20, autosave_name.as_ptr(), 0);
     let sounds: u32 = delphi_call!(0x716d20, sounds_name.as_ptr(), 0);
     let compatible_exes: u32 = delphi_call!(0x716d20, compatible_exes_name.as_ptr(), 0);
+    let dpi_aware: u32 = delphi_call!(0x716d20, dpi_aware_name.as_ptr(), 1);
     AUTOSAVE_ON_BUILD = (autosave as u8) != 0;
     MEDIA_PLAYER_FOR_SOUNDS = (sounds as u8) != 0;
     COMPATIBLE_EXES = (compatible_exes as u8) != 0;
+    DPI_AWARE = (dpi_aware as u8) != 0;
 }
 
 unsafe extern "fastcall" fn save_preferences() {
     let autosave_name = ustr!("AutoSave");
     let sounds_name = ustr!("SoundsInMediaPlayer");
     let compatible_exes_name = ustr!("CompatibleExes");
+    let dpi_aware_name = ustr!("DpiAware");
     // save as bool
     let _: u32 = delphi_call!(0x716b78, autosave_name.as_ptr(), u32::from(AUTOSAVE_ON_BUILD));
     let _: u32 = delphi_call!(0x716b78, sounds_name.as_ptr(), u32::from(MEDIA_PLAYER_FOR_SOUNDS));
     let _: u32 = delphi_call!(0x716b78, compatible_exes_name.as_ptr(), u32::from(COMPATIBLE_EXES));
+    let _: u32 = delphi_call!(0x716b78, dpi_aware_name.as_ptr(), u32::from(DPI_AWARE));
 }
 
 unsafe extern "fastcall" fn open_preferences_form() {
@@ -348,6 +353,7 @@ unsafe extern "fastcall" fn open_preferences_form() {
     let sounds = *preferences_form.add(0x42c / 4);
     let autosave = *preferences_form.add(0x4c4 / 4);
     let compatible_exes = *preferences_form.add(0x4c8 / 4);
+    let dpi_aware = *preferences_form.add(0x3a8 / 4);
     // SetChecked
     asm!(
         "call {}",
@@ -370,6 +376,13 @@ unsafe extern "fastcall" fn open_preferences_form() {
         in("edx") u32::from(COMPATIBLE_EXES),
         clobber_abi("C"),
     );
+    asm!(
+        "call {}",
+        in(reg)  dpi_aware.read().add(0xf0 / 4).read(),
+        in("eax") dpi_aware,
+        in("edx") u32::from(DPI_AWARE),
+        clobber_abi("C"),
+    );
 }
 
 unsafe extern "fastcall" fn close_preferences_form() {
@@ -377,9 +390,11 @@ unsafe extern "fastcall" fn close_preferences_form() {
     let sounds_checkbox = *preferences_form.add(0x42c / 4);
     let autosave_checkbox = *preferences_form.add(0x4c4 / 4);
     let compatible_exes_checkbox = *preferences_form.add(0x4c8 / 4);
+    let dpi_aware_checkbox = *preferences_form.add(0x3a8 / 4);
     let mut sounds: u8;
     let mut autosave: u8;
     let mut compatible_exes: u8;
+    let mut dpi_aware: u8;
     // GetChecked
     asm!(
         "call {}",
@@ -402,9 +417,17 @@ unsafe extern "fastcall" fn close_preferences_form() {
         lateout("al") compatible_exes,
         clobber_abi("C"),
     );
+    asm!(
+        "call {}",
+        in(reg) dpi_aware_checkbox.read().add(0xec / 4).read(),
+        in("eax") dpi_aware_checkbox,
+        lateout("al") dpi_aware,
+        clobber_abi("C"),
+    );
     MEDIA_PLAYER_FOR_SOUNDS = sounds != 0;
     AUTOSAVE_ON_BUILD = autosave != 0;
     COMPATIBLE_EXES = compatible_exes != 0;
+    DPI_AWARE = dpi_aware != 0;
 
     refresh_gm82room_checkbox();
     // save to registry
@@ -569,11 +592,13 @@ unsafe extern "C" fn stuff_to_do_on_ide_start() {
             .add(0x110 / 4)
             .write(start_shader_compiler as *const () as usize);
 
-        #[link(name = "user32")]
-        unsafe extern "system" {
-            fn SetProcessDPIAware() -> u32;
+        if DPI_AWARE {
+            #[link(name = "user32")]
+            unsafe extern "system" {
+                fn SetProcessDPIAware() -> u32;
+            }
+            SetProcessDPIAware();
         }
-        SetProcessDPIAware();
     }
     naked_asm!(
         "mov eax, 0x77f464",
@@ -2124,6 +2149,8 @@ static mut SAVING_FOR_ROOM_EDITOR: bool = false;
 static mut AUTOSAVE_ON_BUILD: bool = false;
 
 static mut COMPATIBLE_EXES: bool = false;
+
+static mut DPI_AWARE: bool = false;
 
 static mut MEDIA_PLAYER_FOR_SOUNDS: bool = false;
 
