@@ -327,10 +327,10 @@ impl TPopupMenu {
     }
 
     pub fn popup_at_cursor_pos(&self) {
-        let mouse_pos: [i32; 2] = [0, 0];
+        let mut mouse_pos: [i32; 2] = [0, 0];
         unsafe {
             // TMouse.GetCursorPos
-            let _: u32 = delphi_call!(0x4fd580, 0, mouse_pos.as_ptr());
+            let _: u32 = delphi_call!(0x4fd580, 0, mouse_pos.as_mut_ptr());
             // TPopupMenu.PopUp
             let _: u32 = delphi_call!(0x4def94, self, mouse_pos[0], mouse_pos[1]);
             // TApplication.ProcessMessages
