@@ -26,7 +26,7 @@ mod save_exe;
 mod stub;
 
 use crate::{
-    delphi::{ExtractFileExt, TMenuItem, TTreeNode, UStr, UStrCopy},
+    delphi::{ExtractFileExt, TMenuItem, TPopupMenu, TTreeNode, UStr, UStrCopy},
     ide::get_triggers,
     load::UStrPtr,
     regular::{extension_watcher::update_extensions, project_watcher},
@@ -583,7 +583,9 @@ unsafe extern "fastcall" fn load(proj_path: &UStr, stream_ptr: *mut u32, result_
 #[unsafe(naked)]
 unsafe extern "C" fn stuff_to_do_on_ide_start() {
     unsafe extern "C" fn inj() {
+        // set up file watch
         regular::init();
+
         // overwrite HelpBtn OnClick
         (0x790100 as *const *const *mut usize)
             .read()
@@ -592,6 +594,23 @@ unsafe extern "C" fn stuff_to_do_on_ide_start() {
             .add(0x110 / 4)
             .write(start_shader_compiler as *const () as usize);
 
+        // overwrite MenuItem4 onclick
+        (0x79007c as *const *const *mut usize)
+            .read()
+            .add(0x3cc / 4)
+            .read()
+            .add(0x110 / 4)
+            .write(open_user_events as *const () as usize);
+
+        // overwrite N5 onclick
+        (0x79007c as *const *const *mut usize)
+            .read()
+            .add(0x5b0 / 4)
+            .read()
+            .add(0x110 / 4)
+            .write(open_joystick_events as *const () as usize);
+
+        // set dpi awareness
         if DPI_AWARE {
             #[link(name = "user32")]
             unsafe extern "system" {
@@ -612,6 +631,22 @@ unsafe extern "fastcall" fn start_shader_compiler() {
     if let Err(e) = std::process::Command::new("anvil.exe").spawn() {
         show_message(format!("Couldn't start anvil.exe: {e}"));
     }
+}
+
+unsafe extern "fastcall" fn open_user_events() {
+    // set event type
+    (0x790080 as *mut usize).write(7);
+
+    // event_form.UserDefined1.Popup()
+    (0x79007c as *const *const *const TPopupMenu).read().add(0x430 / 4).read().as_ref_unchecked().popup_at_cursor_pos();
+}
+
+unsafe extern "fastcall" fn open_joystick_events() {
+    // set event type
+    (0x790080 as *mut usize).write(6);
+
+    // event_form.N2.Popup()
+    (0x79007c as *const *const *const TPopupMenu).read().add(0x5cc / 4).read().as_ref_unchecked().popup_at_cursor_pos();
 }
 
 #[unsafe(naked)]
