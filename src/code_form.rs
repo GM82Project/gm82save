@@ -1,8 +1,7 @@
 use crate::{
     asset::{Action, Event, Room, Timeline, Trigger},
     delphi::UStr,
-    ide,
-    ide::AssetListTrait,
+    ide::{self, AssetListTrait, OBJECTS},
     patch, patch_call,
 };
 use itertools::Itertools;
@@ -324,14 +323,16 @@ unsafe fn create_code_form(
     (UStr::from_ptr(&code).clone(), form as usize)
 }
 
-unsafe fn open_or_insert(holder: CodeHolder, create: impl FnOnce() -> (UStr, CodeFormPointer, AssetId)) {
+unsafe fn open_or_insert(
+    holder: CodeHolder,
+    create: impl FnOnce() -> (UStr, CodeFormPointer, AssetId),
+) -> CodeFormPointer {
     match CODE_FORMS.get_or_insert_default().entry(holder) {
         Entry::Occupied(entry) => {
             let _: u32 = delphi_call!(0x4ee948, entry.get().1);
+            entry.get().1
         },
-        Entry::Vacant(entry) => {
-            entry.insert(create());
-        },
+        Entry::Vacant(entry) => entry.insert(create()).1,
     }
 }
 
@@ -353,14 +354,73 @@ unsafe extern "C" fn edit_action() {
     naked_asm!("mov ecx, eax", "jmp {}", sym inj);
 }
 
+fn open_code_action_inner(
+    action: &Action,
+    window_title: UStr,
+    asset_id: usize,
+    is_timeline: bool,
+    line: Option<usize>,
+) {
+    unsafe {
+        let form = open_or_insert(CodeHolder::Action(action), || {
+            let (code, form) = create_code_form(
+                action.param_strings[0].as_ptr(),
+                Some(action.applies_to),
+                window_title.as_ptr(),
+                action.action_kind != 6,
+                action as *const _ as _,
+                false,
+            );
+            (code, form, if !is_timeline { asset_id } else { !asset_id })
+        });
+        if let Some(line) = line {
+            let editor = (form as *const *mut usize).add(0x43c / 4).read();
+            // TEditor.ShowPosition
+            let _: u32 = delphi_call!(0x6b9154, editor, line - 1, 0);
+        }
+    }
+}
+
+fn open_object_code_action(
+    object_index: usize,
+    event_type: usize,
+    event_number: usize,
+    action_id: usize,
+    line: Option<usize>,
+) {
+    let action = &ide::OBJECTS.assets_mut()[object_index]
+        .as_deref_mut()
+        .unwrap()
+        .get_event(event_type, event_number)
+        .get_actions()[action_id];
+    let object_name = ide::OBJECTS.names()[object_index].clone();
+    let action_description = action.get_description();
+    unsafe {
+        let mut event_name = UStr::default();
+        let _: u32 = delphi_call!(0x6d0df0, event_type, event_number, &mut event_name);
+        let window_title = object_name
+            + ustr!(" - ")
+            + event_name
+            + UStr::new(format!(" - Action {} - ", action_id + 1))
+            + action_description;
+        open_code_action_inner(action, window_title, object_index, false, line);
+    }
+}
+
+fn open_timeline_code_action(timeline_index: usize, moment_id: usize, action_id: usize, line: Option<usize>) {
+    let timeline = ide::TIMELINES.assets()[timeline_index].as_ref().unwrap();
+    let action = &timeline.get_events()[moment_id].get_actions()[action_id];
+    let timeline_name = ide::TIMELINES.names()[timeline_index].clone();
+    let action_description = action.get_description();
+    let window_title = timeline_name
+        + UStr::new(format!(" - Step {} - Action {} - ", timeline.moment_times[moment_id], action_id + 1))
+        + action_description;
+    open_code_action_inner(action, window_title, timeline_index, true, line);
+}
+
 #[unsafe(naked)]
 unsafe extern "C" fn open_code_action() {
-    unsafe extern "fastcall" fn inj(
-        title: *const u16,
-        action: &Action,
-        form_ebx: *const usize,
-        form_esi: *const usize,
-    ) {
+    unsafe extern "fastcall" fn inj(action: &Action, form_ebx: *const usize, form_esi: *const usize) {
         enum ThingForm {
             Object(*const usize),
             Timeline(*const usize),
@@ -374,63 +434,32 @@ unsafe extern "C" fn open_code_action() {
                 _ => unreachable!(),
             },
         };
-        let (title, asset_id) = match form {
+        match form {
             ThingForm::Object(form) => {
                 let object_index = form.add(0x46c / 4).read();
-                let object_name = ide::OBJECTS.names()[object_index].clone();
                 let event_type = form.add(0x8180 / 4).read();
                 let event_number = form.add(0x8184 / 4).read();
                 let event = form.add(0x817c / 4).cast::<&Event>().read();
                 let action_id =
                     event.get_actions().iter().find_position(|act| act.as_ptr() == action as *const _).unwrap().0;
-                let mut event_name = UStr::default();
-                let _: u32 = delphi_call!(0x6d0df0, event_type, event_number, &mut event_name);
-                (
-                    object_name
-                        + ustr!(" - ")
-                        + event_name
-                        + UStr::new(format!(" - Action {} - ", action_id + 1))
-                        + UStr::from_ptr(&title),
-                    object_index,
-                )
+                open_object_code_action(object_index, event_type, event_number, action_id, None);
             },
             ThingForm::Timeline(form) => {
                 let timeline_index = form.add(0x430 / 4).read();
-                let timeline_name = ide::TIMELINES.names()[timeline_index].clone();
                 let timeline = form.add(0x420 / 4).cast::<&Timeline>().read();
                 let event = form.add(0x434 / 4).cast::<&Event>().read();
                 let moment_id =
                     timeline.moment_events.iter().find_position(|e| e.as_ptr() == event as *const _).unwrap().0;
                 let action_id =
                     event.get_actions().iter().find_position(|a| a.as_ptr() == action as *const _).unwrap().0;
-                (
-                    timeline_name
-                        + UStr::new(format!(
-                            " - Step {} - Action {} - ",
-                            timeline.moment_times[moment_id],
-                            action_id + 1
-                        ))
-                        + UStr::from_ptr(&title),
-                    !timeline_index,
-                )
+                open_timeline_code_action(timeline_index, moment_id, action_id, None);
             },
         };
-        open_or_insert(CodeHolder::Action(action), || {
-            let (code, form) = create_code_form(
-                action.param_strings[0].as_ptr(),
-                Some(action.applies_to),
-                title.as_ptr(),
-                action.action_kind != 6,
-                action as *const _ as _,
-                false,
-            );
-            (code, form, asset_id)
-        });
     }
     naked_asm!(
-        "mov edx, dword ptr [esi]",
         "push dword ptr [ebp - 0x1c]",
-        "push dword ptr [ebp + 0xc]",
+        "mov edx, dword ptr [ebp + 0xc]",
+        "mov ecx, dword ptr [esi]",
         "call {}",
         "mov al, 1",
         "ret 8",
@@ -594,6 +623,107 @@ unsafe extern "C" fn destroy_trigger(_: u32, trigger: &Trigger) {
     }
 }
 
+static mut SEARCH_RESULTS_EVENT_TYPE: [usize; 10000] = [0; _];
+static mut SEARCH_RESULTS_EVENT_NUMBER: [usize; 10000] = [0; _];
+static mut SEARCH_RESULTS_ACTION_ID: [usize; 10000] = [0; _];
+
+#[unsafe(naked)]
+unsafe extern "fastcall" fn add_object_event_search_result() {
+    unsafe extern "fastcall" fn inj(item_index: usize, event_type: usize, event_number: usize, action_id: usize) {
+        SEARCH_RESULTS_EVENT_TYPE[item_index] = event_type;
+        SEARCH_RESULTS_EVENT_NUMBER[item_index] = event_number;
+        SEARCH_RESULTS_ACTION_ID[item_index] = action_id;
+    }
+    naked_asm!(
+        "push eax",
+        "push edx",
+        "push ecx",
+        // fourth arg: action index
+        "push dword ptr [ebp - 0x38]",
+        // third arg: event index
+        "push dword ptr [ebp - 0x34]",
+        // second arg: event kind
+        "mov edx, [ebp - 0x28]",
+        // first arg: item index
+        "mov ecx, [eax + 0x3bc]",
+        "call {}",
+        "pop ecx",
+        "pop edx",
+        "pop eax",
+        "push 0x6d1af4",
+        "ret",
+        sym inj,
+    );
+}
+
+#[unsafe(naked)]
+unsafe extern "fastcall" fn open_object_event_search_result() {
+    unsafe extern "fastcall" fn inj(item_index: usize, script_info_form: *const usize) {
+        let object_index = script_info_form.add(0x2f1cc / 4 + item_index).read();
+        let event_type = SEARCH_RESULTS_EVENT_TYPE[item_index];
+        let event_number = SEARCH_RESULTS_EVENT_NUMBER[item_index];
+        let action_id = SEARCH_RESULTS_ACTION_ID[item_index];
+        let line = script_info_form.add(0x3ebd0 / 4 + item_index).read();
+
+        // open the object form
+        let _: u32 = delphi_call!(0x62cde0, object_index);
+
+        let object = OBJECTS.assets_mut()[object_index].as_deref_mut();
+        if let Some(event) =
+            object.map(|o| o.get_event(event_type, event_number)).filter(|e| e.get_actions().len() > action_id)
+        {
+            // open the relevant event
+            let object_form = ide::OBJECTS.forms()[object_index];
+            // TObjectForm.etype
+            (object_form as *mut usize).add(0x8180 / 4).write(event_type);
+            // TObjectForm.ekind
+            (object_form as *mut usize).add(0x8184 / 4).write(event_number);
+            // TObjectForm.theevent
+            (object_form as *mut *const Event).add(0x817c / 4).write(event);
+            // TObjectForm.EventList
+            let event_list = (object_form as *const *const *const usize).add(0x3d4 / 4).read();
+            // select the appropriate event in the list
+            let event_list_index = (0..4000).into_iter().position(|i| {
+                // TObjectForm.elist_type
+                ((object_form + 0x470) as *const [usize; 4000]).read()[i] == event_type
+                    // TObjectForm.elist_kind
+                    && ((object_form + 0x42f4) as *const [usize; 4000]).read()[i] == event_number
+            });
+            if let Some(index) = event_list_index {
+                // TListBox.SetItemIndex
+                asm!(
+                    "call {call}",
+                    call = in(reg) (event_list as *const *const usize).read().add(0xf0 / 4).read(),
+                    inlateout("eax") event_list => _,
+                    in("edx") index,
+                    clobber_abi("C"),
+                );
+            }
+            // TListBox.Invalidate()
+            asm!("call {call}",
+                call = in(reg) event_list.read().add(0x90/4).read(),
+                inlateout("eax") event_list => _,
+                clobber_abi("C"),
+            );
+            // populate action list
+            let _: u32 = delphi_call!(0x6c6e20, object_form);
+            // i would like to select the action in the action list as well,
+            // but that doesn't seem to work for whatever reason
+
+            if event.get_actions()[action_id].action_kind == 7 {
+                // code event
+                open_object_code_action(object_index, event_type, event_number, action_id, Some(line));
+            }
+        }
+    }
+    naked_asm!(
+        "mov ecx, esi",
+        "mov edx, ebx",
+        "jmp {}",
+        sym inj,
+    );
+}
+
 pub unsafe fn inject() {
     // nop out modal creation
     patch(0x7724af, &[0x90; 5]);
@@ -648,4 +778,10 @@ pub unsafe fn inject() {
         ],
     );
     patch_call(0x682a76, close_code as _);
+
+    // open object code actions directly
+    patch_call(0x6d436b, add_object_event_search_result as _);
+    patch_call(0x6d43ef, add_object_event_search_result as _);
+    patch_call(0x6d445d, add_object_event_search_result as _);
+    patch_call(0x6d1ca5, open_object_event_search_result as _);
 }

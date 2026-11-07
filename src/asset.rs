@@ -392,6 +392,12 @@ impl Action {
             definition.as_ref()
         }
     }
+
+    pub fn get_description(&self) -> UStr {
+        let mut action_description = UStr::default();
+        let _: u32 = unsafe { delphi_call!(0x6fff10, self, &mut action_description) };
+        action_description
+    }
 }
 
 #[repr(C)]
