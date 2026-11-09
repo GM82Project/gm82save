@@ -643,21 +643,22 @@ struct InfoFormEntry {
 }
 static mut INFO_FORM_ENTRIES: Option<HashMap<*const TScriptInfoForm, HashMap<usize, InfoFormEntry>>> = None;
 
+unsafe extern "fastcall" fn add_info_form_entry(
+    script_info_form: &TScriptInfoForm,
+    event_type: usize,
+    event_number: usize,
+    action_id: usize,
+) {
+    let item_index = script_info_form.info_count;
+    INFO_FORM_ENTRIES
+        .get_or_insert_default()
+        .entry(script_info_form)
+        .or_default()
+        .insert(item_index, InfoFormEntry { event_type, event_number, action_id });
+}
+
 #[unsafe(naked)]
 unsafe extern "fastcall" fn add_object_event_search_result() {
-    unsafe extern "fastcall" fn inj(
-        script_info_form: &TScriptInfoForm,
-        event_type: usize,
-        event_number: usize,
-        action_id: usize,
-    ) {
-        let item_index = script_info_form.info_count;
-        INFO_FORM_ENTRIES
-            .get_or_insert_default()
-            .entry(script_info_form)
-            .or_default()
-            .insert(item_index, InfoFormEntry { event_type, event_number, action_id });
-    }
     naked_asm!(
         "push eax",
         "push edx",
@@ -676,7 +677,31 @@ unsafe extern "fastcall" fn add_object_event_search_result() {
         "pop eax",
         "push 0x6d1af4",
         "ret",
-        sym inj,
+        sym add_info_form_entry,
+    );
+}
+
+#[unsafe(naked)]
+unsafe extern "fastcall" fn add_object_event_error_result() {
+    naked_asm!(
+        "push eax",
+        "push edx",
+        "push ecx",
+        // fourth arg: action index
+        "push ebx",
+        // third arg: event index
+        "push dword ptr [ebp - 0x2c]",
+        // second arg: event kind
+        "mov edx, [ebp - 0x24]",
+        // first arg: script info form
+        "mov ecx, eax",
+        "call {}",
+        "pop ecx",
+        "pop edx",
+        "pop eax",
+        "push 0x6d1af4",
+        "ret",
+        sym add_info_form_entry,
     );
 }
 
@@ -829,6 +854,9 @@ pub unsafe fn inject() {
     patch_call(0x6d436b, add_object_event_search_result as _);
     patch_call(0x6d43ef, add_object_event_search_result as _);
     patch_call(0x6d445d, add_object_event_search_result as _);
+    patch_call(0x6d3719, add_object_event_error_result as _);
+    patch_call(0x6d37ba, add_object_event_error_result as _);
+    patch_call(0x6d3831, add_object_event_error_result as _);
     patch_call(0x6d1ca5, open_object_event_search_result as _);
     // close script info form
     patch(0x6d4f6c, &[0xe8, 0, 0, 0, 0, 0x90]);
