@@ -623,16 +623,40 @@ unsafe extern "C" fn destroy_trigger(_: u32, trigger: &Trigger) {
     }
 }
 
-static mut SEARCH_RESULTS_EVENT_TYPE: [usize; 10000] = [0; _];
-static mut SEARCH_RESULTS_EVENT_NUMBER: [usize; 10000] = [0; _];
-static mut SEARCH_RESULTS_ACTION_ID: [usize; 10000] = [0; _];
+#[repr(C)]
+struct TScriptInfoForm {
+    _padding: [u8; 0x3b8],
+    info_type: usize,
+    info_count: usize,
+    info_item: [UStr; 16001],
+    info_color: [usize; 16001],
+    info_kind: [usize; 16001],
+    info_index: [usize; 16001],
+    info_line: [usize; 16001],
+}
+
+#[derive(Clone, Copy)]
+struct InfoFormEntry {
+    event_type: usize,
+    event_number: usize,
+    action_id: usize,
+}
+static mut INFO_FORM_ENTRIES: Option<HashMap<*const TScriptInfoForm, HashMap<usize, InfoFormEntry>>> = None;
 
 #[unsafe(naked)]
 unsafe extern "fastcall" fn add_object_event_search_result() {
-    unsafe extern "fastcall" fn inj(item_index: usize, event_type: usize, event_number: usize, action_id: usize) {
-        SEARCH_RESULTS_EVENT_TYPE[item_index] = event_type;
-        SEARCH_RESULTS_EVENT_NUMBER[item_index] = event_number;
-        SEARCH_RESULTS_ACTION_ID[item_index] = action_id;
+    unsafe extern "fastcall" fn inj(
+        script_info_form: &TScriptInfoForm,
+        event_type: usize,
+        event_number: usize,
+        action_id: usize,
+    ) {
+        let item_index = script_info_form.info_count;
+        INFO_FORM_ENTRIES
+            .get_or_insert_default()
+            .entry(script_info_form)
+            .or_default()
+            .insert(item_index, InfoFormEntry { event_type, event_number, action_id });
     }
     naked_asm!(
         "push eax",
@@ -644,8 +668,8 @@ unsafe extern "fastcall" fn add_object_event_search_result() {
         "push dword ptr [ebp - 0x34]",
         // second arg: event kind
         "mov edx, [ebp - 0x28]",
-        // first arg: item index
-        "mov ecx, [eax + 0x3bc]",
+        // first arg: script info form
+        "mov ecx, eax",
         "call {}",
         "pop ecx",
         "pop edx",
@@ -658,61 +682,62 @@ unsafe extern "fastcall" fn add_object_event_search_result() {
 
 #[unsafe(naked)]
 unsafe extern "fastcall" fn open_object_event_search_result() {
-    unsafe extern "fastcall" fn inj(item_index: usize, script_info_form: *const usize) {
-        let object_index = script_info_form.add(0x2f1cc / 4 + item_index).read();
-        let event_type = SEARCH_RESULTS_EVENT_TYPE[item_index];
-        let event_number = SEARCH_RESULTS_EVENT_NUMBER[item_index];
-        let action_id = SEARCH_RESULTS_ACTION_ID[item_index];
-        let line = script_info_form.add(0x3ebd0 / 4 + item_index).read();
+    unsafe extern "fastcall" fn inj(item_index: usize, script_info_form: *const TScriptInfoForm) {
+        let object_index = (*script_info_form).info_index[item_index];
 
         // open the object form
         let _: u32 = delphi_call!(0x62cde0, object_index);
 
-        let object = OBJECTS.assets_mut()[object_index].as_deref_mut();
-        if let Some(event) =
-            object.map(|o| o.get_event(event_type, event_number)).filter(|e| e.get_actions().len() > action_id)
+        if let Some(InfoFormEntry { event_type, event_number, action_id }) =
+            INFO_FORM_ENTRIES.as_ref().and_then(|e| e.get(&script_info_form)).and_then(|e| e.get(&item_index)).copied()
         {
-            // open the relevant event
-            let object_form = ide::OBJECTS.forms()[object_index];
-            // TObjectForm.etype
-            (object_form as *mut usize).add(0x8180 / 4).write(event_type);
-            // TObjectForm.ekind
-            (object_form as *mut usize).add(0x8184 / 4).write(event_number);
-            // TObjectForm.theevent
-            (object_form as *mut *const Event).add(0x817c / 4).write(event);
-            // TObjectForm.EventList
-            let event_list = (object_form as *const *const *const usize).add(0x3d4 / 4).read();
-            // select the appropriate event in the list
-            let event_list_index = (0..4000).into_iter().position(|i| {
-                // TObjectForm.elist_type
-                ((object_form + 0x470) as *const [usize; 4000]).read()[i] == event_type
-                    // TObjectForm.elist_kind
-                    && ((object_form + 0x42f4) as *const [usize; 4000]).read()[i] == event_number
-            });
-            if let Some(index) = event_list_index {
-                // TListBox.SetItemIndex
-                asm!(
-                    "call {call}",
-                    call = in(reg) (event_list as *const *const usize).read().add(0xf0 / 4).read(),
+            let line = (*script_info_form).info_line[item_index];
+            let object = OBJECTS.assets_mut()[object_index].as_deref_mut();
+            if let Some(event) =
+                object.map(|o| o.get_event(event_type, event_number)).filter(|e| e.get_actions().len() > action_id)
+            {
+                // open the relevant event
+                let object_form = ide::OBJECTS.forms()[object_index];
+                // TObjectForm.etype
+                (object_form as *mut usize).add(0x8180 / 4).write(event_type);
+                // TObjectForm.ekind
+                (object_form as *mut usize).add(0x8184 / 4).write(event_number);
+                // TObjectForm.theevent
+                (object_form as *mut *const Event).add(0x817c / 4).write(event);
+                // TObjectForm.EventList
+                let event_list = (object_form as *const *const *const usize).add(0x3d4 / 4).read();
+                // select the appropriate event in the list
+                let event_list_index = (0..4000).into_iter().position(|i| {
+                    // TObjectForm.elist_type
+                    ((object_form + 0x470) as *const [usize; 4000]).read()[i] == event_type
+                        // TObjectForm.elist_kind
+                        && ((object_form + 0x42f4) as *const [usize; 4000]).read()[i] == event_number
+                });
+                if let Some(index) = event_list_index {
+                    // TListBox.SetItemIndex
+                    asm!(
+                        "call {call}",
+                        call = in(reg) (event_list as *const *const usize).read().add(0xf0 / 4).read(),
+                        inlateout("eax") event_list => _,
+                        in("edx") index,
+                        clobber_abi("C"),
+                    );
+                }
+                // TListBox.Invalidate()
+                asm!("call {call}",
+                    call = in(reg) event_list.read().add(0x90/4).read(),
                     inlateout("eax") event_list => _,
-                    in("edx") index,
                     clobber_abi("C"),
                 );
-            }
-            // TListBox.Invalidate()
-            asm!("call {call}",
-                call = in(reg) event_list.read().add(0x90/4).read(),
-                inlateout("eax") event_list => _,
-                clobber_abi("C"),
-            );
-            // populate action list
-            let _: u32 = delphi_call!(0x6c6e20, object_form);
-            // i would like to select the action in the action list as well,
-            // but that doesn't seem to work for whatever reason
+                // populate action list
+                let _: u32 = delphi_call!(0x6c6e20, object_form);
+                // i would like to select the action in the action list as well,
+                // but that doesn't seem to work for whatever reason
 
-            if event.get_actions()[action_id].action_kind == 7 {
-                // code event
-                open_object_code_action(object_index, event_type, event_number, action_id, Some(line));
+                if event.get_actions()[action_id].action_kind == 7 {
+                    // code event
+                    open_object_code_action(object_index, event_type, event_number, action_id, Some(line));
+                }
             }
         }
     }
@@ -720,6 +745,27 @@ unsafe extern "fastcall" fn open_object_event_search_result() {
         "mov ecx, esi",
         "mov edx, ebx",
         "jmp {}",
+        sym inj,
+    );
+}
+
+#[unsafe(naked)]
+pub unsafe extern "fastcall" fn close_script_info_form() {
+    unsafe extern "fastcall" fn inj(script_info_form: *const TScriptInfoForm) -> usize {
+        if let Some(entries) = INFO_FORM_ENTRIES.as_mut() {
+            entries.remove(&script_info_form);
+        }
+        (*script_info_form).info_type
+    }
+    naked_asm!(
+        "push eax",
+        "push ecx",
+        "mov ecx, eax",
+        "call {}",
+        "pop ecx",
+        "mov edx, eax",
+        "pop eax",
+        "ret",
         sym inj,
     );
 }
@@ -779,9 +825,12 @@ pub unsafe fn inject() {
     );
     patch_call(0x682a76, close_code as _);
 
-    // open object code actions directly
+    // open object code actions directly from script info form
     patch_call(0x6d436b, add_object_event_search_result as _);
     patch_call(0x6d43ef, add_object_event_search_result as _);
     patch_call(0x6d445d, add_object_event_search_result as _);
     patch_call(0x6d1ca5, open_object_event_search_result as _);
+    // close script info form
+    patch(0x6d4f6c, &[0xe8, 0, 0, 0, 0, 0x90]);
+    patch_call(0x6d4f6c, close_script_info_form as _);
 }
