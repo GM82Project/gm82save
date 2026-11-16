@@ -289,6 +289,7 @@ impl Default for TileExtra {
 unsafe extern "fastcall" fn stuff_to_do_on_project_init() {
     EXTRA_DATA = None;
     SEEN_ERROR = false;
+    TIME_SPENT = 0;
     project_watcher::unwatch();
     let _: u32 = delphi_call!(0x7149c4); // reload action libraries (what this overwrote)
     // insert blank resources
@@ -467,6 +468,7 @@ struct ExtraData {
 }
 
 static mut EXTRA_DATA: Option<ExtraData> = None;
+static mut TIME_SPENT: usize = 0; // seconds
 
 unsafe extern "fastcall" fn about_inj(about_dialog: *const *const usize) {
     let info = UStr::new(concat!("gm82save: ", env!("ABOUT_BUILD_DATE")));

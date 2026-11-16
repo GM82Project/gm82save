@@ -1129,6 +1129,23 @@ unsafe fn load_settings(extra_data: &mut ExtraData, path: &mut PathBuf) -> Resul
     Ok(())
 }
 
+unsafe fn load_hub_cache(path: &mut PathBuf) -> Result<()> {
+    path.push("cache");
+    path.push("gm82hub.meta");
+    if path.exists() {
+        read_txt(&path, |k, v| {
+            match k {
+                "timespent" => crate::TIME_SPENT = v.parse()?,
+                _ => (),
+            }
+            Ok(())
+        })?;
+    }
+    path.pop();
+    path.pop();
+    Ok(())
+}
+
 fn load_index(name: &str, has_any: bool, path: &mut PathBuf) -> Result<Assets> {
     if !has_any {
         return Ok(Assets { index: Vec::new(), map: HashMap::new() });
@@ -1502,6 +1519,8 @@ pub unsafe fn load_gmk(mut path: PathBuf) -> Result<()> {
             show_message(message);
         }
     }
+
+    load_hub_cache(&mut path)?;
 
     update_timestamp();
 

@@ -1,6 +1,6 @@
 use crate::{
     ACTION_TOKEN, EXTRA_DATA, Error, ExtraData, GMLLines, InstanceExtra, LAST_SAVE, PATH_FORM_UPDATED, Result,
-    SAW_APPLIES_TO_WARNING, TileExtra,
+    SAW_APPLIES_TO_WARNING, TIME_SPENT, TileExtra,
     asset::*,
     delphi::{self, DelphiBox, TTreeNode, UStr, advance_progress_form},
     events,
@@ -1095,6 +1095,26 @@ unsafe fn save_icon_cache(path: &mut PathBuf, smart_save: bool) -> Result<()> {
     Ok(())
 }
 
+unsafe fn save_hub_cache(path: &mut PathBuf) -> Result<()> {
+    path.push("cache");
+    path.push("gm82hub.meta");
+    if let Ok(text) = std::fs::read_to_string(&path) {
+        let mut f = File::create(&path)?;
+        for line in text.lines() {
+            if matches!(line.split_once('='), Some(("timespent", _))) {
+                writeln!(f, "timespent={}", TIME_SPENT)?;
+            } else {
+                writeln!(f, "{}", line)?;
+            }
+        }
+    } else {
+        writeln!(File::create(&path)?, "timespent={}", TIME_SPENT)?;
+    }
+    path.pop();
+    path.pop();
+    Ok(())
+}
+
 pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
     // if we have a watcher, we can do a smart save
     // but if time went backwards, we must do a full save
@@ -1347,6 +1367,8 @@ pub unsafe fn save_gmk(path: &mut PathBuf) -> Result<()> {
     }
 
     advance_progress_form(100);
+
+    save_hub_cache(path)?;
 
     update_timestamp();
 
